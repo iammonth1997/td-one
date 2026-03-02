@@ -11,6 +11,15 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
+  function getDeviceId() {
+    let id = localStorage.getItem("tdone_device_id");
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem("tdone_device_id", id);
+    }
+    return id;
+  }
+
   async function handleLogin() {
     if (loading) return;
     setError("");
@@ -20,7 +29,7 @@ export default function LoginPage() {
       const res = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emp_id: empId, pin }),
+        body: JSON.stringify({ emp_id: empId, pin, device_id: getDeviceId() }),
       });
 
       const data = await res.json();
