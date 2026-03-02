@@ -66,11 +66,11 @@ export async function POST(req) {
     return Response.json({ error: "INVALID_PIN" }, { status: 400 });
   }
 
-  if (user.device_id_hash && user.device_id_hash !== device_id) {
-    return Response.json(
-      { error: "DEVICE_NOT_ALLOWED" },
-      { status: 403 }
-    );
+  if (user.device_id_hash) {
+    const validDevice = await bcrypt.compare(String(device_id || ""), user.device_id_hash);
+    if (!validDevice) {
+      return Response.json({ error: "DEVICE_NOT_ALLOWED" }, { status: 403 });
+    }
   }
 
   return Response.json({
