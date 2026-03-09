@@ -15,8 +15,5 @@ export default defineConfig({
     environment: 'node',
     setupFiles: ['./tests/setup.js'],
     include: ['tests/**/*.test.{js,ts,jsx,tsx}'],
-    environmentMatchGlobs: [
-      ['tests/components/**', 'jsdom'],
-    ],
   },
 });
