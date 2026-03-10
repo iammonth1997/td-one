@@ -31,6 +31,12 @@ function verifyResetToken(token) {
   }
 }
 
+function getClientIp(req) {
+  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    || req.headers.get("x-real-ip")
+    || null;
+}
+
 export async function POST(req) {
   if (!isServiceRoleEnabled) {
     return Response.json(
@@ -66,6 +72,10 @@ export async function POST(req) {
     return Response.json({ error: "INVALID_OR_EXPIRED_TOKEN" }, { status: 400 });
   }
 
+  if (payload.issued_by && payload.issued_by !== session.emp_id) {
+    return Response.json({ error: "TOKEN_ISSUER_MISMATCH" }, { status: 403 });
+  }
+
   const empId = payload.emp_id;
 
   // Verify employee is still active
@@ -92,6 +102,22 @@ export async function POST(req) {
   if (updateError) {
     console.error("reset-pin update failed:", updateError.message);
     return Response.json({ error: "UPDATE_FAILED" }, { status: 500 });
+  }
+
+  const ipAddress = getClientIp(req);
+  const userAgent = req.headers.get("user-agent") || null;
+  const { error: auditError } = await supabaseServer
+    .from("pin_reset_audit")
+    .insert({
+      target_emp_id: empId,
+      reset_by_emp_id: session.emp_id,
+      reset_by_role: session.role,
+      ip_address: ipAddress,
+      user_agent: userAgent,
+    });
+
+  if (auditError) {
+    console.error("pin reset audit insert failed:", auditError.message);
   }
 
   return Response.json({ success: true });

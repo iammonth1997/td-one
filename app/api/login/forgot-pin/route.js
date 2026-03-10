@@ -12,8 +12,12 @@ function canResetPin(role) {
   return RESET_ALLOWED_ROLES.has(normalized);
 }
 
-function generateResetToken(empId) {
-  const payload = { emp_id: empId, exp: Date.now() + TOKEN_EXPIRY_MS };
+function generateResetToken(empId, issuedByEmpId) {
+  const payload = {
+    emp_id: empId,
+    issued_by: issuedByEmpId,
+    exp: Date.now() + TOKEN_EXPIRY_MS,
+  };
   const payloadStr = Buffer.from(JSON.stringify(payload)).toString("base64url");
   const signature = crypto.createHmac("sha256", SECRET).update(payloadStr).digest("base64url");
   return `${payloadStr}.${signature}`;
@@ -113,7 +117,7 @@ export async function POST(req) {
   }
 
   // All checks passed — generate reset token
-  const token = generateResetToken(empId);
+  const token = generateResetToken(empId, session.emp_id);
 
   await clearFailedAttempts(empId);
   return Response.json({ success: true, token });
