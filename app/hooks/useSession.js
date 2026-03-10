@@ -36,6 +36,9 @@ export function useSession() {
     if (!s) {
       router.push("/login");
     } else {
+      if (s.must_change_pin && window.location.pathname !== "/change-pin") {
+        router.replace("/change-pin");
+      }
       setSession(s);
     }
     setLoading(false);

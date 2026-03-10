@@ -96,7 +96,14 @@ export async function POST(req) {
   // Update PIN in login_users
   const { error: updateError } = await supabaseServer
     .from("login_users")
-    .update({ pin_hash })
+    .update({
+      pin_hash,
+      force_pin_change: false,
+      temp_pin_expires_at: null,
+      temp_pin_issued_at: null,
+      temp_pin_issued_by: null,
+      is_registered: true,
+    })
     .eq("emp_id", empId);
 
   if (updateError) {

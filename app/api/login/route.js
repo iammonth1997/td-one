@@ -129,6 +129,12 @@ export async function POST(req) {
     return Response.json({ error: "INVALID_PIN" }, { status: 400 });
   }
 
+  const mustChangePin = Boolean(user.force_pin_change);
+  if (mustChangePin && user.temp_pin_expires_at && new Date(user.temp_pin_expires_at) < new Date()) {
+    logTiming("TEMP_PIN_EXPIRED");
+    return Response.json({ error: "TEMP_PIN_EXPIRED" }, { status: 400 });
+  }
+
   // PIN correct — run independent writes in parallel to reduce total latency.
   const recordAttemptPromise = recordLoginAttempt(empId, true, ipAddress);
   const clearFailedPromise = clearFailedAttempts(empId);
@@ -165,5 +171,6 @@ export async function POST(req) {
     role: user.role,
     status: emp.status,
     session_token: sessionToken,
+    must_change_pin: mustChangePin,
   });
 }

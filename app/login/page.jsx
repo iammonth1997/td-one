@@ -35,6 +35,7 @@ export default function LoginPage() {
         else if (data.error === "EMPLOYEE_NOT_FOUND") setError(L.errEmployeeNotFound);
         else if (data.error === "INVALID_PIN") { setPinSet(true); setError(L.errInvalidPin); }
         else if (data.error === "PIN_NOT_SET") { setPinSet(false); setError(L.errPinNotSet); }
+        else if (data.error === "TEMP_PIN_EXPIRED") setError(L.errTempPinExpired || L.errGeneral);
         else if (data.error === "ACCOUNT_BLOCKED") setError(`${L.errBlocked} (${data.reason})`);
         else if (data.error === "ACCOUNT_LOCKED") setError(L.errAccountLocked.replace("{minutes}", data.minutes_remaining || 15));
         else setError(L.errGeneral);
@@ -49,10 +50,12 @@ export default function LoginPage() {
           status: data.status,
           login_time: new Date().toISOString(),
           session_token: data.session_token,
+          must_change_pin: Boolean(data.must_change_pin),
         })
       );
 
-      router.push("/dashboard");
+      if (data.must_change_pin) router.push("/change-pin");
+      else router.push("/dashboard");
     } finally {
       setLoading(false);
     }

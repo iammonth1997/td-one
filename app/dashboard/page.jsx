@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "../components/sidebar";
 import Header from "../components/Header";
@@ -12,6 +13,12 @@ export default function Dashboard() {
   const { t } = useLanguage();
   const L = t.dashboard;
 
+  useEffect(() => {
+    if (!loading && session?.must_change_pin) {
+      router.replace("/change-pin");
+    }
+  }, [loading, session, router]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#F5F7FA] text-[#1A2B4A]">
@@ -22,6 +29,8 @@ export default function Dashboard() {
       </div>
     );
   }
+
+  if (session?.must_change_pin) return null;
 
   if (!session) return null;
 

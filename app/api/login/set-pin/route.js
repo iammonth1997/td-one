@@ -1,5 +1,6 @@
 import { isServiceRoleEnabled, supabaseServer } from "@/lib/supabaseServer";
 import bcrypt from "bcryptjs";
+import { checkRateLimit, recordLoginAttempt, clearFailedAttempts } from "@/lib/checkRateLimit";
 
 export async function POST(req) {
   if (!isServiceRoleEnabled) {
@@ -18,9 +19,20 @@ export async function POST(req) {
     return Response.json({ error: "INVALID_INPUT" }, { status: 400 });
   }
 
+  // Rate limiting
+  const { locked, minutesRemaining } = await checkRateLimit(empId);
+  if (locked) {
+    return Response.json(
+      { error: "ACCOUNT_LOCKED", minutesRemaining },
+      { status: 429 }
+    );
+  }
+
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
+
   const { data: emp, error: empQueryError } = await supabaseServer
     .from("employees")
-    .select("date_of_birth")
+    .select("date_of_birth, status")
     .eq("employee_code", empId)
     .maybeSingle();
 
@@ -33,8 +45,13 @@ export async function POST(req) {
     return Response.json({ error: "EMPLOYEE_NOT_FOUND" }, { status: 400 });
   }
 
+  if (emp.status !== "active") {
+    return Response.json({ error: "ACCOUNT_BLOCKED", reason: emp.status }, { status: 403 });
+  }
+
   const employeeDob = String(emp.date_of_birth || "").slice(0, 10);
   if (employeeDob !== dob) {
+    await recordLoginAttempt(empId, false, ip);
     return Response.json({ error: "INVALID_DOB" }, { status: 400 });
   }
 
@@ -44,7 +61,15 @@ export async function POST(req) {
   const { error: upsertError } = await supabaseServer
     .from("login_users")
     .upsert(
-      { emp_id: empId, pin_hash, is_registered: true, date_of_birth: emp.date_of_birth },
+      {
+        emp_id: empId,
+        pin_hash,
+        is_registered: true,
+        force_pin_change: false,
+        temp_pin_expires_at: null,
+        temp_pin_issued_at: null,
+        temp_pin_issued_by: null,
+      },
       { onConflict: "emp_id" }
     )
     .select("emp_id");
@@ -54,5 +79,6 @@ export async function POST(req) {
     return Response.json({ error: "UPDATE_FAILED" }, { status: 500 });
   }
 
+  await clearFailedAttempts(empId);
   return Response.json({ success: true });
 }
