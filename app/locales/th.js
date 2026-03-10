@@ -19,7 +19,7 @@ const th = {
     errAccountLocked: "ป้อนรหัสผิดหลายครั้ง กรุณาลองใหม่ใน {minutes} นาที",
     errSessionExpired: "เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง",
     forgotPin: "ลืมรหัส PIN?",
-    forgotPinLink: "รีเซ็ต PIN ที่นี่",
+    forgotPinLink: "ติดต่อ HR Payroll เพื่อรีเซ็ต",
   },
   setPin: {
     title: "ตั้งรหัส PIN",
@@ -143,6 +143,7 @@ const th = {
     errInvalidStartDate: "เดือน/ปีเริ่มงานไม่ถูกต้อง",
     errBlocked: "บัญชีนี้ถูกระงับ",
     errNotRegistered: "บัญชีนี้ยังไม่ได้ตั้ง PIN",
+    errForbidden: "เฉพาะ HR Payroll เท่านั้นที่รีเซ็ตรหัส PIN ได้",
     errGeneral: "เกิดข้อผิดพลาด กรุณาลองใหม่",
   },
   resetPin: {
@@ -158,6 +159,7 @@ const th = {
     errPinLength: "PIN ต้องมีอย่างน้อย 4 ตัวเลข",
     errPinMismatch: "รหัส PIN ไม่ตรงกัน",
     errTokenExpired: "ลิงก์รีเซ็ตหมดอายุ กรุณาลองใหม่",
+    errForbidden: "เฉพาะ HR Payroll เท่านั้นที่รีเซ็ตรหัส PIN ได้",
     errGeneral: "เกิดข้อผิดพลาด กรุณาลองใหม่",
     successMsg: "ตั้งรหัส PIN ใหม่สำเร็จ! กำลังไปหน้าเข้าสู่ระบบ...",
   },

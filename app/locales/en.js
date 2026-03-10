@@ -19,7 +19,7 @@ const en = {
     errAccountLocked: "Too many failed attempts. Please try again in {minutes} minutes",
     errSessionExpired: "Session expired. Please log in again",
     forgotPin: "Forgot PIN?",
-    forgotPinLink: "Reset PIN here",
+    forgotPinLink: "Contact HR Payroll to reset",
   },
   setPin: {
     title: "Set Your PIN",
@@ -143,6 +143,7 @@ const en = {
     errInvalidStartDate: "Incorrect start month/year",
     errBlocked: "Account is blocked",
     errNotRegistered: "This account has no PIN set yet",
+    errForbidden: "Only HR Payroll can reset employee PIN.",
     errGeneral: "An error occurred. Please try again",
   },
   resetPin: {
@@ -158,6 +159,7 @@ const en = {
     errPinLength: "PIN must be at least 4 digits",
     errPinMismatch: "PIN does not match",
     errTokenExpired: "Reset link has expired. Please try again",
+    errForbidden: "Only HR Payroll can reset employee PIN.",
     errGeneral: "An error occurred. Please try again",
     successMsg: "PIN reset successfully! Redirecting to Login...",
   },

@@ -127,10 +127,7 @@ export default function LoginPage() {
         )}
 
         <p className={`text-center text-[#6B7A99] text-xs ${pinSet !== true ? "mt-2" : "mt-4"}`}>
-          {L.forgotPin}{" "}
-          <Link href="/forgot-pin" className="text-[#1352A3] hover:underline font-medium">
-            {L.forgotPinLink}
-          </Link>
+          {L.forgotPin} {L.forgotPinLink}
         </p>
 
         <p className="text-center text-[#6B7A99] text-xs mt-2">

@@ -19,7 +19,7 @@ const lo = {
     errAccountLocked: "ປ້ອນລະຫັດຜິດຫຼາຍຄັ້ງ ກະລຸນາລອງໃໝ່ໃນ {minutes} ນາທີ",
     errSessionExpired: "ເຊສຊັນໝົດອາຍຸ ກະລຸນາເຂົ້າສູ່ລະບົບອີກຄັ້ງ",
     forgotPin: "ລືມລະຫັດຜ່ານ?",
-    forgotPinLink: "ຕັ້ງລະຫັດຜ່ານໃໝ່ ບ່ອນນີ້",
+    forgotPinLink: "ຕິດຕໍ່ HR Payroll ເພື່ອຕັ້ງໃໝ່",
   },
   setPin: {
     title: "ຕັ້ງລະຫັດຜ່ານ",
@@ -143,6 +143,7 @@ const lo = {
     errInvalidStartDate: "ເດືອນ/ປີເລີ່ມງານບໍ່ຖືກຕ້ອງ",
     errBlocked: "ບັນຊີນີ້ຖືກລະງັບ",
     errNotRegistered: "ບັນຊີນີ້ຍັງບໍ່ໄດ້ຕັ້ງລະຫັດຜ່ານ",
+    errForbidden: "ມີພຽງ HR Payroll ເທົ່ານັ້ນທີ່ສາມາດຕັ້ງລະຫັດຜ່ານໃໝ່ໄດ້",
     errGeneral: "ເກີດຂໍ້ຜິດພາດ ກະລຸນາລອງໃໝ່",
   },
   resetPin: {
@@ -158,6 +159,7 @@ const lo = {
     errPinLength: "ລະຫັດຜ່ານ ຕ້ອງມີຢ່າງໜ້ອຍ 4 ຕົວເລກ",
     errPinMismatch: "ລະຫັດຜ່ານ ບໍ່ກົງກັນ",
     errTokenExpired: "ລິ້ງຕັ້ງລະຫັດຜ່ານໝົດອາຍຸ ກະລຸນາລອງໃໝ່",
+    errForbidden: "ມີພຽງ HR Payroll ເທົ່ານັ້ນທີ່ສາມາດຕັ້ງລະຫັດຜ່ານໃໝ່ໄດ້",
     errGeneral: "ເກີດຂໍ້ຜິດພາດ ກະລຸນາລອງໃໝ່",
     successMsg: "ຕັ້ງລະຫັດຜ່ານໃໝ່ສຳເລັດ! ກຳລັງໄປໜ້າເຂົ້າສູ່ລະບົບ...",
   },
