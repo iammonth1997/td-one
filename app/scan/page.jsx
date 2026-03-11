@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "@/app/hooks/useSession";
 import { useLanguage } from "@/app/context/LanguageContext";
 import { useLiff } from "@/app/hooks/useLiff";
+import { uploadToCloudinaryWithSignature } from "@/lib/cloudinaryUtils";
 
 function makeDeviceId() {
   const key = "tdone_device_id";
@@ -255,6 +256,22 @@ export default function ScanPage() {
     setFeedback({ type: "", message: "" });
 
     try {
+      let uploadedSelfieUrl = null;
+
+      // Upload selfie to Cloudinary if camera was enabled and image was captured
+      if (cameraEnabled && selfieDataUrl) {
+        try {
+          setFeedback({ type: "", message: "กำลังอัปโหลดรูปถ่าย..." });
+          uploadedSelfieUrl = await uploadToCloudinaryWithSignature(selfieDataUrl, "tdone-attendance/scan");
+        } catch (uploadError) {
+          setFeedback({
+            type: "error",
+            message: `${L.uploadFailed || "Upload failed"}: ${uploadError.message}`,
+          });
+          return;
+        }
+      }
+
       const res = await fetch("/api/attendance/scan", {
         method: "POST",
         headers: {
@@ -271,7 +288,7 @@ export default function ScanPage() {
           device_id: makeDeviceId(),
           device_name: navigator.userAgent,
           face_verified: false,
-          selfie_url: cameraEnabled ? selfieDataUrl : null,
+          selfie_url: uploadedSelfieUrl,
         }),
       });
 
