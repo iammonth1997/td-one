@@ -41,5 +41,6 @@ export async function POST(req) {
     signature,
     timestamp,
     cloudName,
+    apiKey,
   });
 }

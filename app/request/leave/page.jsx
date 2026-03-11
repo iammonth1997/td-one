@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/app/hooks/useSession";
 import { useLanguage } from "@/app/context/LanguageContext";
+import { uploadFileToCloudinaryWithSignature } from "@/lib/cloudinaryUtils";
 
 function calcLeaveDays(startDate, endDate) {
   if (!startDate || !endDate || startDate > endDate) return 0;
@@ -12,15 +13,6 @@ function calcLeaveDays(startDate, endDate) {
   const end = new Date(endDate);
   const diff = (end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000);
   return Number((diff + 1).toFixed(1));
-}
-
-function fileToDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
 }
 
 export default function RequestLeavePage() {
@@ -97,7 +89,11 @@ export default function RequestLeavePage() {
     try {
       let attachment = form.attachment_url || "";
       if (!attachment && form.attachment_file) {
-        attachment = await fileToDataUrl(form.attachment_file);
+        setSuccess("กำลังอัปโหลดไฟล์แนบ...");
+        attachment = await uploadFileToCloudinaryWithSignature(
+          form.attachment_file,
+          "tdone-attachments/leave"
+        );
       }
 
       const res = await fetch("/api/leave-request", {
