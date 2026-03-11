@@ -40,6 +40,20 @@ export default function Dashboard() {
 
   const services = [
     {
+      key: "scanInOut",
+      title: L.scanInOut,
+      desc: L.scanInOutDesc,
+      href: "/scan",
+      icon: (
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="4" width="18" height="16" rx="2" />
+          <path d="M8 10h8M8 14h5" />
+          <path d="M13 2v4" />
+        </svg>
+      ),
+      iconBg: "bg-[#0F8B6D]",
+    },
+    {
       key: "dayWork",
       title: L.checkDayWork,
       desc: L.checkDayWorkDesc,

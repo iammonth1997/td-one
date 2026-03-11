@@ -66,6 +66,16 @@ See [`.env.example`](.env.example) for required variables.
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service role key (server-side only) |
+| `NEXT_PUBLIC_APP_BASE_URL` | For LIFF | Public app URL (e.g. `https://your-domain`) |
+| `NEXT_PUBLIC_LIFF_ID` | For LIFF | LIFF App ID from LINE Developers |
+| `LINE_CHANNEL_ACCESS_TOKEN` | For Rich Menu | Messaging API token (server-side only) |
+| `LINE_ADMIN_API_KEY` | Optional | Extra API key for rich-menu endpoints |
+
+## LINE LIFF + Rich Menu
+
+- LIFF page route: `/liff`
+- Rich Menu API route: `/api/line/rich-menu`
+- Full setup guide: `docs/line-liff-richmenu.md`
 
 ## First-Time Login Flow
 

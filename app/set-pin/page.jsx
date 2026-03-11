@@ -1,9 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useLanguage } from "@/app/context/LanguageContext";
+import LanguageSwitcher from "@/app/components/LanguageSwitcher";
 
 export default function SetPinPage() {
+  const router = useRouter();
   const [empId, setEmpId] = useState("");
   const [dob, setDob] = useState("");
   const [pin, setPin] = useState("");
@@ -11,6 +15,8 @@ export default function SetPinPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const { t } = useLanguage();
+  const L = t.setPin;
 
   async function handleSetPin() {
     if (loading) return;
@@ -18,12 +24,12 @@ export default function SetPinPage() {
     setSuccess("");
 
     if (pin.length < 4) {
-      setError("PIN ต้องมีอย่างน้อย 4 ตัวเลข");
+      setError(L.errPinLength);
       return;
     }
 
     if (pin !== confirmPin) {
-      setError("PIN ไม่ตรงกัน");
+      setError(L.errPinMismatch);
       return;
     }
 
@@ -39,79 +45,85 @@ export default function SetPinPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        if (data.error === "EMPLOYEE_NOT_FOUND") setError("ไม่พบรหัสพนักงานนี้");
-        else if (data.error === "INVALID_DOB") setError("วันเกิดไม่ถูกต้อง");
-        else setError(data.error || "เกิดข้อผิดพลาด");
+        if (data.error === "EMPLOYEE_NOT_FOUND") setError(L.errNotFound);
+        else if (data.error === "INVALID_DOB") setError(L.errInvalidDob);
+        else if (data.error === "ACCOUNT_BLOCKED") setError(L.errBlocked);
+        else setError(data.error || L.errGeneral);
         return;
       }
 
-      setSuccess("ตั้ง PIN สำเร็จ! กรุณาไปหน้า Login");
+      setSuccess(L.successMsg);
+      setTimeout(() => router.push("/login"), 1500);
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-black">
-      <div className="w-full max-w-sm bg-gray-900 border border-red-600 rounded-xl p-8 shadow-xl">
+    <div className="min-h-screen flex items-center justify-center bg-[#E8F0FB]">
+      <div className="w-full max-w-sm bg-white border border-[#D0D8E4] rounded-2xl p-8 shadow-[0_4px_24px_rgba(13,59,122,0.10)]">
 
-        <h1 className="text-3xl font-bold text-center text-white mb-6">
-          Set Your PIN
+        <div className="flex justify-end mb-4">
+          <LanguageSwitcher />
+        </div>
+
+        <h1 className="text-2xl font-bold text-center text-[#1A2B4A] mb-6">
+          {L.title}
         </h1>
 
-        <label className="text-white text-sm">Employee ID</label>
+        <label className="text-[#334260] text-sm font-medium">{L.empIdLabel}</label>
         <input
           type="text"
           value={empId}
           onChange={(e) => setEmpId(e.target.value)}
-          className="w-full mt-1 mb-4 p-2 rounded bg-gray-800 text-white border border-gray-700 focus:outline-none focus:border-red-500"
-          placeholder="Enter Employee ID"
+          className="w-full mt-1 mb-4 p-2.5 rounded-lg bg-[#F5F7FA] text-[#1A2B4A] border border-[#D0D8E4] focus:outline-none focus:border-[#1352A3] focus:ring-1 focus:ring-[#1352A3]"
+          placeholder={L.empIdPlaceholder}
           disabled={loading}
         />
 
-        <label className="text-white text-sm">Date of Birth</label>
+        <label className="text-[#334260] text-sm font-medium">{L.dobLabel}</label>
         <input
           type="date"
           value={dob}
           onChange={(e) => setDob(e.target.value)}
-          className="w-full mt-1 mb-4 p-2 rounded bg-gray-800 text-white border border-gray-700 focus:outline-none focus:border-red-500"
+          className="w-full mt-1 mb-4 p-2.5 rounded-lg bg-[#F5F7FA] text-[#1A2B4A] border border-[#D0D8E4] focus:outline-none focus:border-[#1352A3] focus:ring-1 focus:ring-[#1352A3]"
           disabled={loading}
         />
 
-        <label className="text-white text-sm">New PIN (อย่างน้อย 4 ตัว)</label>
+        <label className="text-[#334260] text-sm font-medium">{L.pinLabel}</label>
         <input
           type="password"
           value={pin}
           onChange={(e) => setPin(e.target.value)}
-          className="w-full mt-1 mb-4 p-2 rounded bg-gray-800 text-white border border-gray-700 focus:outline-none focus:border-red-500"
-          placeholder="Enter PIN"
+          className="w-full mt-1 mb-4 p-2.5 rounded-lg bg-[#F5F7FA] text-[#1A2B4A] border border-[#D0D8E4] focus:outline-none focus:border-[#1352A3] focus:ring-1 focus:ring-[#1352A3]"
+          placeholder={L.pinPlaceholder}
           disabled={loading}
         />
 
-        <label className="text-white text-sm">Confirm PIN</label>
+        <label className="text-[#334260] text-sm font-medium">{L.confirmPinLabel}</label>
         <input
           type="password"
           value={confirmPin}
           onChange={(e) => setConfirmPin(e.target.value)}
-          className="w-full mt-1 mb-4 p-2 rounded bg-gray-800 text-white border border-gray-700 focus:outline-none focus:border-red-500"
-          placeholder="Confirm PIN"
+          className="w-full mt-1 mb-4 p-2.5 rounded-lg bg-[#F5F7FA] text-[#1A2B4A] border border-[#D0D8E4] focus:outline-none focus:border-[#1352A3] focus:ring-1 focus:ring-[#1352A3]"
+          placeholder={L.confirmPinPlaceholder}
           disabled={loading}
         />
 
-        {error && <p className="text-red-400 text-sm mb-3 text-center">{error}</p>}
-        {success && <p className="text-green-400 text-sm mb-3 text-center">{success}</p>}
+        {error && <p className="text-red-500 text-sm mb-3 text-center">{error}</p>}
+        {success && <p className="text-green-600 text-sm mb-3 text-center">{success}</p>}
 
         <button
           onClick={handleSetPin}
           disabled={loading}
-          className="w-full py-2 mt-2 bg-red-700 hover:bg-red-800 disabled:opacity-50 text-white font-semibold rounded-lg shadow-lg"
+          className="w-full py-2.5 mt-2 bg-[#1352A3] hover:bg-[#0D3B7A] disabled:opacity-50 text-white font-semibold rounded-lg shadow transition"
         >
-          {loading ? "กำลังบันทึก..." : "Set PIN"}
+          {loading ? L.loadingBtn : L.setPinBtn}
         </button>
 
-        <p className="text-center text-gray-400 text-xs mt-4">
-          <Link href="/login" className="text-red-400 hover:underline">
-            กลับหน้า Login
+        <p className="text-center text-[#6B7A99] text-xs mt-4">
+          <Link href="/login" className="text-[#1352A3] hover:underline font-medium">
+            {L.backToLogin}
           </Link>
         </p>
 
