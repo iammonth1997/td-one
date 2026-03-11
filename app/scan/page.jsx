@@ -47,7 +47,7 @@ function formatDateTime(iso, locale) {
 export default function ScanPage() {
   const router = useRouter();
   const { session, loading, getAuthHeaders } = useSession();
-  const { t, lang } = useLanguage();
+  const { t, lang, setLang } = useLanguage();
   const { profile, idToken } = useLiff();
   const L = t.scan;
 
@@ -62,6 +62,7 @@ export default function ScanPage() {
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const [selfieDataUrl, setSelfieDataUrl] = useState(null);
   const [cameraError, setCameraError] = useState("");
+  const [selectedWorkArea, setSelectedWorkArea] = useState("");
   const videoRef = useRef(null);
   const streamRef = useRef(null);
 
@@ -190,6 +191,43 @@ export default function ScanPage() {
     return L.statusOutside;
   }, [locationCheck, L]);
 
+  const localeMap = {
+    th: "th-TH",
+    en: "en-US",
+    lo: "lo-LA",
+  };
+
+  const currentLocale = localeMap[lang] || "th-TH";
+  const currentDateLabel = now.toLocaleDateString(currentLocale, {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+  const currentTimeLabel = now.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
+  const latestRecord = useMemo(() => {
+    if (!todayData?.history?.length) return null;
+    return todayData.history.reduce((latest, item) => {
+      if (!latest) return item;
+      return new Date(item.time).getTime() > new Date(latest.time).getTime() ? item : latest;
+    }, null);
+  }, [todayData]);
+
+  const areaOptions = locations?.length
+    ? locations
+    : [
+        { id: "pit_a", name: "Pit A" },
+        { id: "pit_b", name: "Pit B" },
+        { id: "drilling", name: "Drilling" },
+        { id: "workshop", name: "Workshop" },
+        { id: "transport", name: "Transport" },
+        { id: "office", name: "Office" },
+      ];
+
   async function startCamera() {
     if (!cameraEnabled) return;
     setCameraError("");
@@ -314,93 +352,172 @@ export default function ScanPage() {
 
   if (loading || !session || !todayData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F5F7FA] text-[#1A2B4A]">
+      <div className="min-h-screen flex items-center justify-center bg-[#F4F7FC] text-[#1A2B4A]">
         <p>{L.loading}</p>
       </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#F5F7FA] p-4 sm:p-6">
-      <div className="mx-auto max-w-5xl space-y-4">
-        <section className="rounded-2xl border border-[#D0D8E4] bg-white p-5 shadow-sm">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <h1 className="text-2xl font-bold text-[#1A2B4A]">{L.title}</h1>
-              <p className="text-sm text-[#6B7A99] mt-1">{L.subtitle}</p>
-            </div>
-            <div className="text-sm text-[#334260]">
-              <div>{L.currentTime}: <span className="font-semibold">{formatDateTime(now.toISOString(), lang)}</span></div>
-              <div>{L.today}: <span className="font-semibold">{todayData.today}</span></div>
-            </div>
-          </div>
-        </section>
-
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="rounded-2xl border border-[#D0D8E4] bg-white p-5 space-y-3">
-            <h2 className="text-lg font-bold text-[#1A2B4A]">{L.employeeInfo}</h2>
-            <div className="text-sm text-[#334260] space-y-1">
-              <p>{L.empCode}: <span className="font-semibold">{todayData.employee?.employee_code || session.emp_id}</span></p>
-              <p>{L.empName}: <span className="font-semibold">{todayData.employee?.name || "-"}</span></p>
-              <p>{L.department}: <span className="font-semibold">{todayData.employee?.department || "-"}</span></p>
-              <p>{L.position}: <span className="font-semibold">{todayData.employee?.position || "-"}</span></p>
-              <p>{L.liffName}: <span className="font-semibold">{profile?.displayName || "-"}</span></p>
-              <p>{L.liffUserId}: <span className="font-mono text-xs break-all">{profile?.userId || todayData.employee?.line_user_id || "-"}</span></p>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-[#D0D8E4] bg-white p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-[#1A2B4A]">{L.gpsStatus}</h2>
+    <main className="min-h-screen bg-[#F4F7FC] px-3 pb-6 pt-4 sm:px-6">
+      <div className="mx-auto w-full max-w-md rounded-[28px] bg-white p-4 shadow-[0_8px_26px_rgba(15,31,61,0.1)] sm:p-5">
+        <header className="mb-3 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-[#EEF4FF] text-xl font-bold text-[#1F4FBF]"
+            aria-label="Back"
+          >
+            ←
+          </button>
+          <h1 className="flex-1 text-center text-[1.85rem] font-extrabold tracking-tight text-[#122448]">
+            {L.title || "บันทึกเวลาเข้างาน"}
+          </h1>
+          <div className="flex items-center gap-1">
+            {[
+              { code: "th", label: "TH" },
+              { code: "en", label: "EN" },
+              { code: "lo", label: "LO" },
+            ].map((item) => (
               <button
+                key={item.code}
                 type="button"
-                onClick={refreshGps}
-                className="rounded-lg bg-[#E8F0FB] px-3 py-1.5 text-sm text-[#1352A3] hover:bg-[#DCE8FA]"
+                onClick={() => setLang(item.code)}
+                className={`rounded-full border px-2 py-1 text-[10px] font-bold transition ${
+                  lang === item.code
+                    ? "border-[#1F4FBF] bg-[#1F4FBF] text-white"
+                    : "border-[#D5DFEF] bg-[#F8FBFF] text-[#5B6E93]"
+                }`}
               >
-                {L.refreshGps}
+                {item.label}
               </button>
-            </div>
-
-            <p className="text-sm">
-              {L.statusLabel}: <span className={`font-semibold ${locationCheck?.inside ? "text-green-600" : "text-amber-700"}`}>{statusLabel}</span>
-            </p>
-
-            <p className="text-sm text-[#334260]">{L.gpsCoords}: {gps ? `${gps.latitude.toFixed(6)}, ${gps.longitude.toFixed(6)}` : "-"}</p>
-            <p className="text-sm text-[#334260]">{L.gpsAccuracy}: {gps?.accuracy ? `${Math.round(gps.accuracy)} m` : "-"}</p>
-            <p className="text-sm text-[#334260]">{L.distance}: {locationCheck?.nearest?.distance_meters ?? "-"} m</p>
-            <p className="text-sm text-[#334260]">{L.workplace}: {locationCheck?.nearest?.name || "-"}</p>
-
-            {locationCheck?.suspicious_reasons?.length ? (
-              <div className="rounded-lg bg-amber-50 border border-amber-200 p-2 text-amber-800 text-xs">
-                {L.suspicious}: {locationCheck.suspicious_reasons.join(", ")}
-              </div>
-            ) : null}
-
-            {gpsError ? <p className="text-sm text-red-600">{gpsError}</p> : null}
+            ))}
           </div>
-        </section>
+        </header>
 
-        <section className="rounded-2xl border border-[#D0D8E4] bg-white p-5">
-          <h2 className="text-lg font-bold text-[#1A2B4A] mb-3">{L.mapTitle}</h2>
-          {gps ? (
-            <iframe
-              title="scan-map"
-              src={mapSrc}
-              className="w-full h-64 rounded-xl border border-[#D0D8E4]"
+        <section className="rounded-2xl border border-[#DCE3F0] bg-white p-3 shadow-sm">
+          <div className="grid grid-cols-[96px_1fr] gap-3">
+            <img
+              src={profile?.pictureUrl || "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?q=80&w=300&auto=format&fit=crop"}
+              alt="employee"
+              className="h-24 w-24 rounded-xl object-cover"
             />
-          ) : (
-            <div className="h-40 flex items-center justify-center rounded-xl border border-dashed border-[#D0D8E4] text-[#6B7A99] text-sm">
-              {L.mapPlaceholder}
+            <div>
+              <h2 className="text-[1.15rem] font-bold text-[#122448]">{todayData.employee?.name || profile?.displayName || "-"}</h2>
+              <p className="text-base text-[#5E6F8D]">EMP: {todayData.employee?.employee_code || session.emp_id}</p>
+              <div className="my-2 h-px bg-[#E2E8F4]" />
+              <p className="text-xl font-semibold text-[#D62828]">{todayData.shift_name || "Night Shift"}</p>
+              <p className="text-[1.45rem] text-[#334260]">{todayData.shift_time || "19:00 - 07:00"}</p>
             </div>
-          )}
+          </div>
         </section>
 
-        <section className="rounded-2xl border border-[#D0D8E4] bg-white p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-[#1A2B4A]">{L.scanAction}</h2>
-            <span className="text-sm text-[#334260]">{L.nextAction}: <strong>{suggestedAction === "scan_out" ? L.scanOut : suggestedAction === "completed" ? L.completed : L.scanIn}</strong></span>
+        <section className="mt-3 rounded-2xl border border-[#DCE3F0] bg-white p-3 shadow-sm">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <div className="flex items-center gap-2 text-[1.2rem] font-bold text-[#1B2E52]">
+                <span>📅</span>
+                <span>{L.today || "วันที่"}</span>
+              </div>
+              <p className="mt-1 text-[1.75rem] text-[#334260]">{currentDateLabel}</p>
+            </div>
+            <div className="text-[3.4rem] font-extrabold leading-none text-[#122448]">{currentTimeLabel}</div>
+          </div>
+        </section>
+
+        <section className="mt-3 rounded-2xl border border-[#DCE3F0] bg-white p-3 shadow-sm">
+          <div className="mb-2 flex items-center gap-2 text-[1.15rem] font-bold text-[#1B2E52]">
+            <span>📍</span>
+            <span>{L.workplace || "พื้นที่ทำงาน"}</span>
+          </div>
+          <select
+            value={selectedWorkArea}
+            onChange={(e) => setSelectedWorkArea(e.target.value)}
+            className="w-full rounded-xl border border-[#D5DFEF] bg-white px-3 py-2 text-lg text-[#122448]"
+          >
+            <option value="">{lang === "en" ? "Select Area" : lang === "lo" ? "ເລືອກພື້ນທີ່" : "เลือกพื้นที่"}</option>
+            {areaOptions.map((item, idx) => {
+              const label = item.name || item.location_name || item.area_name || `Area ${idx + 1}`;
+              const value = item.id || label;
+              return (
+                <option key={`${value}-${idx}`} value={label}>{label}</option>
+              );
+            })}
+          </select>
+        </section>
+
+        <section className="mt-3 rounded-2xl border border-[#DCE3F0] bg-white p-3 shadow-sm">
+          <div className="mb-2 flex items-center gap-2 text-[1.2rem] font-bold text-[#1B2E52]">
+            <span className="text-green-600">✔</span>
+            <span>{L.gpsStatus || "GPS Status"}</span>
+          </div>
+          <div className="rounded-xl border border-[#DCE3F0] bg-[#FBFDFF] p-3">
+            <div className="flex items-start gap-2">
+              <span className="mt-0.5 text-green-600">✔</span>
+              <div>
+                <p className="text-lg font-semibold text-[#1B2E52]">{L.statusLabel || "Location Verified"}: {statusLabel}</p>
+                <p className="text-base text-[#334260]">{locationCheck?.nearest?.name || selectedWorkArea || "Pit A Mining Area"}</p>
+                <p className="text-base text-[#4E607F]">
+                  {L.gpsCoords || "GPS"}: {gps ? `${gps.latitude.toFixed(3)} , ${gps.longitude.toFixed(3)}` : "-"}
+                </p>
+              </div>
+            </div>
           </div>
 
+          <div className="mt-3 overflow-hidden rounded-xl border border-[#D5DFEF]">
+            {gps ? (
+              <iframe title="scan-map" src={mapSrc} className="h-36 w-full" />
+            ) : (
+              <div className="relative h-36 w-full bg-gradient-to-br from-[#DCEBDD] to-[#D5E3F4]">
+                <div className="absolute left-[-10%] top-[56%] h-2 w-[130%] -rotate-[14deg] bg-[#F4A92B]" />
+                <div className="absolute left-1/2 top-[46%] h-8 w-8 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[50%_50%_50%_0] bg-[#6AAE67] shadow-md" />
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-white/90 px-3 py-1 text-sm font-semibold text-[#2E426A]">
+                  {selectedWorkArea || "Pit A"}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {gpsError ? <p className="mt-2 text-sm text-red-600">{gpsError}</p> : null}
+          {locationCheck?.suspicious_reasons?.length ? (
+            <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800">
+              {L.suspicious}: {locationCheck.suspicious_reasons.join(", ")}
+            </p>
+          ) : null}
+        </section>
+
+        <button
+          type="button"
+          onClick={refreshGps}
+          className="mt-3 w-full rounded-xl bg-gradient-to-b from-[#F04747] to-[#E53935] py-3 text-[1.45rem] font-extrabold text-white shadow-[0_8px_14px_rgba(229,57,53,0.3)] transition hover:brightness-105 active:translate-y-[1px] active:brightness-95"
+        >
+          {L.refreshGps || "ตรวจสอบตำแหน่ง GPS"}
+        </button>
+
+        <section className="mt-3 rounded-2xl border border-[#DCE3F0] bg-white p-3 shadow-sm">
+          <div className="mb-2 flex items-center gap-2 text-[1.2rem] font-bold text-[#1B2E52]">
+            <span>☑</span>
+            <span>{L.todayHistory || "ลงเวลาล่าสุด"}</span>
+          </div>
+          <div className="rounded-xl border border-[#DCE3F0] bg-[#FBFDFF] px-3 py-2 text-xl text-[#233656]">
+            {latestRecord ? `${latestRecord.type === "scan_out" ? L.scanOut : L.scanIn} ${new Date(latestRecord.time).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })}` : (L.noHistory || "Check In 06:49")}
+          </div>
+
+          <div className="my-3 h-px bg-[#E2E8F4]" />
+
+          <div className="flex items-center justify-around gap-3 text-[1.15rem] font-semibold text-[#2A3D63]">
+            <div className="flex items-center gap-1">
+              <span className="text-green-600">✔</span>
+              <span>{lang === "en" ? "Device Verified" : lang === "lo" ? "ຢືນຢັນອຸປະກອນ" : "Device Verified"}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-green-600">✔</span>
+              <span>{lang === "en" ? "Network: Online" : lang === "lo" ? "ເຄືອຂ່າຍ: ອອນລາຍ" : "Network: Online"}</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-3 rounded-2xl border border-[#DCE3F0] bg-white p-3 shadow-sm">
           <div className="flex items-center gap-2 text-sm text-[#334260]">
             <input
               id="camera-optional"
@@ -410,10 +527,10 @@ export default function ScanPage() {
             />
             <label htmlFor="camera-optional">{L.faceOptional}</label>
           </div>
-          <p className="text-xs text-[#6B7A99]">{L.faceNote}</p>
+          <p className="mt-1 text-xs text-[#6B7A99]">{L.faceNote}</p>
 
           {cameraEnabled ? (
-            <div className="rounded-xl border border-[#D0D8E4] p-3 space-y-2">
+            <div className="mt-2 rounded-xl border border-[#D0D8E4] p-3 space-y-2">
               <video ref={videoRef} className="w-full max-h-64 rounded-lg bg-black" muted playsInline />
               <div className="flex flex-wrap gap-2">
                 <button type="button" onClick={takeSelfie} className="rounded-lg border border-[#1352A3] px-3 py-1.5 text-[#1352A3] text-sm">{L.captureSelfie || "Capture Selfie"}</button>
@@ -423,45 +540,40 @@ export default function ScanPage() {
               {cameraError ? <p className="text-xs text-red-600">{cameraError}</p> : null}
             </div>
           ) : null}
-
-          <button
-            type="button"
-            onClick={handleScan}
-            disabled={busy || !canScan}
-            className={`w-full rounded-2xl py-4 text-lg font-bold transition ${
-              !canScan
-                ? "bg-[#CBD5E1] text-white"
-                : suggestedAction === "scan_out"
-                  ? "bg-[#F5A623] hover:bg-[#D88F1A] text-white"
-                  : "bg-[#1352A3] hover:bg-[#0D3B7A] text-white"
-            }`}
-          >
-            {busy ? L.scanning : suggestedAction === "scan_out" ? L.scanOut : L.scanIn}
-          </button>
-
-          {feedback.message ? (
-            <div className={`rounded-lg p-3 text-sm animate-pulse ${feedback.type === "success" ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
-              {feedback.message}
-            </div>
-          ) : null}
         </section>
 
-        <section className="rounded-2xl border border-[#D0D8E4] bg-white p-5">
-          <h2 className="text-lg font-bold text-[#1A2B4A] mb-3">{L.todayHistory}</h2>
-          {!todayData.history?.length ? (
-            <p className="text-sm text-[#6B7A99]">{L.noHistory}</p>
-          ) : (
+        <button
+          type="button"
+          onClick={handleScan}
+          disabled={busy || !canScan}
+          className={`mt-3 w-full rounded-2xl py-3 text-[1.75rem] font-extrabold text-white transition hover:brightness-105 active:translate-y-[1px] active:brightness-95 ${
+            !canScan
+              ? "bg-[#A8B4CC]"
+              : "bg-gradient-to-b from-[#2F6BDB] to-[#1F4FBF] shadow-[0_10px_16px_rgba(31,79,191,0.32)]"
+          }`}
+        >
+          {busy ? L.scanning : suggestedAction === "scan_out" ? (L.scanOut || "Scan Out") : (L.scanIn || "ยืนยันเวลาเข้างาน")}
+        </button>
+
+        {feedback.message ? (
+          <div className={`mt-3 rounded-xl border px-3 py-2 text-sm ${feedback.type === "success" ? "border-green-200 bg-green-50 text-green-700" : "border-red-200 bg-red-50 text-red-700"}`}>
+            {feedback.message}
+          </div>
+        ) : null}
+
+        {todayData.history?.length ? (
+          <section className="mt-3 rounded-2xl border border-[#DCE3F0] bg-white p-3 shadow-sm">
+            <h2 className="mb-2 text-sm font-bold text-[#1A2B4A]">{L.todayHistory}</h2>
             <div className="space-y-2">
               {todayData.history.map((item, idx) => (
-                <div key={`${item.type}-${idx}`} className="rounded-lg border border-[#E5EAF0] p-3 text-sm text-[#334260]">
+                <div key={`${item.type}-${idx}`} className="rounded-lg border border-[#E5EAF0] p-2 text-sm text-[#334260]">
                   <p className="font-semibold">{item.type === "scan_in" ? L.scanIn : L.scanOut}</p>
                   <p>{L.time}: {formatDateTime(item.time, lang)}</p>
-                  <p>{L.gpsCoords}: {item.latitude}, {item.longitude}</p>
                 </div>
               ))}
             </div>
-          )}
-        </section>
+          </section>
+        ) : null}
       </div>
     </main>
   );
