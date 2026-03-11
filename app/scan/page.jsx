@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/app/hooks/useSession";
 import { useLanguage } from "@/app/context/LanguageContext";
@@ -59,6 +59,10 @@ export default function ScanPage() {
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState({ type: "", message: "" });
   const [cameraEnabled, setCameraEnabled] = useState(false);
+  const [selfieDataUrl, setSelfieDataUrl] = useState(null);
+  const [cameraError, setCameraError] = useState("");
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -185,6 +189,62 @@ export default function ScanPage() {
     return L.statusOutside;
   }, [locationCheck, L]);
 
+  async function startCamera() {
+    if (!cameraEnabled) return;
+    setCameraError("");
+
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setCameraError(L.cameraNotSupported || "Camera not supported");
+        return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play().catch(() => {});
+      }
+    } catch (e) {
+      setCameraError(e?.message || L.cameraStartFailed || "Cannot start camera");
+    }
+  }
+
+  function stopCamera() {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  }
+
+  function takeSelfie() {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth || 320;
+    canvas.height = video.videoHeight || 240;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    setSelfieDataUrl(canvas.toDataURL("image/jpeg", 0.8));
+  }
+
+  useEffect(() => {
+    if (cameraEnabled) {
+      startCamera();
+    } else {
+      stopCamera();
+      setSelfieDataUrl(null);
+      setCameraError("");
+    }
+
+    return () => {
+      stopCamera();
+    };
+  }, [cameraEnabled]);
+
   async function handleScan() {
     if (!gps) {
       setFeedback({ type: "error", message: L.needGpsFirst });
@@ -211,7 +271,7 @@ export default function ScanPage() {
           device_id: makeDeviceId(),
           device_name: navigator.userAgent,
           face_verified: false,
-          selfie_url: null,
+          selfie_url: cameraEnabled ? selfieDataUrl : null,
         }),
       });
 
@@ -335,6 +395,18 @@ export default function ScanPage() {
           </div>
           <p className="text-xs text-[#6B7A99]">{L.faceNote}</p>
 
+          {cameraEnabled ? (
+            <div className="rounded-xl border border-[#D0D8E4] p-3 space-y-2">
+              <video ref={videoRef} className="w-full max-h-64 rounded-lg bg-black" muted playsInline />
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={takeSelfie} className="rounded-lg border border-[#1352A3] px-3 py-1.5 text-[#1352A3] text-sm">{L.captureSelfie || "Capture Selfie"}</button>
+                <button type="button" onClick={() => setSelfieDataUrl(null)} className="rounded-lg border border-[#D0D8E4] px-3 py-1.5 text-[#334260] text-sm">{L.retakeSelfie || "Retake"}</button>
+              </div>
+              {selfieDataUrl ? <img src={selfieDataUrl} alt="selfie-preview" className="w-36 h-36 object-cover rounded-lg border border-[#D0D8E4]" /> : null}
+              {cameraError ? <p className="text-xs text-red-600">{cameraError}</p> : null}
+            </div>
+          ) : null}
+
           <button
             type="button"
             onClick={handleScan}
@@ -351,7 +423,7 @@ export default function ScanPage() {
           </button>
 
           {feedback.message ? (
-            <div className={`rounded-lg p-3 text-sm ${feedback.type === "success" ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+            <div className={`rounded-lg p-3 text-sm animate-pulse ${feedback.type === "success" ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
               {feedback.message}
             </div>
           ) : null}
