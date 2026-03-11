@@ -45,9 +45,6 @@ export default function Sidebar() {
         {!isEmployee && (
           <Link href="/admin/device-binding" className="px-3 py-2.5 rounded-lg text-[#E8F0FB] hover:bg-[#0D3B7A] hover:text-white transition text-sm font-medium">{L.deviceBinding}</Link>
         )}
-        {!isEmployee && (
-          <Link href="/admin/line-rich-menu" className="px-3 py-2.5 rounded-lg text-[#E8F0FB] hover:bg-[#0D3B7A] hover:text-white transition text-sm font-medium">{L.lineRichMenu || "LINE Rich Menu"}</Link>
-        )}
         <Link href="/slip" className="px-3 py-2.5 rounded-lg text-[#E8F0FB] hover:bg-[#0D3B7A] hover:text-white transition text-sm font-medium">{L.mySlip}</Link>
       </nav>
 
