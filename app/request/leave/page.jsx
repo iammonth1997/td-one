@@ -9,6 +9,17 @@ import { uploadFileToCloudinaryWithSignature } from "@/lib/cloudinaryUtils";
 
 const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 const MAX_ATTACHMENT_MB = Math.round(MAX_ATTACHMENT_BYTES / (1024 * 1024));
+const ALLOWED_ATTACHMENT_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+const ALLOWED_ATTACHMENT_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".pdf"];
+
+function isAllowedAttachmentFile(file) {
+  if (!file) return true;
+  const name = String(file.name || "").toLowerCase();
+  const type = String(file.type || "").toLowerCase();
+  const allowedByMime = ALLOWED_ATTACHMENT_MIME_TYPES.includes(type);
+  const allowedByExt = ALLOWED_ATTACHMENT_EXTENSIONS.some((ext) => name.endsWith(ext));
+  return allowedByMime && allowedByExt;
+}
 
 function calcLeaveDays(startDate, endDate) {
   if (!startDate || !endDate || startDate > endDate) return 0;
@@ -92,6 +103,11 @@ export default function RequestLeavePage() {
     try {
       let attachment = form.attachment_url || "";
       if (!attachment && form.attachment_file) {
+        if (!isAllowedAttachmentFile(form.attachment_file)) {
+          setError("อนุญาตเฉพาะไฟล์ JPG, PNG, WEBP หรือ PDF เท่านั้น");
+          return;
+        }
+
         if (Number(form.attachment_file.size || 0) > MAX_ATTACHMENT_BYTES) {
           setError(`ไฟล์แนบต้องมีขนาดไม่เกิน ${MAX_ATTACHMENT_MB}MB`);
           return;
@@ -101,7 +117,9 @@ export default function RequestLeavePage() {
         attachment = await uploadFileToCloudinaryWithSignature(
           form.attachment_file,
           "tdone-attachments/leave",
-          MAX_ATTACHMENT_BYTES
+          MAX_ATTACHMENT_BYTES,
+          ALLOWED_ATTACHMENT_MIME_TYPES,
+          ALLOWED_ATTACHMENT_EXTENSIONS
         );
       }
 
@@ -193,6 +211,13 @@ export default function RequestLeavePage() {
               accept="image/*,.pdf"
               onChange={(e) => {
                 const file = e.target.files?.[0] || null;
+                if (file && !isAllowedAttachmentFile(file)) {
+                  setError("อนุญาตเฉพาะไฟล์ JPG, PNG, WEBP หรือ PDF เท่านั้น");
+                  setForm((s) => ({ ...s, attachment_file: null }));
+                  e.target.value = "";
+                  return;
+                }
+
                 if (file && Number(file.size || 0) > MAX_ATTACHMENT_BYTES) {
                   setError(`ไฟล์แนบต้องมีขนาดไม่เกิน ${MAX_ATTACHMENT_MB}MB`);
                   setForm((s) => ({ ...s, attachment_file: null }));
@@ -204,7 +229,7 @@ export default function RequestLeavePage() {
               }}
               className="mt-1 w-full rounded-lg border border-[#D0D8E4] px-3 py-2"
             />
-            <p className="mt-1 text-xs text-[#6B7A99]">รองรับไฟล์รูปภาพ/PDF ขนาดไม่เกิน {MAX_ATTACHMENT_MB}MB</p>
+            <p className="mt-1 text-xs text-[#6B7A99]">รองรับเฉพาะ JPG, PNG, WEBP, PDF ขนาดไม่เกิน {MAX_ATTACHMENT_MB}MB</p>
           </div>
 
           {error ? <div className="text-sm text-red-600">{error}</div> : null}
