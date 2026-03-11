@@ -19,6 +19,8 @@ export async function POST(req) {
   const endDate = String(body.end_date || "").trim();
   const reason = String(body.reason || "").trim();
   const attachmentUrl = body.attachment_url ? String(body.attachment_url).trim() : null;
+  const attachmentPublicId = body.attachment_public_id ? String(body.attachment_public_id).trim() : null;
+  const attachmentResourceType = body.attachment_resource_type ? String(body.attachment_resource_type).trim() : null;
 
   if (!leaveTypeCode || !startDate || !endDate || !reason) {
     return Response.json({ error: "INVALID_INPUT" }, { status: 400 });
@@ -77,6 +79,9 @@ export async function POST(req) {
       total_days: totalDays,
       reason,
       attachment_url: attachmentUrl,
+      attachment_public_id: attachmentPublicId,
+      attachment_resource_type: attachmentResourceType,
+      attachment_active: attachmentUrl ? true : false,
       status: "pending",
     })
     .select("*")
@@ -121,9 +126,19 @@ export async function GET(req) {
 
   if (leaveTypeError) return Response.json({ error: "LEAVE_TYPE_QUERY_FAILED", detail: leaveTypeError.message }, { status: 500 });
 
+  const sanitizedRows = (requests || []).map((row) => {
+    const fileVisible = row.attachment_active !== false && !row.attachment_deleted_at && row.status !== "cancelled";
+    if (fileVisible) return row;
+    return {
+      ...row,
+      attachment_url: null,
+      attachment_public_id: null,
+    };
+  });
+
   return Response.json({
     success: true,
-    rows: requests || [],
+    rows: sanitizedRows,
     leave_types: leaveTypes || [],
     leave_balances: balances || [],
     year,

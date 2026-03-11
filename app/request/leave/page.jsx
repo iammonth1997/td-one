@@ -102,6 +102,8 @@ export default function RequestLeavePage() {
 
     try {
       let attachment = form.attachment_url || "";
+      let attachmentPublicId = null;
+      let attachmentResourceType = null;
       if (!attachment && form.attachment_file) {
         if (!isAllowedAttachmentFile(form.attachment_file)) {
           setError("อนุญาตเฉพาะไฟล์ JPG, PNG, WEBP หรือ PDF เท่านั้น");
@@ -114,13 +116,16 @@ export default function RequestLeavePage() {
         }
 
         setSuccess("กำลังอัปโหลดไฟล์แนบ...");
-        attachment = await uploadFileToCloudinaryWithSignature(
+        const uploaded = await uploadFileToCloudinaryWithSignature(
           form.attachment_file,
           "tdone-attachments/leave",
           MAX_ATTACHMENT_BYTES,
           ALLOWED_ATTACHMENT_MIME_TYPES,
           ALLOWED_ATTACHMENT_EXTENSIONS
         );
+        attachment = uploaded.secureUrl;
+        attachmentPublicId = uploaded.publicId;
+        attachmentResourceType = uploaded.resourceType;
       }
 
       const res = await fetch("/api/leave-request", {
@@ -132,6 +137,8 @@ export default function RequestLeavePage() {
           end_date: form.end_date,
           reason: form.reason,
           attachment_url: attachment || null,
+          attachment_public_id: attachmentPublicId,
+          attachment_resource_type: attachmentResourceType,
         }),
       });
 
@@ -147,6 +154,29 @@ export default function RequestLeavePage() {
 
       setSuccess(L.leaveSubmitSuccess);
       setForm((s) => ({ ...s, reason: "", attachment_file: null, attachment_url: "" }));
+      await loadData();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function cancelLeaveRequest(requestId) {
+    if (!requestId || busy) return;
+    setBusy(true);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await fetch(`/api/leave-request/${requestId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+        body: JSON.stringify({ action: "cancel" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || L.errGeneral);
+        return;
+      }
+      setSuccess(L.cancelSuccess || "ยกเลิกคำขอลาเรียบร้อย");
       await loadData();
     } finally {
       setBusy(false);
@@ -248,7 +278,18 @@ export default function RequestLeavePage() {
                 <div key={row.id} className="rounded-lg border border-[#E1E7F0] p-3 text-sm">
                   <p className="font-semibold text-[#1A2B4A]">{row.leave_type_code} ({row.start_date} - {row.end_date})</p>
                   <p>{row.total_days} {L.dayUnit}</p>
+                  <p className="text-xs mt-1">Status: <span className="font-semibold">{row.status}</span></p>
                   <p className="text-xs text-[#6B7A99] mt-1">{row.reason || "-"}</p>
+                  {(row.status === "pending" || row.status === "approved") ? (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => cancelLeaveRequest(row.id)}
+                      className="mt-2 rounded-md border border-[#D0D8E4] px-3 py-1.5 text-xs text-[#334260] hover:bg-[#F8FAFD] disabled:opacity-50"
+                    >
+                      {L.cancelBtn || "Cancel"}
+                    </button>
+                  ) : null}
                 </div>
               ))}
             </div>

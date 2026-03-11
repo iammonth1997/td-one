@@ -5,6 +5,7 @@ import { getEmployeeByEmpCode } from "@/lib/otRequestUtils";
 function statusIcon(status) {
   if (status === "approved") return "approved";
   if (status === "rejected") return "rejected";
+  if (status === "cancelled") return "cancelled";
   return "pending";
 }
 
