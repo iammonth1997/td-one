@@ -32,6 +32,7 @@ export default function Sidebar() {
         {!isEmployee && (
           <Link href="/attendance" className="px-3 py-2.5 rounded-lg text-[#E8F0FB] hover:bg-[#0D3B7A] hover:text-white transition text-sm font-medium">{L.attendance}</Link>
         )}
+        <Link href="/request" className="px-3 py-2.5 rounded-lg text-[#E8F0FB] hover:bg-[#0D3B7A] hover:text-white transition text-sm font-medium">{L.request}</Link>
         {!isEmployee && (
           <Link href="/payroll" className="px-3 py-2.5 rounded-lg text-[#E8F0FB] hover:bg-[#0D3B7A] hover:text-white transition text-sm font-medium">{L.payroll}</Link>
         )}
