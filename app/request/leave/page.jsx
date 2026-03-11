@@ -7,6 +7,9 @@ import { useSession } from "@/app/hooks/useSession";
 import { useLanguage } from "@/app/context/LanguageContext";
 import { uploadFileToCloudinaryWithSignature } from "@/lib/cloudinaryUtils";
 
+const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+const MAX_ATTACHMENT_MB = Math.round(MAX_ATTACHMENT_BYTES / (1024 * 1024));
+
 function calcLeaveDays(startDate, endDate) {
   if (!startDate || !endDate || startDate > endDate) return 0;
   const start = new Date(startDate);
@@ -89,10 +92,16 @@ export default function RequestLeavePage() {
     try {
       let attachment = form.attachment_url || "";
       if (!attachment && form.attachment_file) {
+        if (Number(form.attachment_file.size || 0) > MAX_ATTACHMENT_BYTES) {
+          setError(`ไฟล์แนบต้องมีขนาดไม่เกิน ${MAX_ATTACHMENT_MB}MB`);
+          return;
+        }
+
         setSuccess("กำลังอัปโหลดไฟล์แนบ...");
         attachment = await uploadFileToCloudinaryWithSignature(
           form.attachment_file,
-          "tdone-attachments/leave"
+          "tdone-attachments/leave",
+          MAX_ATTACHMENT_BYTES
         );
       }
 
@@ -179,7 +188,23 @@ export default function RequestLeavePage() {
 
           <div>
             <label className="text-sm font-semibold text-[#334260]">{L.attachmentLabel}</label>
-            <input type="file" accept="image/*,.pdf" onChange={(e) => setForm((s) => ({ ...s, attachment_file: e.target.files?.[0] || null }))} className="mt-1 w-full rounded-lg border border-[#D0D8E4] px-3 py-2" />
+            <input
+              type="file"
+              accept="image/*,.pdf"
+              onChange={(e) => {
+                const file = e.target.files?.[0] || null;
+                if (file && Number(file.size || 0) > MAX_ATTACHMENT_BYTES) {
+                  setError(`ไฟล์แนบต้องมีขนาดไม่เกิน ${MAX_ATTACHMENT_MB}MB`);
+                  setForm((s) => ({ ...s, attachment_file: null }));
+                  e.target.value = "";
+                  return;
+                }
+                setError("");
+                setForm((s) => ({ ...s, attachment_file: file }));
+              }}
+              className="mt-1 w-full rounded-lg border border-[#D0D8E4] px-3 py-2"
+            />
+            <p className="mt-1 text-xs text-[#6B7A99]">รองรับไฟล์รูปภาพ/PDF ขนาดไม่เกิน {MAX_ATTACHMENT_MB}MB</p>
           </div>
 
           {error ? <div className="text-sm text-red-600">{error}</div> : null}
