@@ -23,10 +23,35 @@ export default function LocationBoundaryMap({
   onCurrentLocationChange,
   clearSignal,
 }) {
+  const hasExplicitCircleCenter = Number.isFinite(latitude) && Number.isFinite(longitude);
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState("");
   const [mapNotice, setMapNotice] = useState("");
   const [currentLocation, setCurrentLocation] = useState(null);
+  const [initialCenter, setInitialCenter] = useState(() => {
+    if (hasExplicitCircleCenter) {
+      return [latitude, longitude];
+    }
+
+    if (boundaryType === "rectangle" && boundaryJson) {
+      return [
+        (Number(boundaryJson.south) + Number(boundaryJson.north)) / 2,
+        (Number(boundaryJson.west) + Number(boundaryJson.east)) / 2,
+      ];
+    }
+
+    if (boundaryType === "polygon" && boundaryJson?.points?.length >= 3) {
+      const latitudes = boundaryJson.points.map((point) => Number(point.lat));
+      const longitudes = boundaryJson.points.map((point) => Number(point.lng));
+      return [
+        (Math.min(...latitudes) + Math.max(...latitudes)) / 2,
+        (Math.min(...longitudes) + Math.max(...longitudes)) / 2,
+      ];
+    }
+
+    return null;
+  });
+  const [initialCenterResolved, setInitialCenterResolved] = useState(() => Boolean(initialCenter));
   const mapElementRef = useRef(null);
   const mapRef = useRef(null);
   const leafletRef = useRef(null);
@@ -107,6 +132,8 @@ export default function LocationBoundaryMap({
 
         setCurrentLocation(nextLocation);
         publishCurrentLocation(nextLocation);
+        setInitialCenter([nextLat, nextLng]);
+        setInitialCenterResolved(true);
         centerMapToPosition(nextLat, nextLng);
         hasAutoCenteredRef.current = true;
         setLocating(false);
@@ -115,6 +142,8 @@ export default function LocationBoundaryMap({
         setLocating(false);
         setLocationError("Could not get current location. Check browser location permission.");
         publishCurrentLocation(null);
+        setInitialCenter((value) => value || DEFAULT_CENTER);
+        setInitialCenterResolved(true);
       },
       {
         enableHighAccuracy: true,
@@ -123,6 +152,42 @@ export default function LocationBoundaryMap({
       }
     );
   }, [centerMapToPosition, publishCurrentLocation]);
+
+  useEffect(() => {
+    if (hasExplicitCircleCenter) {
+      setInitialCenter([latitude, longitude]);
+      setInitialCenterResolved(true);
+      return;
+    }
+
+    if (boundaryType === "rectangle" && boundaryJson) {
+      setInitialCenter([
+        (Number(boundaryJson.south) + Number(boundaryJson.north)) / 2,
+        (Number(boundaryJson.west) + Number(boundaryJson.east)) / 2,
+      ]);
+      setInitialCenterResolved(true);
+      return;
+    }
+
+    if (boundaryType === "polygon" && boundaryJson?.points?.length >= 3) {
+      const latitudes = boundaryJson.points.map((point) => Number(point.lat));
+      const longitudes = boundaryJson.points.map((point) => Number(point.lng));
+      setInitialCenter([
+        (Math.min(...latitudes) + Math.max(...latitudes)) / 2,
+        (Math.min(...longitudes) + Math.max(...longitudes)) / 2,
+      ]);
+      setInitialCenterResolved(true);
+      return;
+    }
+
+    setInitialCenter(null);
+    setInitialCenterResolved(false);
+  }, [boundaryJson, boundaryType, hasExplicitCircleCenter, latitude, longitude]);
+
+  useEffect(() => {
+    if (initialCenterResolved || hasAutoCenteredRef.current) return;
+    locateCurrentArea();
+  }, [initialCenterResolved, locateCurrentArea]);
 
   const drawCornerMarkers = useCallback(() => {
     const L = leafletRef.current;
@@ -278,13 +343,13 @@ export default function LocationBoundaryMap({
 
     async function initMap() {
       const leafletModule = await import("leaflet");
-      if (disposed || !mapElementRef.current || mapRef.current) return;
+      if (disposed || !mapElementRef.current || mapRef.current || !initialCenterResolved || !initialCenter) return;
 
       const L = leafletModule.default || leafletModule;
       leafletRef.current = L;
 
       const map = L.map(mapElementRef.current, {
-        center: DEFAULT_CENTER,
+        center: initialCenter,
         zoom: DEFAULT_ZOOM,
       });
 
@@ -388,16 +453,6 @@ export default function LocationBoundaryMap({
 
       mapRef.current = map;
       drawBoundary();
-
-      const hasPinnedBoundary = Boolean(
-        (boundaryType === "rectangle" && boundaryJson)
-        || (boundaryType === "polygon" && boundaryJson?.points?.length >= 3)
-        || (Number.isFinite(latitude) && Number.isFinite(longitude))
-      );
-
-      if (!hasPinnedBoundary && !hasAutoCenteredRef.current) {
-        locateCurrentArea();
-      }
     }
 
     initMap();
@@ -418,7 +473,7 @@ export default function LocationBoundaryMap({
       tileLayersRef.current = { satellite: null, street: null, osm: null };
       hasAutoCenteredRef.current = false;
     };
-  }, [boundaryJson, boundaryType, drawBoundary, drawCornerMarkers, latitude, locateCurrentArea, longitude, publishCurrentLocation, publishPolygonDraft]);
+  }, [drawBoundary, drawCornerMarkers, initialCenter, initialCenterResolved, publishCurrentLocation, publishPolygonDraft]);
 
   useEffect(() => {
     drawBoundary();
@@ -481,7 +536,13 @@ export default function LocationBoundaryMap({
       </div>
       {locationError ? <p className="text-xs text-red-600">{locationError}</p> : null}
       {mapNotice ? <p className="text-xs text-amber-700">{mapNotice}</p> : null}
-      <div ref={mapElementRef} className="h-[360px] rounded-xl border border-[#D0D8E4] overflow-hidden" />
+      {!initialCenterResolved ? (
+        <div className="flex h-[360px] items-center justify-center rounded-xl border border-[#D0D8E4] bg-[#F5F7FA] text-sm text-[#6B7A99]">
+          Determining current area...
+        </div>
+      ) : (
+        <div ref={mapElementRef} className="h-[360px] rounded-xl border border-[#D0D8E4] overflow-hidden" />
+      )}
     </div>
   );
 }
