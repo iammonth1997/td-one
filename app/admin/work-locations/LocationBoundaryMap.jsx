@@ -545,7 +545,15 @@ export default function LocationBoundaryMap({
       });
 
       mapRef.current = map;
-      drawBoundary();
+
+      // Re-enable polygon drawing mode here because the useEffect that calls
+      // enablePolygonDrawingMode() runs before the map is initialized (async),
+      // so it exits early. We must re-apply it once the map is ready.
+      if (boundaryType === "polygon") {
+        enablePolygonDrawingMode();
+      }
+
+      drawBoundaryRef.current?.();
     }
 
     initMap();
@@ -569,7 +577,7 @@ export default function LocationBoundaryMap({
       tileLayersRef.current = { satellite: null, street: null, osm: null };
       hasAutoCenteredRef.current = false;
     };
-  }, [boundaryType, disablePolygonDrawingMode, drawBoundary, drawCornerMarkers, initialCenter, initialCenterResolved, publishCurrentLocation, publishPolygonDraft]);
+  }, [boundaryType, disablePolygonDrawingMode, drawCornerMarkers, enablePolygonDrawingMode, initialCenter, initialCenterResolved, publishCurrentLocation, publishPolygonDraft]);
 
   useEffect(() => {
     drawBoundary();
