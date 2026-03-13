@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
 
 :root {
   --blue-primary:   #1352A3;
@@ -30,4 +31,26 @@ body {
     "Phetsarath OT",
     var(--font-inter),
     sans-serif;
+}
+
+.leaflet-container {
+  background: #dbeafe;
+}
+
+.leaflet-container .leaflet-tile {
+  max-width: none !important;
+  max-height: none !important;
+  width: 256px !important;
+  height: 256px !important;
+  visibility: visible !important;
+}
+
+.leaflet-container .leaflet-pane,
+.leaflet-container .leaflet-tile,
+.leaflet-container .leaflet-marker-icon,
+.leaflet-container .leaflet-marker-shadow,
+.leaflet-container .leaflet-tile-container,
+.leaflet-container svg,
+.leaflet-container canvas {
+  transform-origin: 0 0;
 }

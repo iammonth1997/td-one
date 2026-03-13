@@ -5,21 +5,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 const DEFAULT_CENTER = [13.7563, 100.5018];
 const DEFAULT_ZOOM = 14;
 const CURRENT_LOCATION_ZOOM = 17;
-const LEAFLET_CSS_ID = "tdone-leaflet-css";
-const LEAFLET_CSS_HREF = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
 
 function buildProxyTileUrl(provider) {
   return `/api/map-tiles?provider=${provider}&z={z}&x={x}&y={y}`;
-}
-
-function ensureLeafletStylesheet() {
-  if (document.getElementById(LEAFLET_CSS_ID)) return;
-
-  const link = document.createElement("link");
-  link.id = LEAFLET_CSS_ID;
-  link.rel = "stylesheet";
-  link.href = LEAFLET_CSS_HREF;
-  document.head.appendChild(link);
 }
 
 export default function LocationBoundaryMap({
@@ -289,7 +277,6 @@ export default function LocationBoundaryMap({
     let disposed = false;
 
     async function initMap() {
-      ensureLeafletStylesheet();
       const leafletModule = await import("leaflet");
       if (disposed || !mapElementRef.current || mapRef.current) return;
 
