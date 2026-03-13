@@ -8,6 +8,10 @@ const CURRENT_LOCATION_ZOOM = 17;
 const LEAFLET_CSS_ID = "tdone-leaflet-css";
 const LEAFLET_CSS_HREF = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
 
+function buildProxyTileUrl(provider) {
+  return `/api/map-tiles?provider=${provider}&z={z}&x={x}&y={y}`;
+}
+
 function ensureLeafletStylesheet() {
   if (document.getElementById(LEAFLET_CSS_ID)) return;
 
@@ -297,13 +301,13 @@ export default function LocationBoundaryMap({
         zoom: DEFAULT_ZOOM,
       });
 
-      const satellite = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+      const satellite = L.tileLayer(buildProxyTileUrl("satellite"), {
         attribution: "Tiles &copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community",
       });
-      const street = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}", {
+      const street = L.tileLayer(buildProxyTileUrl("street"), {
         attribution: "Tiles &copy; Esri, HERE, Garmin, Intermap, increment P Corp., GEBCO, USGS, FAO, NPS, NRCAN, GeoBase, IGN, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), and the GIS User Community",
       });
-      const osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      const osm = L.tileLayer(buildProxyTileUrl("osm"), {
         attribution: '&copy; OpenStreetMap contributors',
       });
 
