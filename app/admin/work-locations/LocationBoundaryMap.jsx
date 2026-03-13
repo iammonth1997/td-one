@@ -247,6 +247,15 @@ export default function LocationBoundaryMap({
   }, [boundaryType]);
 
   useEffect(() => {
+    if (boundaryType !== "polygon") return;
+
+    const hasFinalPolygon = Boolean(boundaryJson?.points?.length >= 3);
+    if (!hasFinalPolygon) {
+      setIsPolygonDrawingActive(true);
+    }
+  }, [boundaryJson, boundaryType]);
+
+  useEffect(() => {
     if (boundaryType === "polygon" && isPolygonDrawingActive) {
       enablePolygonDrawingMode();
       return;
@@ -620,6 +629,14 @@ export default function LocationBoundaryMap({
               disabled={polygonDraftCount === 0}
             >
               Undo last point
+            </button>
+            <button
+              type="button"
+              className="rounded border border-[#1352A3] bg-white px-2 py-1 text-xs font-semibold text-[#1352A3] disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => setIsPolygonDrawingActive(true)}
+              disabled={isPolygonDrawingActive}
+            >
+              Start drawing
             </button>
             <button
               type="button"
