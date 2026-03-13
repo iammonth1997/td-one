@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 const DEFAULT_CENTER = [13.7563, 100.5018];
 const DEFAULT_ZOOM = 14;
 const CURRENT_LOCATION_ZOOM = 17;
+const MAX_MAP_ZOOM = 22;
+const MAX_NATIVE_TILE_ZOOM = 19;
 
 function buildProxyTileUrl(provider) {
   return `/api/map-tiles?provider=${provider}&z={z}&x={x}&y={y}`;
@@ -203,6 +205,7 @@ export default function LocationBoundaryMap({
         fillColor: "#F59E0B",
         fillOpacity: 0.9,
         weight: 2,
+        interactive: false,
       }).addTo(markerLayer);
     }
 
@@ -213,6 +216,7 @@ export default function LocationBoundaryMap({
         fillColor: index === polygonDraftRef.current.length - 1 ? "#D946EF" : "#1352A3",
         fillOpacity: 0.95,
         weight: 2,
+        interactive: false,
       }).addTo(markerLayer);
     });
   }, []);
@@ -234,6 +238,7 @@ export default function LocationBoundaryMap({
         fillColor: "#14B8A6",
         fillOpacity: 1,
         weight: 2,
+        interactive: false,
       }).addTo(overlayLayer).bindTooltip("Current location", {
         direction: "top",
         offset: [0, -8],
@@ -246,6 +251,7 @@ export default function LocationBoundaryMap({
           weight: 1,
           fillColor: "#14B8A6",
           fillOpacity: 0.08,
+          interactive: false,
         }).addTo(overlayLayer);
       }
     };
@@ -261,6 +267,7 @@ export default function LocationBoundaryMap({
         weight: 2,
         fillColor: "#1352A3",
         fillOpacity: 0.12,
+        interactive: false,
       }).addTo(overlayLayer);
 
       map.fitBounds(bounds, { padding: [24, 24] });
@@ -277,6 +284,7 @@ export default function LocationBoundaryMap({
         weight: 2,
         fillColor: "#1352A3",
         fillOpacity: 0.12,
+        interactive: false,
       }).addTo(overlayLayer);
 
       map.fitBounds(L.latLngBounds(latLngs), { padding: [24, 24] });
@@ -293,6 +301,7 @@ export default function LocationBoundaryMap({
           color: "#D946EF",
           weight: 2,
           dashArray: "8 6",
+          interactive: false,
         }).addTo(overlayLayer);
       }
 
@@ -308,6 +317,7 @@ export default function LocationBoundaryMap({
         weight: 2,
         fillColor: "#1352A3",
         fillOpacity: 0.12,
+        interactive: false,
       }).addTo(overlayLayer);
 
       L.circleMarker([latitude, longitude], {
@@ -316,6 +326,7 @@ export default function LocationBoundaryMap({
         fillColor: "#1352A3",
         fillOpacity: 1,
         weight: 2,
+        interactive: false,
       }).addTo(overlayLayer);
 
       map.setView([latitude, longitude], Math.max(map.getZoom(), DEFAULT_ZOOM));
@@ -351,16 +362,23 @@ export default function LocationBoundaryMap({
       const map = L.map(mapElementRef.current, {
         center: initialCenter,
         zoom: DEFAULT_ZOOM,
+        maxZoom: MAX_MAP_ZOOM,
       });
 
       const satellite = L.tileLayer(buildProxyTileUrl("satellite"), {
         attribution: "Tiles &copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community",
+        maxZoom: MAX_MAP_ZOOM,
+        maxNativeZoom: MAX_NATIVE_TILE_ZOOM,
       });
       const street = L.tileLayer(buildProxyTileUrl("street"), {
         attribution: "Tiles &copy; Esri, HERE, Garmin, Intermap, increment P Corp., GEBCO, USGS, FAO, NPS, NRCAN, GeoBase, IGN, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), and the GIS User Community",
+        maxZoom: MAX_MAP_ZOOM,
+        maxNativeZoom: MAX_NATIVE_TILE_ZOOM,
       });
       const osm = L.tileLayer(buildProxyTileUrl("osm"), {
         attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: MAX_MAP_ZOOM,
+        maxNativeZoom: MAX_NATIVE_TILE_ZOOM,
       });
 
       street.addTo(map);
