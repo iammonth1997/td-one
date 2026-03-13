@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { writeStoredSession } from "@/lib/clientSession";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -31,18 +32,15 @@ export default function AdminLoginPage() {
         return;
       }
 
-      localStorage.setItem(
-        "tdone_session",
-        JSON.stringify({
-          emp_id: data.emp_id,
-          role: data.role,
-          status: data.status,
-          login_context: "admin_portal",
-          login_time: new Date().toISOString(),
-          session_token: data.session_token,
-          must_change_pin: false,
-        })
-      );
+      writeStoredSession({
+        emp_id: data.emp_id,
+        role: data.role,
+        status: data.status,
+        login_context: "admin_portal",
+        login_time: new Date().toISOString(),
+        session_token: data.session_token,
+        must_change_pin: false,
+      });
 
       router.replace("/admin");
     } finally {

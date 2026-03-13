@@ -4,13 +4,13 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useLanguage } from "@/app/context/LanguageContext";
 import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
+import { readStoredSession } from "@/lib/clientSession";
 
 export default function Sidebar() {
   const [session] = useState(() => {
     if (typeof window === "undefined") return null;
     try {
-      const raw = localStorage.getItem("tdone_session");
-      return raw ? JSON.parse(raw) : null;
+      return readStoredSession("employee_portal");
     } catch (err) {
       console.error("Sidebar: failed to parse session", err);
       return null;

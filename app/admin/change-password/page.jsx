@@ -75,7 +75,7 @@ export default function AdminChangePasswordPage() {
 
   return (
     <div className="min-h-screen bg-[#F5F7FA] text-[#1A2B4A]">
-      <Header />
+      <Header portal="admin_portal" loginPath="/admin/login" />
 
       <div className="max-w-2xl mx-auto p-6">
         <div className="mb-4">

@@ -2,9 +2,9 @@
 
 import { Suspense } from "react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useLanguage } from "@/app/context/LanguageContext";
+import { readStoredSession } from "@/lib/clientSession";
 
 function CenterCard({ children }) {
   return (
@@ -24,34 +24,9 @@ function SlipOTViewContent() {
   const { t } = useLanguage();
   const L = t.slipView;
 
-  const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState("");
-  const [empInfo, setEmpInfo] = useState(null);
-
-  useEffect(() => {
-    const sessionRaw = localStorage.getItem("tdone_session");
-    let session = null;
-    try {
-      session = sessionRaw ? JSON.parse(sessionRaw) : null;
-    } catch {
-      // ignore parse error
-    }
-
-    if (!session?.emp_id) {
-      setErrorMsg(L.errNoSession);
-    } else {
-      setEmpInfo({ empId: session.emp_id });
-    }
-    setLoading(false);
-  }, []);
-
-  if (loading) {
-    return (
-      <CenterCard>
-        <p className="text-slate-700">{L.loading}</p>
-      </CenterCard>
-    );
-  }
+  const session = readStoredSession("employee_portal");
+  const errorMsg = session?.emp_id ? "" : L.errNoSession;
+  const empInfo = session?.emp_id ? { empId: session.emp_id } : null;
 
   if (errorMsg) {
     return (

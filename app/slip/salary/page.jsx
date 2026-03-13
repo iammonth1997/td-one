@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/app/context/LanguageContext";
+import { readStoredSession } from "@/lib/clientSession";
 
 export default function SlipSalarySelectPage() {
   const router = useRouter();
@@ -16,19 +17,25 @@ export default function SlipSalarySelectPage() {
   // จำนวนวันในเดือนที่เลือก
   const daysInMonth = new Date(year, month, 0).getDate();
 
-  // ถ้าวันที่เลือกเกินจำนวนวันในเดือนใหม่ ให้รีเซ็ต
   useEffect(() => {
-    if (day > daysInMonth) setDay(daysInMonth);
-  }, [month, year, daysInMonth]);
-
-  useEffect(() => {
-    try {
-      const s = localStorage.getItem("tdone_session");
-      if (!s) router.push("/login");
-    } catch {
+    if (!readStoredSession("employee_portal")) {
       router.push("/login");
     }
   }, [router]);
+
+  const handleMonthChange = (value) => {
+    const nextMonth = Number(value);
+    const nextDaysInMonth = new Date(year, nextMonth, 0).getDate();
+    setMonth(nextMonth);
+    setDay((currentDay) => Math.min(currentDay, nextDaysInMonth));
+  };
+
+  const handleYearChange = (value) => {
+    const nextYear = Number(value);
+    const nextDaysInMonth = new Date(nextYear, month, 0).getDate();
+    setYear(nextYear);
+    setDay((currentDay) => Math.min(currentDay, nextDaysInMonth));
+  };
 
   const handleSubmit = () => {
     router.push(`/slip/salary/view?year=${year}&month=${month}&day=${day}`);
@@ -57,7 +64,7 @@ export default function SlipSalarySelectPage() {
             <label className="mb-2 block text-sm font-semibold text-[#334260]">{L.selectMonth}</label>
             <select
               value={month}
-              onChange={(e) => setMonth(Number(e.target.value))}
+              onChange={(e) => handleMonthChange(e.target.value)}
               className="block w-full rounded-lg border border-[#D0D8E4] bg-white px-3 py-2 text-[#1A2B4A] outline-none focus:border-[#1352A3]"
             >
               {L.months.map((name, i) => (
@@ -70,7 +77,7 @@ export default function SlipSalarySelectPage() {
             <label className="mb-2 block text-sm font-semibold text-[#334260]">{L.selectYear}</label>
             <select
               value={year}
-              onChange={(e) => setYear(Number(e.target.value))}
+              onChange={(e) => handleYearChange(e.target.value)}
               className="block w-full rounded-lg border border-[#D0D8E4] bg-white px-3 py-2 text-[#1A2B4A] outline-none focus:border-[#1352A3]"
             >
               <option value="2025">2025</option>

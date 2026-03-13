@@ -57,7 +57,7 @@ export default function AdminHomePage() {
 
   return (
     <div className="min-h-screen bg-[#F5F7FA] text-[#1A2B4A]">
-      <Header />
+      <Header portal="admin_portal" loginPath="/admin/login" />
 
       <div className="max-w-6xl mx-auto p-6">
         <div className="rounded-2xl bg-gradient-to-br from-[#0D3B7A] via-[#1352A3] to-[#1E6CC8] p-6 text-white shadow-[0_8px_32px_rgba(13,59,122,0.20)]">

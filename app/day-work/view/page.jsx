@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useLanguage } from "@/app/context/LanguageContext";
+import { readStoredSession, removeStoredSession } from "@/lib/clientSession";
 
 function CenterCard({ children }) {
   return (
@@ -45,13 +46,7 @@ function DayWorkViewContent() {
         return;
       }
 
-      const sessionRaw = localStorage.getItem("tdone_session");
-      let session = null;
-      try {
-        session = sessionRaw ? JSON.parse(sessionRaw) : null;
-      } catch (err) {
-        console.error("Failed to parse session:", err);
-      }
+      const session = readStoredSession("employee_portal");
       const currentEmpId = session?.emp_id || session?.user?.emp_id || null;
 
       if (!currentEmpId) {
@@ -74,7 +69,7 @@ function DayWorkViewContent() {
         );
 
         if (res.status === 401) {
-          localStorage.removeItem("tdone_session");
+          removeStoredSession("employee_portal");
           window.location.href = "/login";
           return;
         }
@@ -115,7 +110,7 @@ function DayWorkViewContent() {
     }
 
     loadData();
-  }, [year, month]);
+  }, [year, month, L]);
 
   if (loading) {
     return (

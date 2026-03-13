@@ -4,31 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import LinkAccountPage from "@/app/components/LinkAccountPage";
 import { useLiff } from "@/app/hooks/useLiff";
-
-const SESSION_DURATION_MS = 8 * 60 * 60 * 1000; // 8 hours
-
-function hasValidSession() {
-  try {
-    const raw = localStorage.getItem("tdone_session");
-    if (!raw) return null;
-
-    const parsed = JSON.parse(raw);
-    const loginTime = new Date(parsed.login_time).getTime();
-    if (isNaN(loginTime) || Date.now() > loginTime + SESSION_DURATION_MS) {
-      localStorage.removeItem("tdone_session");
-      return null;
-    }
-
-    if (!parsed.session_token) {
-      return null;
-    }
-
-    return parsed;
-  } catch {
-    localStorage.removeItem("tdone_session");
-    return null;
-  }
-}
+import { readAnyStoredSession, writeStoredSession } from "@/lib/clientSession";
 
 export default function Home() {
   const router = useRouter();
@@ -38,7 +14,7 @@ export default function Home() {
   const [linkError, setLinkError] = useState("");
 
   useEffect(() => {
-    const session = hasValidSession();
+    const session = readAnyStoredSession();
     if (!session) return;
 
     const isAdminPortal = session.login_context === "admin_portal";
@@ -77,18 +53,15 @@ export default function Home() {
         }
 
         if (data.linked) {
-          localStorage.setItem(
-            "tdone_session",
-            JSON.stringify({
-              emp_id: data.emp_id,
-              role: data.role,
-              status: data.status,
-              login_context: data.login_context || "employee_portal",
-              login_time: new Date().toISOString(),
-              session_token: data.session_token,
-              must_change_pin: Boolean(data.must_change_pin),
-            })
-          );
+          writeStoredSession({
+            emp_id: data.emp_id,
+            role: data.role,
+            status: data.status,
+            login_context: data.login_context || "employee_portal",
+            login_time: new Date().toISOString(),
+            session_token: data.session_token,
+            must_change_pin: Boolean(data.must_change_pin),
+          });
 
           if (!cancelled) {
             if (data.must_change_pin) router.replace("/change-pin");

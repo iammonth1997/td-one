@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/app/hooks/useSession";
+import { patchStoredSession } from "@/lib/clientSession";
 
 export default function ChangePinPage() {
   const router = useRouter();
@@ -52,16 +53,7 @@ export default function ChangePinPage() {
         return;
       }
 
-      try {
-        const raw = localStorage.getItem("tdone_session");
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          parsed.must_change_pin = false;
-          localStorage.setItem("tdone_session", JSON.stringify(parsed));
-        }
-      } catch {
-        // ignore local storage parsing errors
-      }
+      patchStoredSession("employee_portal", { must_change_pin: false });
 
       router.replace("/dashboard");
     } finally {

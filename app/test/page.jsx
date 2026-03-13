@@ -3,31 +3,28 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { readStoredSession } from "@/lib/clientSession";
 
 export default function TestPage() {
   const router = useRouter();
   const [rows, setRows] = useState([]);
-  const [authed, setAuthed] = useState(false);
+  const session = typeof window === "undefined" ? null : readStoredSession("admin_portal");
+  const authed = session?.role === "admin";
 
   useEffect(() => {
-    try {
-      const s = localStorage.getItem("tdone_session");
-      if (!s) { router.push("/login"); return; }
-      const session = JSON.parse(s);
-      if (session?.role !== "admin") { router.push("/dashboard"); return; }
-    } catch {
-      router.push("/login");
+    if (!session) {
+      router.push("/admin/login");
       return;
     }
 
-    setAuthed(true);
+    if (session?.role !== "admin") { router.push("/dashboard"); return; }
 
     async function loadData() {
       const { data } = await supabase.from("login_users").select("emp_id, is_registered, role");
       setRows(data || []);
     }
     loadData();
-  }, [router]);
+  }, [router, session]);
 
   if (!authed) return null;
 

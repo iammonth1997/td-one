@@ -4,6 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import type { LiffProfile } from "@/lib/liff";
+import { writeStoredSession } from "@/lib/clientSession";
 
 type Props = {
   profile: LiffProfile;
@@ -59,18 +60,15 @@ export default function LinkAccountPage({ profile, idToken }: Props) {
         return;
       }
 
-      localStorage.setItem(
-        "tdone_session",
-        JSON.stringify({
-          emp_id: data.emp_id,
-          role: data.role,
-          status: data.status,
-          login_context: data.login_context || "employee_portal",
-          login_time: new Date().toISOString(),
-          session_token: data.session_token,
-          must_change_pin: Boolean(data.must_change_pin),
-        })
-      );
+      writeStoredSession({
+        emp_id: data.emp_id,
+        role: data.role,
+        status: data.status,
+        login_context: data.login_context || "employee_portal",
+        login_time: new Date().toISOString(),
+        session_token: data.session_token,
+        must_change_pin: Boolean(data.must_change_pin),
+      });
 
       if (data.must_change_pin) router.replace("/change-pin");
       else router.replace("/dashboard");

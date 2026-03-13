@@ -2,33 +2,19 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { readStoredSession, removeStoredSession } from "@/lib/clientSession";
+import { EMPLOYEE_PORTAL } from "@/lib/sessionContext";
 
-const SESSION_DURATION_MS = 8 * 60 * 60 * 1000; // 8 hours
 const CHECK_INTERVAL_MS = 60 * 1000; // check every 60 seconds
 
 export function useSession({ loginPath = "/login", requiredPortal = null } = {}) {
   const router = useRouter();
   const [refreshTick, setRefreshTick] = useState(0);
+  const portal = requiredPortal || EMPLOYEE_PORTAL;
 
   const checkAndGetSession = useCallback(() => {
-    try {
-      const raw = localStorage.getItem("tdone_session");
-      if (!raw) return null;
-
-      const parsed = JSON.parse(raw);
-      const loginTime = new Date(parsed.login_time).getTime();
-
-      if (isNaN(loginTime) || Date.now() > loginTime + SESSION_DURATION_MS) {
-        localStorage.removeItem("tdone_session");
-        return null;
-      }
-
-      return parsed;
-    } catch {
-      localStorage.removeItem("tdone_session");
-      return null;
-    }
-  }, []);
+    return readStoredSession(portal);
+  }, [portal]);
 
   void refreshTick;
   const session = typeof window === "undefined" ? null : checkAndGetSession();
@@ -59,37 +45,30 @@ export function useSession({ loginPath = "/login", requiredPortal = null } = {})
   }, [checkAndGetSession, loginPath, requiredPortal, router, session]);
 
   const getAuthHeaders = useCallback(() => {
-    try {
-      const raw = localStorage.getItem("tdone_session");
-      if (!raw) return {};
-      const parsed = JSON.parse(raw);
-      if (parsed.session_token) {
-        return { Authorization: `Bearer ${parsed.session_token}` };
-      }
-    } catch { /* ignore */ }
+    const current = readStoredSession(portal);
+    if (current?.session_token) {
+      return { Authorization: `Bearer ${current.session_token}` };
+    }
     return {};
-  }, []);
+  }, [portal]);
 
   const logout = useCallback(async () => {
     try {
-      const raw = localStorage.getItem("tdone_session");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed.session_token) {
+      const current = readStoredSession(portal);
+      if (current?.session_token) {
           fetch("/api/login/logout", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${parsed.session_token}`,
+              Authorization: `Bearer ${current.session_token}`,
             },
           }).catch(() => {});
-        }
       }
     } catch { /* ignore */ }
-    localStorage.removeItem("tdone_session");
+    removeStoredSession(portal);
     setRefreshTick((value) => value + 1);
     router.push(loginPath);
-  }, [loginPath, router]);
+  }, [loginPath, portal, router]);
 
   return {
     session,

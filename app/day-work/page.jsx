@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/app/context/LanguageContext";
+import { readStoredSession } from "@/lib/clientSession";
 
 export default function DayWorkSelectPage() {
   const router = useRouter();
@@ -12,12 +13,7 @@ export default function DayWorkSelectPage() {
   const L = t.dayWork;
 
   useEffect(() => {
-    try {
-      const s = localStorage.getItem("tdone_session");
-      if (!s) {
-        router.push("/login");
-      }
-    } catch {
+    if (!readStoredSession("employee_portal")) {
       router.push("/login");
     }
   }, [router]);

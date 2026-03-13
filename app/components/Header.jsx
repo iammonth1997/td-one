@@ -4,8 +4,8 @@ import { useLanguage } from "@/app/context/LanguageContext";
 import LanguageSwitcher from "@/app/components/LanguageSwitcher";
 import { useSession } from "@/app/hooks/useSession";
 
-export default function Header() {
-  const { session, logout } = useSession();
+export default function Header({ portal = "employee_portal", loginPath = "/login" }) {
+  const { session, logout } = useSession({ requiredPortal: portal, loginPath });
   const { t } = useLanguage();
   const L = t.header;
 
