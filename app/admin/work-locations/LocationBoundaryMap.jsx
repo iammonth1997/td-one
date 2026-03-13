@@ -1,0 +1,214 @@
+"use client";
+
+import { useCallback, useEffect, useRef } from "react";
+
+const DEFAULT_CENTER = [17.9757, 102.6331];
+const DEFAULT_ZOOM = 14;
+const LEAFLET_CSS_ID = "tdone-leaflet-css";
+const LEAFLET_CSS_HREF = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+
+function ensureLeafletStylesheet() {
+  if (document.getElementById(LEAFLET_CSS_ID)) return;
+
+  const link = document.createElement("link");
+  link.id = LEAFLET_CSS_ID;
+  link.rel = "stylesheet";
+  link.href = LEAFLET_CSS_HREF;
+  document.head.appendChild(link);
+}
+
+export default function LocationBoundaryMap({
+  boundaryType,
+  latitude,
+  longitude,
+  radiusMeters,
+  boundaryJson,
+  onCircleChange,
+  onRectangleChange,
+  clearSignal,
+}) {
+  const mapElementRef = useRef(null);
+  const mapRef = useRef(null);
+  const leafletRef = useRef(null);
+  const overlayLayerRef = useRef(null);
+  const cornerMarkerLayerRef = useRef(null);
+  const firstCornerRef = useRef(null);
+  const latestConfigRef = useRef({
+    boundaryType,
+    latitude,
+    longitude,
+    radiusMeters,
+    boundaryJson,
+    onCircleChange,
+    onRectangleChange,
+  });
+
+  latestConfigRef.current = {
+    boundaryType,
+    latitude,
+    longitude,
+    radiusMeters,
+    boundaryJson,
+    onCircleChange,
+    onRectangleChange,
+  };
+
+  const drawCornerMarkers = useCallback(() => {
+    const L = leafletRef.current;
+    const markerLayer = cornerMarkerLayerRef.current;
+    if (!L || !markerLayer) return;
+
+    markerLayer.clearLayers();
+    if (!firstCornerRef.current) return;
+
+    L.circleMarker([firstCornerRef.current.lat, firstCornerRef.current.lng], {
+      radius: 6,
+      color: "#F59E0B",
+      fillColor: "#F59E0B",
+      fillOpacity: 0.9,
+      weight: 2,
+    }).addTo(markerLayer);
+  }, []);
+
+  const drawBoundary = useCallback(() => {
+    const L = leafletRef.current;
+    const map = mapRef.current;
+    const overlayLayer = overlayLayerRef.current;
+    if (!L || !map || !overlayLayer) return;
+
+    overlayLayer.clearLayers();
+
+    if (boundaryType === "rectangle" && boundaryJson) {
+      const bounds = [
+        [boundaryJson.south, boundaryJson.west],
+        [boundaryJson.north, boundaryJson.east],
+      ];
+
+      L.rectangle(bounds, {
+        color: "#1352A3",
+        weight: 2,
+        fillColor: "#1352A3",
+        fillOpacity: 0.12,
+      }).addTo(overlayLayer);
+
+      map.fitBounds(bounds, { padding: [24, 24] });
+      drawCornerMarkers();
+      return;
+    }
+
+    if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+      L.circle([latitude, longitude], {
+        radius: Number(radiusMeters) || 200,
+        color: "#1352A3",
+        weight: 2,
+        fillColor: "#1352A3",
+        fillOpacity: 0.12,
+      }).addTo(overlayLayer);
+
+      L.circleMarker([latitude, longitude], {
+        radius: 6,
+        color: "#1352A3",
+        fillColor: "#1352A3",
+        fillOpacity: 1,
+        weight: 2,
+      }).addTo(overlayLayer);
+
+      map.setView([latitude, longitude], Math.max(map.getZoom(), DEFAULT_ZOOM));
+    }
+
+    drawCornerMarkers();
+  }, [boundaryJson, boundaryType, drawCornerMarkers, latitude, longitude, radiusMeters]);
+
+  useEffect(() => {
+    let disposed = false;
+
+    async function initMap() {
+      ensureLeafletStylesheet();
+      const leafletModule = await import("leaflet");
+      if (disposed || !mapElementRef.current || mapRef.current) return;
+
+      const L = leafletModule.default || leafletModule;
+      leafletRef.current = L;
+
+      const map = L.map(mapElementRef.current, {
+        center: DEFAULT_CENTER,
+        zoom: DEFAULT_ZOOM,
+      });
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '&copy; OpenStreetMap contributors',
+      }).addTo(map);
+
+      overlayLayerRef.current = L.layerGroup().addTo(map);
+      cornerMarkerLayerRef.current = L.layerGroup().addTo(map);
+
+      map.on("click", (event) => {
+        const config = latestConfigRef.current;
+        const clickedLat = Number(event.latlng.lat.toFixed(8));
+        const clickedLng = Number(event.latlng.lng.toFixed(8));
+
+        if (config.boundaryType === "rectangle") {
+          if (!firstCornerRef.current) {
+            firstCornerRef.current = { lat: clickedLat, lng: clickedLng };
+            drawCornerMarkers();
+            return;
+          }
+
+          const first = firstCornerRef.current;
+          firstCornerRef.current = null;
+          config.onRectangleChange({
+            south: Math.min(first.lat, clickedLat),
+            west: Math.min(first.lng, clickedLng),
+            north: Math.max(first.lat, clickedLat),
+            east: Math.max(first.lng, clickedLng),
+          });
+          return;
+        }
+
+        config.onCircleChange({
+          latitude: clickedLat,
+          longitude: clickedLng,
+        });
+      });
+
+      mapRef.current = map;
+      drawBoundary();
+    }
+
+    initMap();
+
+    return () => {
+      disposed = true;
+      if (mapRef.current) {
+        mapRef.current.remove();
+      }
+      mapRef.current = null;
+      leafletRef.current = null;
+      overlayLayerRef.current = null;
+      cornerMarkerLayerRef.current = null;
+      firstCornerRef.current = null;
+    };
+  }, [drawBoundary, drawCornerMarkers]);
+
+  useEffect(() => {
+    drawBoundary();
+  }, [drawBoundary]);
+
+  useEffect(() => {
+    firstCornerRef.current = null;
+    drawCornerMarkers();
+  }, [clearSignal, drawCornerMarkers]);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between text-xs text-[#6B7A99]">
+        <span>
+          {boundaryType === "rectangle"
+            ? "Rectangle mode: click 2 points on the map to create opposite corners."
+            : "Circle mode: click once on the map to set the center point."}
+        </span>
+      </div>
+      <div ref={mapElementRef} className="h-[360px] rounded-xl border border-[#D0D8E4] overflow-hidden" />
+    </div>
+  );
+}

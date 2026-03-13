@@ -4,6 +4,81 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
 import { hasAnyPermission } from "@/lib/rbac/access";
 
+function normalizeBoundaryType(value) {
+  return String(value || "circle").trim().toLowerCase() === "rectangle"
+    ? "rectangle"
+    : "circle";
+}
+
+function normalizeRectangleBoundary(boundaryJson) {
+  if (!boundaryJson || typeof boundaryJson !== "object") return null;
+
+  const south = Number(boundaryJson.south);
+  const west = Number(boundaryJson.west);
+  const north = Number(boundaryJson.north);
+  const east = Number(boundaryJson.east);
+
+  if (![south, west, north, east].every(Number.isFinite)) {
+    return null;
+  }
+
+  return {
+    south: Math.min(south, north),
+    west: Math.min(west, east),
+    north: Math.max(south, north),
+    east: Math.max(west, east),
+  };
+}
+
+function deriveRectangleCenter(boundary) {
+  return {
+    latitude: (boundary.south + boundary.north) / 2,
+    longitude: (boundary.west + boundary.east) / 2,
+  };
+}
+
+function deriveRectangleRadius(boundary) {
+  const latDistance = Math.abs(boundary.north - boundary.south) * 111320;
+  const lngDistance = Math.abs(boundary.east - boundary.west) * 111320;
+  return Math.round(Math.sqrt(latDistance ** 2 + lngDistance ** 2) / 2);
+}
+
+function buildLocationPayload(input) {
+  const boundaryType = normalizeBoundaryType(input.boundary_type);
+  const payload = {
+    name: String(input.name || "").trim(),
+    latitude: Number(input.latitude),
+    longitude: Number(input.longitude),
+    radius_meters: Number(input.radius_meters || 200),
+    is_active: input.is_active !== false,
+    boundary_type: boundaryType,
+    boundary_json: null,
+  };
+
+  if (boundaryType === "rectangle") {
+    const boundary = normalizeRectangleBoundary(input.boundary_json);
+    if (!boundary) {
+      return { payload: null, error: "INVALID_BOUNDARY" };
+    }
+
+    const center = deriveRectangleCenter(boundary);
+    payload.latitude = center.latitude;
+    payload.longitude = center.longitude;
+    payload.radius_meters = deriveRectangleRadius(boundary);
+    payload.boundary_json = boundary;
+  }
+
+  if (!payload.name || !Number.isFinite(payload.latitude) || !Number.isFinite(payload.longitude)) {
+    return { payload: null, error: "INVALID_INPUT" };
+  }
+
+  if (boundaryType === "circle" && !Number.isFinite(payload.radius_meters)) {
+    return { payload: null, error: "INVALID_INPUT" };
+  }
+
+  return { payload, error: null };
+}
+
 export async function GET(req) {
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) {
@@ -23,7 +98,7 @@ export async function GET(req) {
   if (includeInactive) {
     const { data, error } = await supabaseServer
       .from("work_locations")
-      .select("id, name, latitude, longitude, radius_meters, is_active, created_at")
+      .select("id, name, latitude, longitude, radius_meters, boundary_type, boundary_json, is_active, created_at")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -52,23 +127,17 @@ export async function POST(req) {
     return Response.json({ error: "FORBIDDEN" }, { status: 403 });
   }
 
-  const { name, latitude, longitude, radius_meters, is_active } = await req.json();
-  const payload = {
-    name: String(name || "").trim(),
-    latitude: Number(latitude),
-    longitude: Number(longitude),
-    radius_meters: Number(radius_meters || 200),
-    is_active: is_active !== false,
-  };
+  const requestBody = await req.json();
+  const { payload, error: payloadError } = buildLocationPayload(requestBody);
 
-  if (!payload.name || !Number.isFinite(payload.latitude) || !Number.isFinite(payload.longitude)) {
-    return Response.json({ error: "INVALID_INPUT" }, { status: 400 });
+  if (payloadError) {
+    return Response.json({ error: payloadError }, { status: 400 });
   }
 
   const { data, error } = await supabaseServer
     .from("work_locations")
     .insert(payload)
-    .select("id, name, latitude, longitude, radius_meters, is_active, created_at")
+    .select("id, name, latitude, longitude, radius_meters, boundary_type, boundary_json, is_active, created_at")
     .maybeSingle();
 
   if (error) {
@@ -89,24 +158,46 @@ export async function PUT(req) {
     return Response.json({ error: "FORBIDDEN" }, { status: 403 });
   }
 
-  const { id, name, latitude, longitude, radius_meters, is_active } = await req.json();
+  const requestBody = await req.json();
+  const { id } = requestBody;
   const locationId = String(id || "").trim();
   if (!locationId) {
     return Response.json({ error: "INVALID_INPUT" }, { status: 400 });
   }
 
   const updates = {};
-  if (name !== undefined) updates.name = String(name || "").trim();
-  if (latitude !== undefined) updates.latitude = Number(latitude);
-  if (longitude !== undefined) updates.longitude = Number(longitude);
-  if (radius_meters !== undefined) updates.radius_meters = Number(radius_meters);
-  if (is_active !== undefined) updates.is_active = Boolean(is_active);
+  if (
+    requestBody.name !== undefined
+    || requestBody.latitude !== undefined
+    || requestBody.longitude !== undefined
+    || requestBody.radius_meters !== undefined
+    || requestBody.boundary_type !== undefined
+    || requestBody.boundary_json !== undefined
+  ) {
+    const { payload, error: payloadError } = buildLocationPayload({
+      name: requestBody.name,
+      latitude: requestBody.latitude,
+      longitude: requestBody.longitude,
+      radius_meters: requestBody.radius_meters,
+      boundary_type: requestBody.boundary_type,
+      boundary_json: requestBody.boundary_json,
+      is_active: requestBody.is_active,
+    });
+
+    if (payloadError) {
+      return Response.json({ error: payloadError }, { status: 400 });
+    }
+
+    Object.assign(updates, payload);
+  }
+
+  if (requestBody.is_active !== undefined) updates.is_active = Boolean(requestBody.is_active);
 
   const { data, error } = await supabaseServer
     .from("work_locations")
     .update(updates)
     .eq("id", locationId)
-    .select("id, name, latitude, longitude, radius_meters, is_active, created_at")
+    .select("id, name, latitude, longitude, radius_meters, boundary_type, boundary_json, is_active, created_at")
     .maybeSingle();
 
   if (error) {
