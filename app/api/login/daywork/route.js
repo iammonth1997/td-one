@@ -1,5 +1,7 @@
 import { supabaseServer } from "@/lib/supabaseServer";
 import { validateSession } from "@/lib/validateSession";
+import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
+import { hasAnyPermission } from "@/lib/rbac/access";
 
 export async function GET(req) {
   // Session validation
@@ -7,6 +9,8 @@ export async function GET(req) {
   if (authError) {
     return Response.json({ error: authError }, { status: authStatus });
   }
+
+  const accessProfile = buildSessionAccessProfile(session);
 
   try {
     const { searchParams } = new URL(req.url);
@@ -20,7 +24,14 @@ export async function GET(req) {
     }
 
     // Enforce: employees can only query their own data
-    if (emp_id !== session.emp_id && !["admin", "super_admin"].includes(session.role)) {
+    const canReadOwn = hasAnyPermission(accessProfile, ["daywork.read.self", "daywork.read.all", "rbac.manage"]);
+    const canReadAll = hasAnyPermission(accessProfile, ["daywork.read.all", "rbac.manage"]);
+
+    if (!canReadOwn) {
+      return Response.json({ error: "FORBIDDEN" }, { status: 403 });
+    }
+
+    if (emp_id !== session.emp_id && !canReadAll) {
       return Response.json({ error: "FORBIDDEN" }, { status: 403 });
     }
 

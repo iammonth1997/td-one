@@ -1,18 +1,6 @@
 import { validateSession } from "@/lib/validateSession";
 import { supabaseServer } from "@/lib/supabaseServer";
-
-const ALLOWED_ROLES = new Set([
-  "admin",
-  "super_admin",
-  "hr_payroll",
-  "hr-payroll",
-  "hr payroll",
-  "hrpayroll",
-]);
-
-function canResetDevice(role) {
-  return ALLOWED_ROLES.has(String(role || "").trim().toLowerCase());
-}
+import { buildSessionAccessProfile, canManageAdminActions } from "@/lib/rbac/sessionAccess";
 
 export async function GET(req) {
   const { session, error: authError, status: authStatus } = await validateSession(req);
@@ -20,7 +8,8 @@ export async function GET(req) {
     return Response.json({ error: authError }, { status: authStatus });
   }
 
-  if (!canResetDevice(session.role)) {
+  const accessProfile = buildSessionAccessProfile(session);
+  if (!canManageAdminActions(session, accessProfile)) {
     return Response.json({ error: "FORBIDDEN" }, { status: 403 });
   }
 
@@ -43,7 +32,8 @@ export async function POST(req) {
     return Response.json({ error: authError }, { status: authStatus });
   }
 
-  if (!canResetDevice(session.role)) {
+  const accessProfile = buildSessionAccessProfile(session);
+  if (!canManageAdminActions(session, accessProfile)) {
     return Response.json({ error: "FORBIDDEN" }, { status: 403 });
   }
 

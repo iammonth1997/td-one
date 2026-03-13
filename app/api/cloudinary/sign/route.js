@@ -1,10 +1,23 @@
 import { validateSession } from "@/lib/validateSession";
 import crypto from "crypto";
+import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
+import { hasAnyPermission } from "@/lib/rbac/access";
 
 export async function POST(req) {
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) {
     return Response.json({ error: authError }, { status: authStatus });
+  }
+
+  const accessProfile = buildSessionAccessProfile(session);
+  if (!hasAnyPermission(accessProfile, [
+    "attendance.read.self",
+    "leave.request.self",
+    "time_correction.request.self",
+    "ot.request.self",
+    "rbac.manage",
+  ])) {
+    return Response.json({ error: "FORBIDDEN" }, { status: 403 });
   }
 
   const payload = await req.json();

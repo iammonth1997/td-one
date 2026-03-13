@@ -1,6 +1,8 @@
 import { validateSession } from "@/lib/validateSession";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { getEmployeeByEmpCode } from "@/lib/otRequestUtils";
+import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
+import { hasAnyPermission } from "@/lib/rbac/access";
 
 function calcLeaveDays(startDate, endDate) {
   const start = new Date(`${startDate}T00:00:00+07:00`);
@@ -12,6 +14,11 @@ function calcLeaveDays(startDate, endDate) {
 export async function POST(req) {
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) return Response.json({ error: authError }, { status: authStatus });
+
+  const accessProfile = buildSessionAccessProfile(session);
+  if (!hasAnyPermission(accessProfile, ["leave.request.self", "leave.approve.section", "leave.approve.department", "leave.approve.company"])) {
+    return Response.json({ error: "FORBIDDEN" }, { status: 403 });
+  }
 
   const body = await req.json();
   const leaveTypeCode = String(body.leave_type_code || "").trim().toLowerCase();
@@ -95,6 +102,11 @@ export async function POST(req) {
 export async function GET(req) {
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) return Response.json({ error: authError }, { status: authStatus });
+
+  const accessProfile = buildSessionAccessProfile(session);
+  if (!hasAnyPermission(accessProfile, ["leave.request.self", "leave.approve.section", "leave.approve.department", "leave.approve.company"])) {
+    return Response.json({ error: "FORBIDDEN" }, { status: 403 });
+  }
 
   const { employee, error: employeeError } = await getEmployeeByEmpCode(session.emp_id);
   if (employeeError) return Response.json({ error: "EMPLOYEE_QUERY_FAILED", detail: employeeError.message }, { status: 500 });

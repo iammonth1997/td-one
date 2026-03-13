@@ -1,19 +1,8 @@
 import { validateSession } from "@/lib/validateSession";
 import { loadActiveWorkLocations } from "@/lib/attendanceUtils";
 import { supabaseServer } from "@/lib/supabaseServer";
-
-const ADMIN_ROLES = new Set([
-  "admin",
-  "super_admin",
-  "hr_payroll",
-  "hr-payroll",
-  "hr payroll",
-  "hrpayroll",
-]);
-
-function canManage(role) {
-  return ADMIN_ROLES.has(String(role || "").trim().toLowerCase());
-}
+import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
+import { hasAnyPermission } from "@/lib/rbac/access";
 
 export async function GET(req) {
   const { session, error: authError, status: authStatus } = await validateSession(req);
@@ -21,10 +10,13 @@ export async function GET(req) {
     return Response.json({ error: authError }, { status: authStatus });
   }
 
+  const accessProfile = buildSessionAccessProfile(session);
+  const canManage = hasAnyPermission(accessProfile, ["settings.work_location.manage", "rbac.manage"]);
+
   const { searchParams } = new URL(req.url);
   const includeInactive = searchParams.get("all") === "1";
 
-  if (includeInactive && !canManage(session.role)) {
+  if (includeInactive && !canManage) {
     return Response.json({ error: "FORBIDDEN" }, { status: 403 });
   }
 
@@ -55,7 +47,8 @@ export async function POST(req) {
     return Response.json({ error: authError }, { status: authStatus });
   }
 
-  if (!canManage(session.role)) {
+  const accessProfile = buildSessionAccessProfile(session);
+  if (!hasAnyPermission(accessProfile, ["settings.work_location.manage", "rbac.manage"])) {
     return Response.json({ error: "FORBIDDEN" }, { status: 403 });
   }
 
@@ -91,7 +84,8 @@ export async function PUT(req) {
     return Response.json({ error: authError }, { status: authStatus });
   }
 
-  if (!canManage(session.role)) {
+  const accessProfile = buildSessionAccessProfile(session);
+  if (!hasAnyPermission(accessProfile, ["settings.work_location.manage", "rbac.manage"])) {
     return Response.json({ error: "FORBIDDEN" }, { status: 403 });
   }
 
@@ -128,7 +122,8 @@ export async function DELETE(req) {
     return Response.json({ error: authError }, { status: authStatus });
   }
 
-  if (!canManage(session.role)) {
+  const accessProfile = buildSessionAccessProfile(session);
+  if (!hasAnyPermission(accessProfile, ["settings.work_location.manage", "rbac.manage"])) {
     return Response.json({ error: "FORBIDDEN" }, { status: 403 });
   }
 

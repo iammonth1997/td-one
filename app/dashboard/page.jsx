@@ -9,11 +9,16 @@ import { useSession } from "@/app/hooks/useSession";
 
 export default function Dashboard() {
   const router = useRouter();
-  const { session, loading } = useSession();
+  const { session, loading } = useSession({ loginPath: "/login", requiredPortal: "employee_portal" });
   const { t } = useLanguage();
   const L = t.dashboard;
 
   useEffect(() => {
+    if (!loading && session?.login_context === "admin_portal") {
+      router.replace("/admin");
+      return;
+    }
+
     if (!loading && session?.must_change_pin) {
       router.replace("/change-pin");
     }

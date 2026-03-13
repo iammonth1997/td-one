@@ -2,21 +2,10 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { validateSession } from "@/lib/validateSession";
-
-const ISSUE_ALLOWED_ROLES = new Set([
-  "super_admin",
-  "hr_payroll",
-  "hr-payroll",
-  "hr payroll",
-  "hrpayroll",
-]);
+import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
+import { hasAnyPermission } from "@/lib/rbac/access";
 
 const TEMP_PIN_TTL_MINUTES = 15;
-
-function canIssueTempPin(role) {
-  const normalized = String(role || "").trim().toLowerCase();
-  return ISSUE_ALLOWED_ROLES.has(normalized);
-}
 
 function generateTempPin() {
   const bytes = crypto.randomBytes(4).readUInt32BE(0);
@@ -36,7 +25,9 @@ export async function POST(req) {
     return Response.json({ error: authError }, { status: authStatus });
   }
 
-  if (!canIssueTempPin(session.role)) {
+  const accessProfile = buildSessionAccessProfile(session);
+
+  if (!hasAnyPermission(accessProfile, ["security.pin.reset.manage", "rbac.manage"])) {
     return Response.json({ error: "FORBIDDEN" }, { status: 403 });
   }
 

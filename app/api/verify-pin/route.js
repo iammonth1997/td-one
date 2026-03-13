@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { verifyLineIdToken } from "@/lib/verifyLineIdToken";
+import { EMPLOYEE_PORTAL } from "@/lib/sessionContext";
 
 const SESSION_DURATION_MS = 8 * 60 * 60 * 1000;
 
@@ -110,6 +111,7 @@ export async function POST(req) {
         role: user.role,
         expires_at: expiresAt,
         is_active: true,
+        login_context: EMPLOYEE_PORTAL,
         user_agent: req.headers.get("user-agent") || null,
       });
 
@@ -124,6 +126,7 @@ export async function POST(req) {
       role: user.role,
       status: emp.status,
       session_token: sessionToken,
+      login_context: EMPLOYEE_PORTAL,
       must_change_pin: mustChangePin,
     });
   } catch (error) {

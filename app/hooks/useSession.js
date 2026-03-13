@@ -6,10 +6,9 @@ import { useRouter } from "next/navigation";
 const SESSION_DURATION_MS = 8 * 60 * 60 * 1000; // 8 hours
 const CHECK_INTERVAL_MS = 60 * 1000; // check every 60 seconds
 
-export function useSession() {
+export function useSession({ loginPath = "/login", requiredPortal = null } = {}) {
   const router = useRouter();
-  const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   const checkAndGetSession = useCallback(() => {
     try {
@@ -31,28 +30,33 @@ export function useSession() {
     }
   }, []);
 
+  void refreshTick;
+  const session = typeof window === "undefined" ? null : checkAndGetSession();
+
   useEffect(() => {
-    const s = checkAndGetSession();
-    if (!s) {
-      router.push("/login");
+    if (!session) {
+      router.push(loginPath);
     } else {
-      if (s.must_change_pin && window.location.pathname !== "/change-pin") {
-        router.replace("/change-pin");
+      if (requiredPortal && session.login_context !== requiredPortal) {
+        router.replace(session.login_context === "admin_portal" ? "/admin" : "/dashboard");
+      } else {
+        if (session.must_change_pin && window.location.pathname !== "/change-pin") {
+          router.replace("/change-pin");
+        }
       }
-      setSession(s);
     }
-    setLoading(false);
 
     const interval = setInterval(() => {
       const current = checkAndGetSession();
       if (!current) {
-        setSession(null);
-        router.push("/login");
+        router.push(loginPath);
+      } else {
+        setRefreshTick((value) => value + 1);
       }
     }, CHECK_INTERVAL_MS);
 
     return () => clearInterval(interval);
-  }, [checkAndGetSession, router]);
+  }, [checkAndGetSession, loginPath, requiredPortal, router, session]);
 
   const getAuthHeaders = useCallback(() => {
     try {
@@ -83,9 +87,14 @@ export function useSession() {
       }
     } catch { /* ignore */ }
     localStorage.removeItem("tdone_session");
-    setSession(null);
-    router.push("/login");
-  }, [router]);
+    setRefreshTick((value) => value + 1);
+    router.push(loginPath);
+  }, [loginPath, router]);
 
-  return { session, loading, logout, getAuthHeaders };
+  return {
+    session,
+    loading: false,
+    logout,
+    getAuthHeaders,
+  };
 }

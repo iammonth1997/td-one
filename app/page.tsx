@@ -41,7 +41,10 @@ export default function Home() {
     const session = hasValidSession();
     if (!session) return;
 
-    const target = session.must_change_pin ? "/change-pin" : "/dashboard";
+    const isAdminPortal = session.login_context === "admin_portal";
+    const target = session.must_change_pin
+      ? "/change-pin"
+      : (isAdminPortal ? "/admin" : "/dashboard");
     router.replace(target);
   }, [router]);
 
@@ -80,6 +83,7 @@ export default function Home() {
               emp_id: data.emp_id,
               role: data.role,
               status: data.status,
+              login_context: data.login_context || "employee_portal",
               login_time: new Date().toISOString(),
               session_token: data.session_token,
               must_change_pin: Boolean(data.must_change_pin),

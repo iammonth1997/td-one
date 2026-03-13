@@ -1,20 +1,8 @@
 import { validateSession } from "@/lib/validateSession";
-
-const ALLOWED_ROLES = new Set([
-  "admin",
-  "super_admin",
-  "hr_payroll",
-  "hr-payroll",
-  "hr payroll",
-  "hrpayroll",
-]);
+import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
+import { hasAnyPermission } from "@/lib/rbac/access";
 
 const LINE_API_BASE = "https://api.line.me/v2/bot";
-
-function canManageRichMenu(role) {
-  const normalized = String(role || "").trim().toLowerCase();
-  return ALLOWED_ROLES.has(normalized);
-}
 
 function lineHeaders(contentType) {
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -79,7 +67,9 @@ export async function GET(req) {
     return Response.json({ error: authError }, { status: authStatus });
   }
 
-  if (!canManageRichMenu(session.role)) {
+  const accessProfile = buildSessionAccessProfile(session);
+
+  if (!hasAnyPermission(accessProfile, ["settings.rich_menu.manage", "rbac.manage"])) {
     return Response.json({ error: "FORBIDDEN" }, { status: 403 });
   }
 
@@ -109,7 +99,9 @@ export async function POST(req) {
     return Response.json({ error: authError }, { status: authStatus });
   }
 
-  if (!canManageRichMenu(session.role)) {
+  const accessProfile = buildSessionAccessProfile(session);
+
+  if (!hasAnyPermission(accessProfile, ["settings.rich_menu.manage", "rbac.manage"])) {
     return Response.json({ error: "FORBIDDEN" }, { status: 403 });
   }
 

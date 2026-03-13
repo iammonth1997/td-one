@@ -1,5 +1,7 @@
 import { supabaseServer } from "@/lib/supabaseServer";
 import { validateSession } from "@/lib/validateSession";
+import { buildSessionAccessProfile, mapSessionRoleToAppRole } from "@/lib/rbac/sessionAccess";
+import { hasAnyPermission } from "@/lib/rbac/access";
 
 export async function POST(req) {
   const { session, error: authError, status: authStatus } = await validateSession(req);
@@ -7,7 +9,9 @@ export async function POST(req) {
     return Response.json({ error: authError }, { status: authStatus });
   }
 
-  if (!["admin", "super_admin"].includes(session.role)) {
+  const accessProfile = buildSessionAccessProfile(session);
+
+  if (!hasAnyPermission(accessProfile, ["security.session.revoke", "rbac.manage"])) {
     return Response.json({ error: "FORBIDDEN" }, { status: 403 });
   }
 
@@ -28,7 +32,9 @@ export async function POST(req) {
     return Response.json({ error: "USER_NOT_FOUND" }, { status: 400 });
   }
 
-  if (targetUser.role === "super_admin" && session.role !== "super_admin") {
+  const isTargetSuperAdmin = mapSessionRoleToAppRole(targetUser.role) === "SUPER_ADMIN";
+  const isRequesterSuperAdmin = mapSessionRoleToAppRole(session.role) === "SUPER_ADMIN";
+  if (isTargetSuperAdmin && !isRequesterSuperAdmin) {
     return Response.json({ error: "CANNOT_REVOKE_SUPER_ADMIN" }, { status: 403 });
   }
 

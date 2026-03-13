@@ -1,6 +1,9 @@
 import { validateSession } from "@/lib/validateSession";
 import { getEmployeeFromSessionEmpId, getTodayDateInBangkok, pickEmployeeName } from "@/lib/attendanceUtils";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
+import { hasAnyPermission } from "@/lib/rbac/access";
+import { EMPLOYEE_PORTAL, isPortalContextAllowed } from "@/lib/sessionContext";
 
 function buildTodayHistory(row) {
   if (!row) return [];
@@ -32,6 +35,15 @@ export async function GET(req) {
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) {
     return Response.json({ error: authError }, { status: authStatus });
+  }
+
+  if (!isPortalContextAllowed(session, [EMPLOYEE_PORTAL])) {
+    return Response.json({ error: "FORBIDDEN_PORTAL_CONTEXT" }, { status: 403 });
+  }
+
+  const accessProfile = buildSessionAccessProfile(session);
+  if (!hasAnyPermission(accessProfile, ["attendance.read.self", "attendance.read.team", "attendance.read.department", "attendance.read.all"])) {
+    return Response.json({ error: "FORBIDDEN" }, { status: 403 });
   }
 
   const { employee, error: employeeError } = await getEmployeeFromSessionEmpId(session.emp_id);

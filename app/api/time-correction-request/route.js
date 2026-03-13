@@ -1,12 +1,19 @@
 import { validateSession } from "@/lib/validateSession";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { getEmployeeByEmpCode } from "@/lib/otRequestUtils";
+import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
+import { hasAnyPermission } from "@/lib/rbac/access";
 
 const ALLOWED_TYPES = new Set(["forgot_in", "forgot_out", "forgot_both"]);
 
 export async function POST(req) {
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) return Response.json({ error: authError }, { status: authStatus });
+
+  const accessProfile = buildSessionAccessProfile(session);
+  if (!hasAnyPermission(accessProfile, ["time_correction.request.self", "time_correction.read.all", "rbac.manage"])) {
+    return Response.json({ error: "FORBIDDEN" }, { status: 403 });
+  }
 
   const body = await req.json();
   const date = String(body.date || "").trim();
@@ -55,6 +62,11 @@ export async function POST(req) {
 export async function GET(req) {
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) return Response.json({ error: authError }, { status: authStatus });
+
+  const accessProfile = buildSessionAccessProfile(session);
+  if (!hasAnyPermission(accessProfile, ["time_correction.read.self", "time_correction.read.all", "time_correction.request.self", "rbac.manage"])) {
+    return Response.json({ error: "FORBIDDEN" }, { status: 403 });
+  }
 
   const { employee, error: employeeError } = await getEmployeeByEmpCode(session.emp_id);
   if (employeeError) return Response.json({ error: "EMPLOYEE_QUERY_FAILED", detail: employeeError.message }, { status: 500 });

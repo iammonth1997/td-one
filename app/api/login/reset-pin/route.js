@@ -2,14 +2,10 @@ import { isServiceRoleEnabled, supabaseServer } from "@/lib/supabaseServer";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { validateSession } from "@/lib/validateSession";
+import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
+import { hasAnyPermission } from "@/lib/rbac/access";
 
 const SECRET = process.env.RESET_PIN_SECRET || "td-one-reset-pin-secret-2026";
-const RESET_ALLOWED_ROLES = new Set(["hr_payroll", "hr-payroll", "hr payroll", "hrpayroll"]);
-
-function canResetPin(role) {
-  const normalized = String(role || "").trim().toLowerCase();
-  return RESET_ALLOWED_ROLES.has(normalized);
-}
 
 function verifyResetToken(token) {
   try {
@@ -50,7 +46,9 @@ export async function POST(req) {
     return Response.json({ error: authError }, { status: authStatus });
   }
 
-  if (!canResetPin(session.role)) {
+  const accessProfile = buildSessionAccessProfile(session);
+
+  if (!hasAnyPermission(accessProfile, ["security.pin.reset.manage", "rbac.manage"])) {
     return Response.json({ error: "FORBIDDEN" }, { status: 403 });
   }
 

@@ -65,6 +65,7 @@ export default function LinkAccountPage({ profile, idToken }: Props) {
           emp_id: data.emp_id,
           role: data.role,
           status: data.status,
+          login_context: data.login_context || "employee_portal",
           login_time: new Date().toISOString(),
           session_token: data.session_token,
           must_change_pin: Boolean(data.must_change_pin),

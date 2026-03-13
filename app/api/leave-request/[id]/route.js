@@ -1,17 +1,18 @@
 import { validateSession } from "@/lib/validateSession";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { getEmployeeByEmpCode } from "@/lib/otRequestUtils";
-
-const ADMIN_ROLES = new Set(["admin", "super_admin", "hr_payroll", "hr-payroll", "hr payroll", "hrpayroll"]);
-
-function isAdmin(role) {
-  return ADMIN_ROLES.has(String(role || "").trim().toLowerCase());
-}
+import { buildSessionAccessProfile, canManageAdminActions } from "@/lib/rbac/sessionAccess";
+import { hasAnyPermission } from "@/lib/rbac/access";
 
 export async function PUT(req, { params }) {
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) {
     return Response.json({ error: authError }, { status: authStatus });
+  }
+
+  const accessProfile = buildSessionAccessProfile(session);
+  if (!hasAnyPermission(accessProfile, ["leave.request.self", "leave.approve.section", "leave.approve.department", "leave.approve.company"]) && !canManageAdminActions(session, accessProfile)) {
+    return Response.json({ error: "FORBIDDEN" }, { status: 403 });
   }
 
   const { id } = await params;
@@ -38,7 +39,7 @@ export async function PUT(req, { params }) {
     return Response.json({ error: "LEAVE_REQUEST_NOT_FOUND" }, { status: 404 });
   }
 
-  if (!isAdmin(session.role)) {
+  if (!canManageAdminActions(session, accessProfile)) {
     const { employee, error: employeeError } = await getEmployeeByEmpCode(session.emp_id);
     if (employeeError) {
       return Response.json({ error: "EMPLOYEE_QUERY_FAILED", detail: employeeError.message }, { status: 500 });

@@ -9,17 +9,18 @@ import {
   hasLeaveOnDate,
   validateOtDate,
 } from "@/lib/otRequestUtils";
-
-const ADMIN_ROLES = new Set(["admin", "super_admin", "hr_payroll", "hr-payroll", "hr payroll", "hrpayroll"]);
-
-function canViewAll(role) {
-  return ADMIN_ROLES.has(String(role || "").trim().toLowerCase());
-}
+import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
+import { hasAnyPermission } from "@/lib/rbac/access";
 
 export async function POST(req) {
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) {
     return Response.json({ error: authError }, { status: authStatus });
+  }
+
+  const accessProfile = buildSessionAccessProfile(session);
+  if (!hasAnyPermission(accessProfile, ["ot.request.self", "ot.approve.section", "ot.approve.department", "ot.approve.company", "ot.read.all"])) {
+    return Response.json({ error: "FORBIDDEN" }, { status: 403 });
   }
 
   const body = await req.json();
@@ -119,6 +120,11 @@ export async function GET(req) {
     return Response.json({ error: authError }, { status: authStatus });
   }
 
+  const accessProfile = buildSessionAccessProfile(session);
+  if (!hasAnyPermission(accessProfile, ["ot.read.self", "ot.read.team", "ot.read.department", "ot.read.all", "ot.request.self"])) {
+    return Response.json({ error: "FORBIDDEN" }, { status: 403 });
+  }
+
   const { employee, error: employeeError } = await getEmployeeByEmpCode(session.emp_id);
   if (employeeError) {
     return Response.json({ error: "EMPLOYEE_QUERY_FAILED", detail: employeeError.message }, { status: 500 });
@@ -140,7 +146,7 @@ export async function GET(req) {
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  if (canViewAll(session.role) && empCode) {
+  if (hasAnyPermission(accessProfile, ["ot.read.all", "rbac.manage"]) && empCode) {
     const employeeLookup = await getEmployeeByEmpCode(empCode);
     if (employeeLookup.error) {
       return Response.json({ error: "EMPLOYEE_QUERY_FAILED", detail: employeeLookup.error.message }, { status: 500 });

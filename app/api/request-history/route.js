@@ -1,6 +1,8 @@
 import { validateSession } from "@/lib/validateSession";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { getEmployeeByEmpCode } from "@/lib/otRequestUtils";
+import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
+import { hasAnyPermission } from "@/lib/rbac/access";
 
 function statusIcon(status) {
   if (status === "approved") return "approved";
@@ -12,6 +14,25 @@ function statusIcon(status) {
 export async function GET(req) {
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) return Response.json({ error: authError }, { status: authStatus });
+
+  const accessProfile = buildSessionAccessProfile(session);
+  if (!hasAnyPermission(accessProfile, [
+    "leave.request.self",
+    "leave.approve.section",
+    "leave.approve.department",
+    "leave.approve.company",
+    "time_correction.read.self",
+    "time_correction.read.all",
+    "time_correction.request.self",
+    "ot.request.self",
+    "ot.read.self",
+    "ot.read.team",
+    "ot.read.department",
+    "ot.read.all",
+    "rbac.manage",
+  ])) {
+    return Response.json({ error: "FORBIDDEN" }, { status: 403 });
+  }
 
   const { employee, error: employeeError } = await getEmployeeByEmpCode(session.emp_id);
   if (employeeError) return Response.json({ error: "EMPLOYEE_QUERY_FAILED", detail: employeeError.message }, { status: 500 });

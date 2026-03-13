@@ -1,11 +1,23 @@
 import { validateSession } from "@/lib/validateSession";
 import { detectSuspiciousGps, verifyWorkLocation } from "@/lib/attendanceUtils";
 import { verifyAttendanceLiffBySession } from "@/lib/verifyAttendanceLiff";
+import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
+import { hasAnyPermission } from "@/lib/rbac/access";
+import { EMPLOYEE_PORTAL, isPortalContextAllowed } from "@/lib/sessionContext";
 
 export async function POST(req) {
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) {
     return Response.json({ error: authError }, { status: authStatus });
+  }
+
+  if (!isPortalContextAllowed(session, [EMPLOYEE_PORTAL])) {
+    return Response.json({ error: "FORBIDDEN_PORTAL_CONTEXT" }, { status: 403 });
+  }
+
+  const accessProfile = buildSessionAccessProfile(session);
+  if (!hasAnyPermission(accessProfile, ["attendance.read.self", "attendance.read.team", "attendance.read.department", "attendance.read.all"])) {
+    return Response.json({ error: "FORBIDDEN" }, { status: 403 });
   }
 
   const liffCheck = await verifyAttendanceLiffBySession(req, session.emp_id);

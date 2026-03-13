@@ -1,10 +1,17 @@
 import { validateSession } from "@/lib/validateSession";
 import { findExistingOtOnDate, getEmployeeByEmpCode, hasLeaveOnDate } from "@/lib/otRequestUtils";
+import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
+import { hasAnyPermission } from "@/lib/rbac/access";
 
 export async function GET(req) {
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) {
     return Response.json({ error: authError }, { status: authStatus });
+  }
+
+  const accessProfile = buildSessionAccessProfile(session);
+  if (!hasAnyPermission(accessProfile, ["ot.request.self", "ot.read.self", "ot.read.team", "ot.read.department", "ot.read.all", "rbac.manage"])) {
+    return Response.json({ error: "FORBIDDEN" }, { status: 403 });
   }
 
   const { searchParams } = new URL(req.url);

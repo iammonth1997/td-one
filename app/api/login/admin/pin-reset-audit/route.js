@@ -1,19 +1,7 @@
 import { supabaseServer } from "@/lib/supabaseServer";
 import { validateSession } from "@/lib/validateSession";
-
-const VIEW_ALLOWED_ROLES = new Set([
-  "admin",
-  "super_admin",
-  "hr_payroll",
-  "hr-payroll",
-  "hr payroll",
-  "hrpayroll",
-]);
-
-function canViewAudit(role) {
-  const normalized = String(role || "").trim().toLowerCase();
-  return VIEW_ALLOWED_ROLES.has(normalized);
-}
+import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
+import { hasAnyPermission } from "@/lib/rbac/access";
 
 export async function GET(req) {
   const { session, error: authError, status: authStatus } = await validateSession(req);
@@ -21,7 +9,9 @@ export async function GET(req) {
     return Response.json({ error: authError }, { status: authStatus });
   }
 
-  if (!canViewAudit(session.role)) {
+  const accessProfile = buildSessionAccessProfile(session);
+
+  if (!hasAnyPermission(accessProfile, ["audit.read.pin_reset", "audit.read.all", "rbac.manage"])) {
     return Response.json({ error: "FORBIDDEN" }, { status: 403 });
   }
 

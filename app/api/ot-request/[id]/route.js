@@ -1,17 +1,18 @@
 import { validateSession } from "@/lib/validateSession";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { getEmployeeByEmpCode } from "@/lib/otRequestUtils";
-
-const ADMIN_ROLES = new Set(["admin", "super_admin", "hr_payroll", "hr-payroll", "hr payroll", "hrpayroll"]);
-
-function isAdmin(role) {
-  return ADMIN_ROLES.has(String(role || "").trim().toLowerCase());
-}
+import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
+import { hasAnyPermission } from "@/lib/rbac/access";
 
 export async function GET(req, { params }) {
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) {
     return Response.json({ error: authError }, { status: authStatus });
+  }
+
+  const accessProfile = buildSessionAccessProfile(session);
+  if (!hasAnyPermission(accessProfile, ["ot.read.self", "ot.read.team", "ot.read.department", "ot.read.all", "ot.request.self"])) {
+    return Response.json({ error: "FORBIDDEN" }, { status: 403 });
   }
 
   const { id } = await params;
@@ -32,7 +33,7 @@ export async function GET(req, { params }) {
     return Response.json({ error: "OT_REQUEST_NOT_FOUND" }, { status: 404 });
   }
 
-  if (!isAdmin(session.role)) {
+  if (!hasAnyPermission(accessProfile, ["ot.read.all", "rbac.manage"])) {
     const { employee, error: employeeError } = await getEmployeeByEmpCode(session.emp_id);
     if (employeeError) {
       return Response.json({ error: "EMPLOYEE_QUERY_FAILED", detail: employeeError.message }, { status: 500 });
@@ -49,6 +50,11 @@ export async function PUT(req, { params }) {
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) {
     return Response.json({ error: authError }, { status: authStatus });
+  }
+
+  const accessProfile = buildSessionAccessProfile(session);
+  if (!hasAnyPermission(accessProfile, ["ot.request.self", "ot.approve.section", "ot.approve.department", "ot.approve.company", "ot.read.all", "rbac.manage"])) {
+    return Response.json({ error: "FORBIDDEN" }, { status: 403 });
   }
 
   const { id } = await params;
@@ -75,7 +81,7 @@ export async function PUT(req, { params }) {
     return Response.json({ error: "OT_REQUEST_NOT_FOUND" }, { status: 404 });
   }
 
-  const admin = isAdmin(session.role);
+  const admin = hasAnyPermission(accessProfile, ["ot.approve.company", "ot.read.all", "rbac.manage"]);
   if (!admin) {
     const { employee, error: employeeError } = await getEmployeeByEmpCode(session.emp_id);
     if (employeeError) {
