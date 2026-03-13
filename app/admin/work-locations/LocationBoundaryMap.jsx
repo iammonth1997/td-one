@@ -25,6 +25,7 @@ export default function LocationBoundaryMap({
   boundaryJson,
   onCircleChange,
   onRectangleChange,
+  onPolygonChange,
   clearSignal,
 }) {
   const mapElementRef = useRef(null);
@@ -33,6 +34,8 @@ export default function LocationBoundaryMap({
   const overlayLayerRef = useRef(null);
   const cornerMarkerLayerRef = useRef(null);
   const firstCornerRef = useRef(null);
+  const polygonDraftRef = useRef([]);
+  const tileLayersRef = useRef({ satellite: null, street: null });
   const latestConfigRef = useRef({
     boundaryType,
     latitude,
@@ -41,6 +44,7 @@ export default function LocationBoundaryMap({
     boundaryJson,
     onCircleChange,
     onRectangleChange,
+    onPolygonChange,
   });
 
   latestConfigRef.current = {
@@ -51,6 +55,7 @@ export default function LocationBoundaryMap({
     boundaryJson,
     onCircleChange,
     onRectangleChange,
+    onPolygonChange,
   };
 
   const drawCornerMarkers = useCallback(() => {
@@ -68,6 +73,16 @@ export default function LocationBoundaryMap({
       fillOpacity: 0.9,
       weight: 2,
     }).addTo(markerLayer);
+
+    polygonDraftRef.current.forEach((point, index) => {
+      L.circleMarker([point.lat, point.lng], {
+        radius: 5,
+        color: index === polygonDraftRef.current.length - 1 ? "#D946EF" : "#1352A3",
+        fillColor: index === polygonDraftRef.current.length - 1 ? "#D946EF" : "#1352A3",
+        fillOpacity: 0.95,
+        weight: 2,
+      }).addTo(markerLayer);
+    });
   }, []);
 
   const drawBoundary = useCallback(() => {
@@ -92,6 +107,36 @@ export default function LocationBoundaryMap({
       }).addTo(overlayLayer);
 
       map.fitBounds(bounds, { padding: [24, 24] });
+      drawCornerMarkers();
+      return;
+    }
+
+    if (boundaryType === "polygon" && boundaryJson?.points?.length >= 3) {
+      const latLngs = boundaryJson.points.map((point) => [point.lat, point.lng]);
+
+      L.polygon(latLngs, {
+        color: "#1352A3",
+        weight: 2,
+        fillColor: "#1352A3",
+        fillOpacity: 0.12,
+      }).addTo(overlayLayer);
+
+      map.fitBounds(L.latLngBounds(latLngs), { padding: [24, 24] });
+      drawCornerMarkers();
+      return;
+    }
+
+    if (boundaryType === "polygon" && polygonDraftRef.current.length >= 1) {
+      const latLngs = polygonDraftRef.current.map((point) => [point.lat, point.lng]);
+
+      if (latLngs.length >= 2) {
+        L.polyline(latLngs, {
+          color: "#D946EF",
+          weight: 2,
+          dashArray: "8 6",
+        }).addTo(overlayLayer);
+      }
+
       drawCornerMarkers();
       return;
     }
@@ -135,9 +180,24 @@ export default function LocationBoundaryMap({
         zoom: DEFAULT_ZOOM,
       });
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      const satellite = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+        attribution: "Tiles &copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community",
+      });
+      const street = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: '&copy; OpenStreetMap contributors',
-      }).addTo(map);
+      });
+
+      satellite.addTo(map);
+      tileLayersRef.current = { satellite, street };
+
+      L.control.layers(
+        {
+          "Satellite": satellite,
+          "Street Map": street,
+        },
+        {},
+        { position: "topright" }
+      ).addTo(map);
 
       overlayLayerRef.current = L.layerGroup().addTo(map);
       cornerMarkerLayerRef.current = L.layerGroup().addTo(map);
@@ -165,6 +225,16 @@ export default function LocationBoundaryMap({
           return;
         }
 
+        if (config.boundaryType === "polygon") {
+          polygonDraftRef.current = [...polygonDraftRef.current, { lat: clickedLat, lng: clickedLng }];
+          drawBoundary();
+
+          if (polygonDraftRef.current.length >= 3) {
+            config.onPolygonChange({ points: polygonDraftRef.current });
+          }
+          return;
+        }
+
         config.onCircleChange({
           latitude: clickedLat,
           longitude: clickedLng,
@@ -187,6 +257,8 @@ export default function LocationBoundaryMap({
       overlayLayerRef.current = null;
       cornerMarkerLayerRef.current = null;
       firstCornerRef.current = null;
+      polygonDraftRef.current = [];
+      tileLayersRef.current = { satellite: null, street: null };
     };
   }, [drawBoundary, drawCornerMarkers]);
 
@@ -196,6 +268,7 @@ export default function LocationBoundaryMap({
 
   useEffect(() => {
     firstCornerRef.current = null;
+    polygonDraftRef.current = [];
     drawCornerMarkers();
   }, [clearSignal, drawCornerMarkers]);
 
@@ -205,7 +278,9 @@ export default function LocationBoundaryMap({
         <span>
           {boundaryType === "rectangle"
             ? "Rectangle mode: click 2 points on the map to create opposite corners."
-            : "Circle mode: click once on the map to set the center point."}
+            : boundaryType === "polygon"
+              ? "Polygon mode: click multiple points around the area. The shape updates as you add vertices."
+              : "Circle mode: click once on the map to set the center point."}
         </span>
       </div>
       <div ref={mapElementRef} className="h-[360px] rounded-xl border border-[#D0D8E4] overflow-hidden" />

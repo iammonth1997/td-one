@@ -5,9 +5,11 @@ import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
 import { hasAnyPermission } from "@/lib/rbac/access";
 
 function normalizeBoundaryType(value) {
-  return String(value || "circle").trim().toLowerCase() === "rectangle"
-    ? "rectangle"
-    : "circle";
+  const normalized = String(value || "circle").trim().toLowerCase();
+  if (normalized === "rectangle" || normalized === "polygon") {
+    return normalized;
+  }
+  return "circle";
 }
 
 function normalizeRectangleBoundary(boundaryJson) {
@@ -30,6 +32,25 @@ function normalizeRectangleBoundary(boundaryJson) {
   };
 }
 
+function normalizePolygonBoundary(boundaryJson) {
+  if (!boundaryJson || typeof boundaryJson !== "object" || !Array.isArray(boundaryJson.points)) {
+    return null;
+  }
+
+  const points = boundaryJson.points
+    .map((point) => ({
+      lat: Number(point?.lat),
+      lng: Number(point?.lng),
+    }))
+    .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng));
+
+  if (points.length < 3) {
+    return null;
+  }
+
+  return { points };
+}
+
 function deriveRectangleCenter(boundary) {
   return {
     latitude: (boundary.south + boundary.north) / 2,
@@ -37,10 +58,31 @@ function deriveRectangleCenter(boundary) {
   };
 }
 
+function derivePolygonCenter(boundary) {
+  const latitudes = boundary.points.map((point) => point.lat);
+  const longitudes = boundary.points.map((point) => point.lng);
+
+  return {
+    latitude: (Math.min(...latitudes) + Math.max(...latitudes)) / 2,
+    longitude: (Math.min(...longitudes) + Math.max(...longitudes)) / 2,
+  };
+}
+
 function deriveRectangleRadius(boundary) {
   const latDistance = Math.abs(boundary.north - boundary.south) * 111320;
   const lngDistance = Math.abs(boundary.east - boundary.west) * 111320;
   return Math.round(Math.sqrt(latDistance ** 2 + lngDistance ** 2) / 2);
+}
+
+function derivePolygonRadius(boundary) {
+  const center = derivePolygonCenter(boundary);
+  const distances = boundary.points.map((point) => {
+    const latDistance = Math.abs(point.lat - center.latitude) * 111320;
+    const lngDistance = Math.abs(point.lng - center.longitude) * 111320;
+    return Math.sqrt(latDistance ** 2 + lngDistance ** 2);
+  });
+
+  return Math.round(Math.max(...distances));
 }
 
 function buildLocationPayload(input) {
@@ -65,6 +107,19 @@ function buildLocationPayload(input) {
     payload.latitude = center.latitude;
     payload.longitude = center.longitude;
     payload.radius_meters = deriveRectangleRadius(boundary);
+    payload.boundary_json = boundary;
+  }
+
+  if (boundaryType === "polygon") {
+    const boundary = normalizePolygonBoundary(input.boundary_json);
+    if (!boundary) {
+      return { payload: null, error: "INVALID_BOUNDARY" };
+    }
+
+    const center = derivePolygonCenter(boundary);
+    payload.latitude = center.latitude;
+    payload.longitude = center.longitude;
+    payload.radius_meters = derivePolygonRadius(boundary);
     payload.boundary_json = boundary;
   }
 

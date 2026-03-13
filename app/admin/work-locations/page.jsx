@@ -53,8 +53,8 @@ export default function WorkLocationsAdminPage() {
     setBusy(true);
     setError("");
     try {
-      if (form.boundary_type === "rectangle" && !form.boundary_json) {
-        throw new Error("Please draw a rectangle on the map before saving.");
+      if ((form.boundary_type === "rectangle" || form.boundary_type === "polygon") && !form.boundary_json) {
+        throw new Error(`Please draw a ${form.boundary_type} on the map before saving.`);
       }
 
       const res = await fetch("/api/work-locations", {
@@ -124,6 +124,20 @@ export default function WorkLocationsAdminPage() {
   if (!allowed) return null;
 
   const isRectangle = form.boundary_type === "rectangle";
+  const isPolygon = form.boundary_type === "polygon";
+  const isShapeBoundary = isRectangle || isPolygon;
+
+  function renderBoundarySummary(boundaryType, boundaryJson) {
+    if (boundaryType === "rectangle" && boundaryJson) {
+      return `${Number(boundaryJson.south).toFixed(4)}, ${Number(boundaryJson.west).toFixed(4)} -> ${Number(boundaryJson.north).toFixed(4)}, ${Number(boundaryJson.east).toFixed(4)}`;
+    }
+
+    if (boundaryType === "polygon" && boundaryJson?.points?.length) {
+      return `${boundaryJson.points.length} points`;
+    }
+
+    return null;
+  }
 
   return (
     <main className="min-h-screen bg-[#F5F7FA] p-6 text-[#1A2B4A]">
@@ -142,14 +156,21 @@ export default function WorkLocationsAdminPage() {
             <select
               className="border rounded px-3 py-2 bg-white"
               value={form.boundary_type}
-              onChange={(e) => setForm((state) => ({
-                ...state,
-                boundary_type: e.target.value,
-                boundary_json: e.target.value === "rectangle" ? state.boundary_json : null,
-              }))}
+              onChange={(e) => {
+                const nextBoundaryType = e.target.value;
+                setForm((state) => ({
+                  ...state,
+                  boundary_type: nextBoundaryType,
+                  boundary_json: null,
+                  latitude: nextBoundaryType === "circle" ? state.latitude : "",
+                  longitude: nextBoundaryType === "circle" ? state.longitude : "",
+                }));
+                setMapResetTick((value) => value + 1);
+              }}
             >
               <option value="circle">Circle (center + radius)</option>
               <option value="rectangle">Rectangle (draw on map)</option>
+              <option value="polygon">Polygon (free-form draw)</option>
             </select>
           </div>
 
@@ -177,6 +198,18 @@ export default function WorkLocationsAdminPage() {
                 boundary_json: boundary,
               }));
             }}
+            onPolygonChange={(boundary) => {
+              const latitudes = boundary.points.map((point) => point.lat);
+              const longitudes = boundary.points.map((point) => point.lng);
+              const centerLat = ((Math.min(...latitudes) + Math.max(...latitudes)) / 2).toFixed(8);
+              const centerLng = ((Math.min(...longitudes) + Math.max(...longitudes)) / 2).toFixed(8);
+              setForm((state) => ({
+                ...state,
+                latitude: centerLat,
+                longitude: centerLng,
+                boundary_json: boundary,
+              }));
+            }}
           />
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -185,34 +218,43 @@ export default function WorkLocationsAdminPage() {
               placeholder="Latitude"
               value={form.latitude}
               onChange={(e) => setForm((state) => ({ ...state, latitude: e.target.value }))}
-              disabled={isRectangle}
+              disabled={isShapeBoundary}
             />
             <input
               className="border rounded px-3 py-2"
               placeholder="Longitude"
               value={form.longitude}
               onChange={(e) => setForm((state) => ({ ...state, longitude: e.target.value }))}
-              disabled={isRectangle}
+              disabled={isShapeBoundary}
             />
             <input
               className="border rounded px-3 py-2"
               placeholder="Radius meters"
               value={form.radius_meters}
               onChange={(e) => setForm((state) => ({ ...state, radius_meters: e.target.value }))}
-              disabled={isRectangle}
+              disabled={isShapeBoundary}
             />
             <button disabled={busy} className="bg-[#1352A3] text-white rounded px-4 py-2 font-semibold">Add Location</button>
           </div>
 
-          {isRectangle && (
+          {isShapeBoundary && (
             <div className="rounded-lg border border-[#D0D8E4] bg-[#F5F7FA] px-3 py-2 text-sm text-[#334260]">
-              {form.boundary_json ? (
+              {isRectangle && form.boundary_json ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   <span>South / West: {form.boundary_json.south.toFixed(6)}, {form.boundary_json.west.toFixed(6)}</span>
                   <span>North / East: {form.boundary_json.north.toFixed(6)}, {form.boundary_json.east.toFixed(6)}</span>
                 </div>
+              ) : isPolygon && form.boundary_json?.points?.length ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <span>Vertices: {form.boundary_json.points.length} points</span>
+                  <span>Center: {form.latitude}, {form.longitude}</span>
+                </div>
               ) : (
-                <span>Draw 2 opposite corners on the map to create a rectangular work area.</span>
+                <span>
+                  {isRectangle
+                    ? "Draw 2 opposite corners on the map to create a rectangular work area."
+                    : "Click around the work area to add polygon points. At least 3 points are required."}
+                </span>
               )}
             </div>
           )}
@@ -228,7 +270,7 @@ export default function WorkLocationsAdminPage() {
             >
               Reset Form
             </button>
-            <span className="text-[#6B7A99]">Tip: circle mode is good for a single building, rectangle mode is better for yard/factory areas.</span>
+            <span className="text-[#6B7A99]">Tip: circle is for a single building, rectangle for box-like areas, polygon for real site outlines.</span>
           </div>
         </form>
 
@@ -255,9 +297,7 @@ export default function WorkLocationsAdminPage() {
                   <td className="px-3 py-2">{row.latitude}</td>
                   <td className="px-3 py-2">{row.longitude}</td>
                   <td className="px-3 py-2 text-xs text-[#6B7A99]">
-                    {row.boundary_type === "rectangle" && row.boundary_json
-                      ? `${Number(row.boundary_json.south).toFixed(4)}, ${Number(row.boundary_json.west).toFixed(4)} -> ${Number(row.boundary_json.north).toFixed(4)}, ${Number(row.boundary_json.east).toFixed(4)}`
-                      : `${row.radius_meters} m`}
+                    {renderBoundarySummary(row.boundary_type, row.boundary_json) || `${row.radius_meters} m`}
                   </td>
                   <td className="px-3 py-2">{row.is_active ? "Yes" : "No"}</td>
                   <td className="px-3 py-2 space-x-2">
