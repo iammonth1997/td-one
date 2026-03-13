@@ -32,6 +32,7 @@ export default function LocationBoundaryMap({
   const [mapNotice, setMapNotice] = useState("");
   const [currentLocation, setCurrentLocation] = useState(null);
   const [polygonDraftCount, setPolygonDraftCount] = useState(0);
+  const [isPolygonDrawingActive, setIsPolygonDrawingActive] = useState(boundaryType === "polygon");
   const [initialCenter, setInitialCenter] = useState(() => {
     if (hasExplicitCircleCenter) {
       return [latitude, longitude];
@@ -59,10 +60,12 @@ export default function LocationBoundaryMap({
   const mapElementRef = useRef(null);
   const mapRef = useRef(null);
   const leafletRef = useRef(null);
+  const drawBoundaryRef = useRef(null);
   const overlayLayerRef = useRef(null);
   const cornerMarkerLayerRef = useRef(null);
   const firstCornerRef = useRef(null);
   const polygonDraftRef = useRef([]);
+  const polygonClickHandlerRef = useRef(null);
   const tileLayersRef = useRef({ satellite: null, street: null, osm: null });
   const hasAutoCenteredRef = useRef(false);
   const latestConfigRef = useRef({
@@ -109,6 +112,46 @@ export default function LocationBoundaryMap({
       latestConfigRef.current.onCurrentLocationChange(nextLocation);
     }
   }, []);
+
+  const disablePolygonDrawingMode = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (polygonClickHandlerRef.current) {
+      map.off("click", polygonClickHandlerRef.current);
+      polygonClickHandlerRef.current = null;
+    }
+
+    map.dragging.enable();
+    map.doubleClickZoom.enable();
+  }, []);
+
+  const enablePolygonDrawingMode = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    map.dragging.disable();
+    map.doubleClickZoom.disable();
+
+    if (polygonClickHandlerRef.current) return;
+
+    polygonClickHandlerRef.current = (event) => {
+      const config = latestConfigRef.current;
+      if (config.boundaryType !== "polygon") return;
+
+      if (config.boundaryJson?.points?.length >= 3 && polygonDraftRef.current.length === 0) {
+        config.onPolygonDraftChange?.({ points: [] });
+      }
+
+      const clickedLat = Number(event.latlng.lat.toFixed(8));
+      const clickedLng = Number(event.latlng.lng.toFixed(8));
+      polygonDraftRef.current = [...polygonDraftRef.current, { lat: clickedLat, lng: clickedLng }];
+      publishPolygonDraft(polygonDraftRef.current);
+      drawBoundaryRef.current?.();
+    };
+
+    map.on("click", polygonClickHandlerRef.current);
+  }, [publishPolygonDraft]);
 
   const centerMapToPosition = useCallback((lat, lng, zoom = CURRENT_LOCATION_ZOOM) => {
     const map = mapRef.current;
@@ -193,6 +236,24 @@ export default function LocationBoundaryMap({
     if (initialCenterResolved || hasAutoCenteredRef.current) return;
     locateCurrentArea();
   }, [initialCenterResolved, locateCurrentArea]);
+
+  useEffect(() => {
+    if (boundaryType === "polygon") {
+      setIsPolygonDrawingActive(true);
+      return;
+    }
+
+    setIsPolygonDrawingActive(false);
+  }, [boundaryType]);
+
+  useEffect(() => {
+    if (boundaryType === "polygon" && isPolygonDrawingActive) {
+      enablePolygonDrawingMode();
+      return;
+    }
+
+    disablePolygonDrawingMode();
+  }, [boundaryType, disablePolygonDrawingMode, enablePolygonDrawingMode, isPolygonDrawingActive]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -353,6 +414,10 @@ export default function LocationBoundaryMap({
     drawCornerMarkers();
   }, [boundaryJson, boundaryType, currentLocation, drawCornerMarkers, isShapeDrawingMode, latitude, longitude, radiusMeters]);
 
+  useEffect(() => {
+    drawBoundaryRef.current = drawBoundary;
+  }, [drawBoundary]);
+
   const handleUndoPolygonPoint = useCallback(() => {
     if (polygonDraftRef.current.length === 0) return;
 
@@ -364,7 +429,9 @@ export default function LocationBoundaryMap({
   const handleFinishPolygon = useCallback(() => {
     if (polygonDraftRef.current.length < 3) return;
     publishPolygonFinal(polygonDraftRef.current);
-  }, [publishPolygonFinal]);
+    setIsPolygonDrawingActive(false);
+    disablePolygonDrawingMode();
+  }, [disablePolygonDrawingMode, publishPolygonFinal]);
 
   useEffect(() => {
     let disposed = false;
@@ -448,6 +515,8 @@ export default function LocationBoundaryMap({
 
       map.on("click", (event) => {
         const config = latestConfigRef.current;
+        if (config.boundaryType === "polygon") return;
+
         const clickedLat = Number(event.latlng.lat.toFixed(8));
         const clickedLng = Number(event.latlng.lng.toFixed(8));
 
@@ -466,17 +535,6 @@ export default function LocationBoundaryMap({
             north: Math.max(first.lat, clickedLat),
             east: Math.max(first.lng, clickedLng),
           });
-          return;
-        }
-
-        if (config.boundaryType === "polygon") {
-          if (config.boundaryJson?.points?.length >= 3 && polygonDraftRef.current.length === 0) {
-            config.onPolygonDraftChange?.({ points: [] });
-          }
-
-          polygonDraftRef.current = [...polygonDraftRef.current, { lat: clickedLat, lng: clickedLng }];
-          publishPolygonDraft(polygonDraftRef.current);
-          drawBoundary();
           return;
         }
 
@@ -506,10 +564,12 @@ export default function LocationBoundaryMap({
       publishPolygonDraft([]);
       publishCurrentLocation(null);
       setPolygonDraftCount(0);
+      setIsPolygonDrawingActive(boundaryType === "polygon");
+      disablePolygonDrawingMode();
       tileLayersRef.current = { satellite: null, street: null, osm: null };
       hasAutoCenteredRef.current = false;
     };
-  }, [drawBoundary, drawCornerMarkers, initialCenter, initialCenterResolved, publishCurrentLocation, publishPolygonDraft]);
+  }, [boundaryType, disablePolygonDrawingMode, drawBoundary, drawCornerMarkers, initialCenter, initialCenterResolved, publishCurrentLocation, publishPolygonDraft]);
 
   useEffect(() => {
     drawBoundary();
@@ -520,8 +580,9 @@ export default function LocationBoundaryMap({
     polygonDraftRef.current = [];
     publishPolygonDraft([]);
     setPolygonDraftCount(0);
+    setIsPolygonDrawingActive(boundaryType === "polygon");
     drawCornerMarkers();
-  }, [clearSignal, drawCornerMarkers, publishPolygonDraft]);
+  }, [boundaryType, clearSignal, drawCornerMarkers, publishPolygonDraft]);
 
   return (
     <div className="space-y-2">
