@@ -17,6 +17,11 @@ const DEFAULT_FORM = {
 
 const ALLOWED = new Set(["admin", "super_admin", "hr_payroll", "hr-payroll", "hr payroll", "hrpayroll"]);
 
+function parseCoordinate(value) {
+  if (value === "" || value === null || value === undefined) return Number.NaN;
+  return Number(value);
+}
+
 export default function WorkLocationsAdminPage() {
   const router = useRouter();
   const { session, loading, getAuthHeaders } = useSession({
@@ -181,8 +186,8 @@ export default function WorkLocationsAdminPage() {
 
           <LocationBoundaryMap
             boundaryType={form.boundary_type}
-            latitude={Number(form.latitude)}
-            longitude={Number(form.longitude)}
+            latitude={parseCoordinate(form.latitude)}
+            longitude={parseCoordinate(form.longitude)}
             radiusMeters={Number(form.radius_meters || 200)}
             boundaryJson={form.boundary_json}
             clearSignal={mapResetTick}
