@@ -28,6 +28,7 @@ export default function WorkLocationsAdminPage() {
   const [error, setError] = useState("");
   const [mapResetTick, setMapResetTick] = useState(0);
   const [polygonDraftPoints, setPolygonDraftPoints] = useState([]);
+  const [currentLocation, setCurrentLocation] = useState(null);
   const [form, setForm] = useState(DEFAULT_FORM);
 
   const role = String(session?.role || "").trim().toLowerCase();
@@ -75,6 +76,7 @@ export default function WorkLocationsAdminPage() {
       if (!res.ok) throw new Error(data.error || "CREATE_FAILED");
       setForm(DEFAULT_FORM);
       setPolygonDraftPoints([]);
+      setCurrentLocation(null);
       setMapResetTick((value) => value + 1);
       await loadRows();
     } catch (e) {
@@ -239,7 +241,21 @@ export default function WorkLocationsAdminPage() {
                 boundary_json: null,
               }));
             }}
+            onCurrentLocationChange={(nextLocation) => {
+              setCurrentLocation(nextLocation);
+            }}
           />
+
+          {currentLocation ? (
+            <div className="rounded-lg border border-[#BFE7E2] bg-[#F0FDFA] px-3 py-2 text-sm text-[#134E4A]">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span className="font-medium">Current location</span>
+                <span>Lat: {currentLocation.latitude.toFixed(6)}</span>
+                <span>Lng: {currentLocation.longitude.toFixed(6)}</span>
+                <span>Accuracy: {Math.round(currentLocation.accuracy || 0)} m</span>
+              </div>
+            </div>
+          ) : null}
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <input
@@ -300,6 +316,7 @@ export default function WorkLocationsAdminPage() {
               onClick={() => {
                 setForm(DEFAULT_FORM);
                 setPolygonDraftPoints([]);
+                setCurrentLocation(null);
                 setMapResetTick((value) => value + 1);
               }}
             >

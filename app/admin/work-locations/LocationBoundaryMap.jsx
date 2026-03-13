@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-const DEFAULT_CENTER = [17.9757, 102.6331];
+const DEFAULT_CENTER = [13.7563, 100.5018];
 const DEFAULT_ZOOM = 14;
+const CURRENT_LOCATION_ZOOM = 17;
 const LEAFLET_CSS_ID = "tdone-leaflet-css";
 const LEAFLET_CSS_HREF = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
 
@@ -27,8 +28,13 @@ export default function LocationBoundaryMap({
   onRectangleChange,
   onPolygonChange,
   onPolygonDraftChange,
+  onCurrentLocationChange,
   clearSignal,
 }) {
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState("");
+  const [mapNotice, setMapNotice] = useState("");
+  const [currentLocation, setCurrentLocation] = useState(null);
   const mapElementRef = useRef(null);
   const mapRef = useRef(null);
   const leafletRef = useRef(null);
@@ -37,6 +43,7 @@ export default function LocationBoundaryMap({
   const firstCornerRef = useRef(null);
   const polygonDraftRef = useRef([]);
   const tileLayersRef = useRef({ satellite: null, street: null });
+  const hasAutoCenteredRef = useRef(false);
   const latestConfigRef = useRef({
     boundaryType,
     latitude,
@@ -47,6 +54,7 @@ export default function LocationBoundaryMap({
     onRectangleChange,
     onPolygonChange,
     onPolygonDraftChange,
+    onCurrentLocationChange,
   });
 
   latestConfigRef.current = {
@@ -59,6 +67,7 @@ export default function LocationBoundaryMap({
     onRectangleChange,
     onPolygonChange,
     onPolygonDraftChange,
+    onCurrentLocationChange,
   };
 
   const publishPolygonDraft = useCallback((points) => {
@@ -73,18 +82,55 @@ export default function LocationBoundaryMap({
     }
   }, []);
 
-  const handleUndoPolygonPoint = useCallback(() => {
-    if (polygonDraftRef.current.length === 0) return;
+  const publishCurrentLocation = useCallback((nextLocation) => {
+    if (typeof latestConfigRef.current.onCurrentLocationChange === "function") {
+      latestConfigRef.current.onCurrentLocationChange(nextLocation);
+    }
+  }, []);
 
-    polygonDraftRef.current = polygonDraftRef.current.slice(0, -1);
-    publishPolygonDraft(polygonDraftRef.current);
-    drawBoundary();
-  }, [drawBoundary, publishPolygonDraft]);
+  const centerMapToPosition = useCallback((lat, lng, zoom = CURRENT_LOCATION_ZOOM) => {
+    const map = mapRef.current;
+    if (!map || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    map.setView([lat, lng], zoom);
+  }, []);
 
-  const handleFinishPolygon = useCallback(() => {
-    if (polygonDraftRef.current.length < 3) return;
-    publishPolygonFinal(polygonDraftRef.current);
-  }, [publishPolygonFinal]);
+  const locateCurrentArea = useCallback(() => {
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      setLocationError("Browser does not support geolocation.");
+      return;
+    }
+
+    setLocating(true);
+    setLocationError("");
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const nextLat = Number(position.coords.latitude);
+        const nextLng = Number(position.coords.longitude);
+        const nextLocation = {
+          latitude: nextLat,
+          longitude: nextLng,
+          accuracy: Number(position.coords.accuracy),
+        };
+
+        setCurrentLocation(nextLocation);
+        publishCurrentLocation(nextLocation);
+        centerMapToPosition(nextLat, nextLng);
+        hasAutoCenteredRef.current = true;
+        setLocating(false);
+      },
+      () => {
+        setLocating(false);
+        setLocationError("Could not get current location. Check browser location permission.");
+        publishCurrentLocation(null);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+      }
+    );
+  }, [centerMapToPosition, publishCurrentLocation]);
 
   const drawCornerMarkers = useCallback(() => {
     const L = leafletRef.current;
@@ -122,6 +168,31 @@ export default function LocationBoundaryMap({
 
     overlayLayer.clearLayers();
 
+    const drawCurrentLocationOverlay = () => {
+      if (!currentLocation) return;
+
+      L.circleMarker([currentLocation.latitude, currentLocation.longitude], {
+        radius: 7,
+        color: "#0F766E",
+        fillColor: "#14B8A6",
+        fillOpacity: 1,
+        weight: 2,
+      }).addTo(overlayLayer).bindTooltip("Current location", {
+        direction: "top",
+        offset: [0, -8],
+      });
+
+      if (Number.isFinite(currentLocation.accuracy) && currentLocation.accuracy > 0) {
+        L.circle([currentLocation.latitude, currentLocation.longitude], {
+          radius: currentLocation.accuracy,
+          color: "#14B8A6",
+          weight: 1,
+          fillColor: "#14B8A6",
+          fillOpacity: 0.08,
+        }).addTo(overlayLayer);
+      }
+    };
+
     if (boundaryType === "rectangle" && boundaryJson) {
       const bounds = [
         [boundaryJson.south, boundaryJson.west],
@@ -136,6 +207,7 @@ export default function LocationBoundaryMap({
       }).addTo(overlayLayer);
 
       map.fitBounds(bounds, { padding: [24, 24] });
+      drawCurrentLocationOverlay();
       drawCornerMarkers();
       return;
     }
@@ -151,6 +223,7 @@ export default function LocationBoundaryMap({
       }).addTo(overlayLayer);
 
       map.fitBounds(L.latLngBounds(latLngs), { padding: [24, 24] });
+      drawCurrentLocationOverlay();
       drawCornerMarkers();
       return;
     }
@@ -166,6 +239,7 @@ export default function LocationBoundaryMap({
         }).addTo(overlayLayer);
       }
 
+      drawCurrentLocationOverlay();
       drawCornerMarkers();
       return;
     }
@@ -190,8 +264,22 @@ export default function LocationBoundaryMap({
       map.setView([latitude, longitude], Math.max(map.getZoom(), DEFAULT_ZOOM));
     }
 
+    drawCurrentLocationOverlay();
     drawCornerMarkers();
-  }, [boundaryJson, boundaryType, drawCornerMarkers, latitude, longitude, radiusMeters]);
+  }, [boundaryJson, boundaryType, currentLocation, drawCornerMarkers, latitude, longitude, radiusMeters]);
+
+  const handleUndoPolygonPoint = useCallback(() => {
+    if (polygonDraftRef.current.length === 0) return;
+
+    polygonDraftRef.current = polygonDraftRef.current.slice(0, -1);
+    publishPolygonDraft(polygonDraftRef.current);
+    drawBoundary();
+  }, [drawBoundary, publishPolygonDraft]);
+
+  const handleFinishPolygon = useCallback(() => {
+    if (polygonDraftRef.current.length < 3) return;
+    publishPolygonFinal(polygonDraftRef.current);
+  }, [publishPolygonFinal]);
 
   useEffect(() => {
     let disposed = false;
@@ -216,8 +304,28 @@ export default function LocationBoundaryMap({
         attribution: '&copy; OpenStreetMap contributors',
       });
 
-      satellite.addTo(map);
+      street.addTo(map);
       tileLayersRef.current = { satellite, street };
+
+      satellite.on("tileerror", () => {
+        setMapNotice("Satellite imagery is not available for this area right now, so the map switched to Street Map.");
+
+        if (map.hasLayer(satellite)) {
+          map.removeLayer(satellite);
+        }
+
+        if (!map.hasLayer(street)) {
+          street.addTo(map);
+        }
+      });
+
+      street.on("add", () => {
+        setMapNotice("");
+      });
+
+      satellite.on("add", () => {
+        setMapNotice("");
+      });
 
       L.control.layers(
         {
@@ -273,6 +381,16 @@ export default function LocationBoundaryMap({
 
       mapRef.current = map;
       drawBoundary();
+
+      const hasPinnedBoundary = Boolean(
+        (boundaryType === "rectangle" && boundaryJson)
+        || (boundaryType === "polygon" && boundaryJson?.points?.length >= 3)
+        || (Number.isFinite(latitude) && Number.isFinite(longitude))
+      );
+
+      if (!hasPinnedBoundary && !hasAutoCenteredRef.current) {
+        locateCurrentArea();
+      }
     }
 
     initMap();
@@ -289,9 +407,11 @@ export default function LocationBoundaryMap({
       firstCornerRef.current = null;
       polygonDraftRef.current = [];
       publishPolygonDraft([]);
+      publishCurrentLocation(null);
       tileLayersRef.current = { satellite: null, street: null };
+      hasAutoCenteredRef.current = false;
     };
-  }, [drawBoundary, drawCornerMarkers, publishPolygonDraft]);
+  }, [boundaryJson, boundaryType, drawBoundary, drawCornerMarkers, latitude, locateCurrentArea, longitude, publishCurrentLocation, publishPolygonDraft]);
 
   useEffect(() => {
     drawBoundary();
@@ -319,6 +439,14 @@ export default function LocationBoundaryMap({
             <button
               type="button"
               className="rounded border border-[#D0D8E4] bg-white px-2 py-1 text-xs text-[#334260] disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={locateCurrentArea}
+              disabled={locating}
+            >
+              {locating ? "Locating..." : "Current area"}
+            </button>
+            <button
+              type="button"
+              className="rounded border border-[#D0D8E4] bg-white px-2 py-1 text-xs text-[#334260] disabled:cursor-not-allowed disabled:opacity-50"
               onClick={handleUndoPolygonPoint}
               disabled={polygonDraftRef.current.length === 0}
             >
@@ -333,8 +461,19 @@ export default function LocationBoundaryMap({
               Finish polygon
             </button>
           </div>
-        ) : null}
+        ) : (
+          <button
+            type="button"
+            className="rounded border border-[#D0D8E4] bg-white px-2 py-1 text-xs text-[#334260] disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={locateCurrentArea}
+            disabled={locating}
+          >
+            {locating ? "Locating..." : "Current area"}
+          </button>
+        )}
       </div>
+      {locationError ? <p className="text-xs text-red-600">{locationError}</p> : null}
+      {mapNotice ? <p className="text-xs text-amber-700">{mapNotice}</p> : null}
       <div ref={mapElementRef} className="h-[360px] rounded-xl border border-[#D0D8E4] overflow-hidden" />
     </div>
   );
