@@ -27,6 +27,7 @@ export default function WorkLocationsAdminPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [mapResetTick, setMapResetTick] = useState(0);
+  const [polygonDraftPoints, setPolygonDraftPoints] = useState([]);
   const [form, setForm] = useState(DEFAULT_FORM);
 
   const role = String(session?.role || "").trim().toLowerCase();
@@ -73,6 +74,7 @@ export default function WorkLocationsAdminPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "CREATE_FAILED");
       setForm(DEFAULT_FORM);
+      setPolygonDraftPoints([]);
       setMapResetTick((value) => value + 1);
       await loadRows();
     } catch (e) {
@@ -165,6 +167,7 @@ export default function WorkLocationsAdminPage() {
                   latitude: nextBoundaryType === "circle" ? state.latitude : "",
                   longitude: nextBoundaryType === "circle" ? state.longitude : "",
                 }));
+                setPolygonDraftPoints([]);
                 setMapResetTick((value) => value + 1);
               }}
             >
@@ -203,11 +206,37 @@ export default function WorkLocationsAdminPage() {
               const longitudes = boundary.points.map((point) => point.lng);
               const centerLat = ((Math.min(...latitudes) + Math.max(...latitudes)) / 2).toFixed(8);
               const centerLng = ((Math.min(...longitudes) + Math.max(...longitudes)) / 2).toFixed(8);
+              setPolygonDraftPoints(boundary.points);
               setForm((state) => ({
                 ...state,
                 latitude: centerLat,
                 longitude: centerLng,
                 boundary_json: boundary,
+              }));
+            }}
+            onPolygonDraftChange={({ points }) => {
+              setPolygonDraftPoints(points);
+
+              if (!points.length) {
+                setForm((state) => ({
+                  ...state,
+                  latitude: "",
+                  longitude: "",
+                  boundary_json: null,
+                }));
+                return;
+              }
+
+              const latitudes = points.map((point) => point.lat);
+              const longitudes = points.map((point) => point.lng);
+              const centerLat = ((Math.min(...latitudes) + Math.max(...latitudes)) / 2).toFixed(8);
+              const centerLng = ((Math.min(...longitudes) + Math.max(...longitudes)) / 2).toFixed(8);
+
+              setForm((state) => ({
+                ...state,
+                latitude: centerLat,
+                longitude: centerLng,
+                boundary_json: null,
               }));
             }}
           />
@@ -249,11 +278,16 @@ export default function WorkLocationsAdminPage() {
                   <span>Vertices: {form.boundary_json.points.length} points</span>
                   <span>Center: {form.latitude}, {form.longitude}</span>
                 </div>
+              ) : isPolygon && polygonDraftPoints.length ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <span>Draft vertices: {polygonDraftPoints.length} points</span>
+                  <span>{polygonDraftPoints.length >= 3 ? "Press Finish polygon to confirm this area." : "Add at least 3 points before finishing the polygon."}</span>
+                </div>
               ) : (
                 <span>
                   {isRectangle
                     ? "Draw 2 opposite corners on the map to create a rectangular work area."
-                    : "Click around the work area to add polygon points. At least 3 points are required."}
+                    : "Click around the work area to add polygon points, then press Finish polygon."}
                 </span>
               )}
             </div>
@@ -265,6 +299,7 @@ export default function WorkLocationsAdminPage() {
               className="rounded border border-[#D0D8E4] px-3 py-2 bg-white"
               onClick={() => {
                 setForm(DEFAULT_FORM);
+                setPolygonDraftPoints([]);
                 setMapResetTick((value) => value + 1);
               }}
             >

@@ -26,6 +26,7 @@ export default function LocationBoundaryMap({
   onCircleChange,
   onRectangleChange,
   onPolygonChange,
+  onPolygonDraftChange,
   clearSignal,
 }) {
   const mapElementRef = useRef(null);
@@ -45,6 +46,7 @@ export default function LocationBoundaryMap({
     onCircleChange,
     onRectangleChange,
     onPolygonChange,
+    onPolygonDraftChange,
   });
 
   latestConfigRef.current = {
@@ -56,7 +58,33 @@ export default function LocationBoundaryMap({
     onCircleChange,
     onRectangleChange,
     onPolygonChange,
+    onPolygonDraftChange,
   };
+
+  const publishPolygonDraft = useCallback((points) => {
+    if (typeof latestConfigRef.current.onPolygonDraftChange === "function") {
+      latestConfigRef.current.onPolygonDraftChange({ points });
+    }
+  }, []);
+
+  const publishPolygonFinal = useCallback((points) => {
+    if (typeof latestConfigRef.current.onPolygonChange === "function") {
+      latestConfigRef.current.onPolygonChange({ points });
+    }
+  }, []);
+
+  const handleUndoPolygonPoint = useCallback(() => {
+    if (polygonDraftRef.current.length === 0) return;
+
+    polygonDraftRef.current = polygonDraftRef.current.slice(0, -1);
+    publishPolygonDraft(polygonDraftRef.current);
+    drawBoundary();
+  }, [drawBoundary, publishPolygonDraft]);
+
+  const handleFinishPolygon = useCallback(() => {
+    if (polygonDraftRef.current.length < 3) return;
+    publishPolygonFinal(polygonDraftRef.current);
+  }, [publishPolygonFinal]);
 
   const drawCornerMarkers = useCallback(() => {
     const L = leafletRef.current;
@@ -64,15 +92,16 @@ export default function LocationBoundaryMap({
     if (!L || !markerLayer) return;
 
     markerLayer.clearLayers();
-    if (!firstCornerRef.current) return;
 
-    L.circleMarker([firstCornerRef.current.lat, firstCornerRef.current.lng], {
-      radius: 6,
-      color: "#F59E0B",
-      fillColor: "#F59E0B",
-      fillOpacity: 0.9,
-      weight: 2,
-    }).addTo(markerLayer);
+    if (firstCornerRef.current) {
+      L.circleMarker([firstCornerRef.current.lat, firstCornerRef.current.lng], {
+        radius: 6,
+        color: "#F59E0B",
+        fillColor: "#F59E0B",
+        fillOpacity: 0.9,
+        weight: 2,
+      }).addTo(markerLayer);
+    }
 
     polygonDraftRef.current.forEach((point, index) => {
       L.circleMarker([point.lat, point.lng], {
@@ -226,12 +255,13 @@ export default function LocationBoundaryMap({
         }
 
         if (config.boundaryType === "polygon") {
-          polygonDraftRef.current = [...polygonDraftRef.current, { lat: clickedLat, lng: clickedLng }];
-          drawBoundary();
-
-          if (polygonDraftRef.current.length >= 3) {
-            config.onPolygonChange({ points: polygonDraftRef.current });
+          if (config.boundaryJson?.points?.length >= 3 && polygonDraftRef.current.length === 0) {
+            config.onPolygonDraftChange?.({ points: [] });
           }
+
+          polygonDraftRef.current = [...polygonDraftRef.current, { lat: clickedLat, lng: clickedLng }];
+          publishPolygonDraft(polygonDraftRef.current);
+          drawBoundary();
           return;
         }
 
@@ -258,9 +288,10 @@ export default function LocationBoundaryMap({
       cornerMarkerLayerRef.current = null;
       firstCornerRef.current = null;
       polygonDraftRef.current = [];
+      publishPolygonDraft([]);
       tileLayersRef.current = { satellite: null, street: null };
     };
-  }, [drawBoundary, drawCornerMarkers]);
+  }, [drawBoundary, drawCornerMarkers, publishPolygonDraft]);
 
   useEffect(() => {
     drawBoundary();
@@ -269,8 +300,9 @@ export default function LocationBoundaryMap({
   useEffect(() => {
     firstCornerRef.current = null;
     polygonDraftRef.current = [];
+    publishPolygonDraft([]);
     drawCornerMarkers();
-  }, [clearSignal, drawCornerMarkers]);
+  }, [clearSignal, drawCornerMarkers, publishPolygonDraft]);
 
   return (
     <div className="space-y-2">
@@ -279,9 +311,29 @@ export default function LocationBoundaryMap({
           {boundaryType === "rectangle"
             ? "Rectangle mode: click 2 points on the map to create opposite corners."
             : boundaryType === "polygon"
-              ? "Polygon mode: click multiple points around the area. The shape updates as you add vertices."
+              ? "Polygon mode: click multiple points around the area, undo if needed, then press Finish polygon."
               : "Circle mode: click once on the map to set the center point."}
         </span>
+        {boundaryType === "polygon" ? (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="rounded border border-[#D0D8E4] bg-white px-2 py-1 text-xs text-[#334260] disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={handleUndoPolygonPoint}
+              disabled={polygonDraftRef.current.length === 0}
+            >
+              Undo last point
+            </button>
+            <button
+              type="button"
+              className="rounded bg-[#1352A3] px-2 py-1 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={handleFinishPolygon}
+              disabled={polygonDraftRef.current.length < 3}
+            >
+              Finish polygon
+            </button>
+          </div>
+        ) : null}
       </div>
       <div ref={mapElementRef} className="h-[360px] rounded-xl border border-[#D0D8E4] overflow-hidden" />
     </div>
