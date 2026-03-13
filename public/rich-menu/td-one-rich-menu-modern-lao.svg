@@ -1,0 +1,168 @@
+<svg width="2500" height="1686" viewBox="0 0 2500 1686" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="2500" y2="1686" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1E3C72"/>
+      <stop offset="1" stop-color="#2A5298"/>
+    </linearGradient>
+
+    <filter id="cardShadow" x="0" y="0" width="2500" height="1686" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="16" stdDeviation="16" flood-color="#0A1E44" flood-opacity="0.24"/>
+    </filter>
+
+    <style>
+      .title {
+        font-family: "Noto Sans Lao", "Inter", "Segoe UI", Arial, sans-serif;
+        font-size: 66px;
+        font-weight: 700;
+        fill: #0F2B5D;
+        text-anchor: middle;
+      }
+      .subtitle {
+        font-family: "Inter", "Noto Sans Lao", "Segoe UI", Arial, sans-serif;
+        font-size: 38px;
+        font-weight: 600;
+        fill: #2C4A7A;
+        text-anchor: middle;
+      }
+      .caption {
+        font-family: "Noto Sans Lao", "Inter", "Segoe UI", Arial, sans-serif;
+        font-size: 31px;
+        font-weight: 500;
+        fill: #6B7EA6;
+        text-anchor: middle;
+      }
+      .smallCaption {
+        font-family: "Noto Sans Lao", "Inter", "Segoe UI", Arial, sans-serif;
+        font-size: 27px;
+        font-weight: 500;
+        fill: #6B7EA6;
+        text-anchor: middle;
+      }
+      .iconStroke {
+        fill: none;
+        stroke-width: 10;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="2500" height="1686" fill="url(#bgGrad)"/>
+
+  <path d="M-120 260C200 120 500 120 760 260C1020 400 1320 410 1600 290C1880 170 2200 170 2520 320" stroke="white" stroke-opacity="0.12" stroke-width="4"/>
+  <path d="M-80 610C220 480 530 470 820 600C1110 730 1410 740 1700 620C1990 500 2280 500 2580 640" stroke="white" stroke-opacity="0.10" stroke-width="3"/>
+  <path d="M-40 970C280 840 560 840 840 980C1120 1120 1420 1130 1710 1010C2000 890 2280 900 2560 1040" stroke="white" stroke-opacity="0.09" stroke-width="3"/>
+  <path d="M-110 1340C210 1220 500 1230 780 1360C1060 1490 1360 1510 1650 1400C1940 1290 2230 1300 2540 1430" stroke="white" stroke-opacity="0.10" stroke-width="4"/>
+
+  <!-- Grid: margin=120, gap=60, cardW=(2500-240-120)/3=713.333, cardH=(1686-240-60)/2=693 -->
+
+  <!-- Card 1 -->
+  <g filter="url(#cardShadow)">
+    <rect x="120" y="120" width="713.333" height="693" rx="48" fill="white"/>
+    <rect x="122" y="122" width="709.333" height="689" rx="46" fill="none" stroke="#EDF2FB" stroke-width="2"/>
+  </g>
+  <g transform="translate(476.666,248)">
+    <circle cx="0" cy="0" r="86" fill="#E8F8EF"/>
+    <g class="iconStroke" stroke="#28B463">
+      <rect x="-42" y="-32" width="84" height="76" rx="12"/>
+      <path d="M-42 -12H42"/>
+      <path d="M-20 -46V-20"/>
+      <path d="M20 -46V-20"/>
+      <path d="M-18 16L-2 32L22 6"/>
+    </g>
+  </g>
+  <text class="title" x="476.666" y="430">ສະແກນເຂົ້າ-ອອກ</text>
+  <text class="subtitle" x="476.666" y="492">Scan In/Out</text>
+  <text class="caption" x="476.666" y="546">GPS + Selfie</text>
+
+  <!-- Card 2 -->
+  <g filter="url(#cardShadow)">
+    <rect x="893.333" y="120" width="713.333" height="693" rx="48" fill="white"/>
+    <rect x="895.333" y="122" width="709.333" height="689" rx="46" fill="none" stroke="#EDF2FB" stroke-width="2"/>
+  </g>
+  <g transform="translate(1250,248)">
+    <circle cx="0" cy="0" r="86" fill="#EAF2FF"/>
+    <g class="iconStroke" stroke="#2F80ED">
+      <rect x="-42" y="-32" width="84" height="76" rx="12"/>
+      <path d="M-42 -12H42"/>
+      <path d="M-20 -46V-20"/>
+      <path d="M20 -46V-20"/>
+      <path d="M-20 12H20"/>
+      <path d="M-20 28H8"/>
+    </g>
+  </g>
+  <text class="title" x="1250" y="430">ກວດວັນງານ</text>
+  <text class="subtitle" x="1250" y="492">Check Day Work</text>
+  <text class="smallCaption" x="1250" y="546">ລະບົບບັນທຶກວັນງານ</text>
+
+  <!-- Card 3 -->
+  <g filter="url(#cardShadow)">
+    <rect x="1666.666" y="120" width="713.333" height="693" rx="48" fill="white"/>
+    <rect x="1668.666" y="122" width="709.333" height="689" rx="46" fill="none" stroke="#EDF2FB" stroke-width="2"/>
+  </g>
+  <g transform="translate(2023.333,248)">
+    <circle cx="0" cy="0" r="86" fill="#FFF3E8"/>
+    <g class="iconStroke" stroke="#F2994A">
+      <circle cx="0" cy="0" r="42"/>
+      <path d="M0 -14V4L16 16"/>
+      <path d="M0 -64V-52"/>
+      <path d="M0 64V52"/>
+    </g>
+  </g>
+  <text class="title" x="2023.333" y="430">ກວດ OT</text>
+  <text class="subtitle" x="2023.333" y="492">Check OT</text>
+  <text class="caption" x="2023.333" y="546">ຊົ່ວໂມງລ່ວງເວລາ</text>
+
+  <!-- Card 4 -->
+  <g filter="url(#cardShadow)">
+    <rect x="120" y="873" width="713.333" height="693" rx="48" fill="white"/>
+    <rect x="122" y="875" width="709.333" height="689" rx="46" fill="none" stroke="#EDF2FB" stroke-width="2"/>
+  </g>
+  <g transform="translate(476.666,1001)">
+    <circle cx="0" cy="0" r="86" fill="#F2ECFF"/>
+    <g class="iconStroke" stroke="#8E5BE8">
+      <path d="M-30 -44H20L38 -26V42H-30V-44Z"/>
+      <path d="M20 -44V-26H38"/>
+      <path d="M-16 -8H20"/>
+      <path d="M-16 12H20"/>
+      <path d="M-16 32H12"/>
+    </g>
+  </g>
+  <text class="title" x="476.666" y="1183">ລາຍໄດ້</text>
+  <text class="subtitle" x="476.666" y="1245">Income</text>
+  <text class="caption" x="476.666" y="1299">ເງິນເດືອນ + OT</text>
+
+  <!-- Card 5 -->
+  <g filter="url(#cardShadow)">
+    <rect x="893.333" y="873" width="713.333" height="693" rx="48" fill="white"/>
+    <rect x="895.333" y="875" width="709.333" height="689" rx="46" fill="none" stroke="#EDF2FB" stroke-width="2"/>
+  </g>
+  <g transform="translate(1250,1001)">
+    <circle cx="0" cy="0" r="86" fill="#FFEAF4"/>
+    <g class="iconStroke" stroke="#E75297">
+      <rect x="-32" y="-42" width="64" height="86" rx="10"/>
+      <path d="M-14 -52H14"/>
+      <path d="M-14 -24H14"/>
+      <path d="M-14 -4H14"/>
+      <path d="M-14 16H6"/>
+    </g>
+  </g>
+  <text class="title" x="1250" y="1183">ຂໍອະນຸມັດ</text>
+  <text class="subtitle" x="1250" y="1245">Request Center</text>
+  <text class="caption" x="1250" y="1299">ລາ / OT / ຄຳຂໍ</text>
+
+  <!-- Card 6 -->
+  <g filter="url(#cardShadow)">
+    <rect x="1666.666" y="873" width="713.333" height="693" rx="48" fill="white"/>
+    <rect x="1668.666" y="875" width="709.333" height="689" rx="46" fill="none" stroke="#EDF2FB" stroke-width="2"/>
+  </g>
+  <g transform="translate(2023.333,1001)">
+    <circle cx="0" cy="0" r="86" fill="#E8FBF8"/>
+    <g class="iconStroke" stroke="#22A6A1">
+      <path d="M-42 -6L0 -42L42 -6V42H-20V10H20V42"/>
+    </g>
+  </g>
+  <text class="title" x="2023.333" y="1183">ໜ້າຫຼັກ</text>
+  <text class="subtitle" x="2023.333" y="1245">Dashboard</text>
+  <text class="caption" x="2023.333" y="1299">TD One</text>
+</svg>

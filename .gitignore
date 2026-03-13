@@ -37,6 +37,13 @@ yarn-error.log*
 # vercel
 .vercel
 
+# local assistant/temp artifacts
+tmpclaude-*
+dev.log
+nul
+time-attendance.html
+.claude/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
