@@ -42,7 +42,7 @@ export default function LocationBoundaryMap({
   const cornerMarkerLayerRef = useRef(null);
   const firstCornerRef = useRef(null);
   const polygonDraftRef = useRef([]);
-  const tileLayersRef = useRef({ satellite: null, street: null });
+  const tileLayersRef = useRef({ satellite: null, street: null, osm: null });
   const hasAutoCenteredRef = useRef(false);
   const latestConfigRef = useRef({
     boundaryType,
@@ -300,23 +300,34 @@ export default function LocationBoundaryMap({
       const satellite = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
         attribution: "Tiles &copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community",
       });
-      const street = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      const street = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}", {
+        attribution: "Tiles &copy; Esri, HERE, Garmin, Intermap, increment P Corp., GEBCO, USGS, FAO, NPS, NRCAN, GeoBase, IGN, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), and the GIS User Community",
+      });
+      const osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: '&copy; OpenStreetMap contributors',
       });
 
       street.addTo(map);
-      tileLayersRef.current = { satellite, street };
+      tileLayersRef.current = { satellite, street, osm };
+
+      const ensureLayerActive = (preferredLayer, fallbackLayer) => {
+        if (map.hasLayer(preferredLayer)) {
+          map.removeLayer(preferredLayer);
+        }
+
+        if (fallbackLayer && !map.hasLayer(fallbackLayer)) {
+          fallbackLayer.addTo(map);
+        }
+      };
 
       satellite.on("tileerror", () => {
         setMapNotice("Satellite imagery is not available for this area right now, so the map switched to Street Map.");
+        ensureLayerActive(satellite, street);
+      });
 
-        if (map.hasLayer(satellite)) {
-          map.removeLayer(satellite);
-        }
-
-        if (!map.hasLayer(street)) {
-          street.addTo(map);
-        }
+      street.on("tileerror", () => {
+        setMapNotice("Street map tiles are not available from the primary provider, so the map switched to OpenStreetMap.");
+        ensureLayerActive(street, osm);
       });
 
       street.on("add", () => {
@@ -327,10 +338,15 @@ export default function LocationBoundaryMap({
         setMapNotice("");
       });
 
+      osm.on("add", () => {
+        setMapNotice("");
+      });
+
       L.control.layers(
         {
           "Satellite": satellite,
           "Street Map": street,
+          "OpenStreetMap": osm,
         },
         {},
         { position: "topright" }
@@ -408,7 +424,7 @@ export default function LocationBoundaryMap({
       polygonDraftRef.current = [];
       publishPolygonDraft([]);
       publishCurrentLocation(null);
-      tileLayersRef.current = { satellite: null, street: null };
+      tileLayersRef.current = { satellite: null, street: null, osm: null };
       hasAutoCenteredRef.current = false;
     };
   }, [boundaryJson, boundaryType, drawBoundary, drawCornerMarkers, latitude, locateCurrentArea, longitude, publishCurrentLocation, publishPolygonDraft]);
