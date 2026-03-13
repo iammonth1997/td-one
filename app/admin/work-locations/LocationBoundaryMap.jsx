@@ -568,6 +568,7 @@ export default function LocationBoundaryMap({
       overlayLayerRef.current = null;
       cornerMarkerLayerRef.current = null;
       firstCornerRef.current = null;
+      polygonClickHandlerRef.current = null;
       polygonDraftRef.current = [];
       publishPolygonDraft([]);
       publishCurrentLocation(null);
