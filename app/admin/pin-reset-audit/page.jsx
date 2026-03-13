@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/app/context/LanguageContext";
 import { useSession } from "@/app/hooks/useSession";
@@ -30,7 +30,10 @@ function canViewAudit(role) {
 export default function PinResetAuditPage() {
   const router = useRouter();
   const { t } = useLanguage();
-  const { session, loading: sessionLoading, getAuthHeaders } = useSession();
+  const { session, loading: sessionLoading, getAuthHeaders } = useSession({
+    loginPath: "/admin/login",
+    requiredPortal: "admin_portal",
+  });
   const L = t.pinResetAudit;
 
   const [searchEmpId, setSearchEmpId] = useState("");
@@ -90,7 +93,7 @@ export default function PinResetAuditPage() {
     }
   }
 
-  async function loadRows(empId = "") {
+  const loadRows = useCallback(async (empId = "") => {
     setLoading(true);
     setError("");
 
@@ -118,16 +121,16 @@ export default function PinResetAuditPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [L.errForbidden, L.errGeneral, getAuthHeaders]);
 
   useEffect(() => {
     if (sessionLoading) return;
     if (!allowed) {
-      router.replace("/dashboard");
+      router.replace("/admin");
       return;
     }
     loadRows();
-  }, [sessionLoading, allowed, router]);
+  }, [sessionLoading, allowed, loadRows, router]);
 
   if (sessionLoading) {
     return (

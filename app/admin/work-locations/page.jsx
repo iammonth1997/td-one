@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/app/hooks/useSession";
 
@@ -8,7 +8,10 @@ const ALLOWED = new Set(["admin", "super_admin", "hr_payroll", "hr-payroll", "hr
 
 export default function WorkLocationsAdminPage() {
   const router = useRouter();
-  const { session, loading, getAuthHeaders } = useSession();
+  const { session, loading, getAuthHeaders } = useSession({
+    loginPath: "/admin/login",
+    requiredPortal: "admin_portal",
+  });
   const [rows, setRows] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -17,21 +20,21 @@ export default function WorkLocationsAdminPage() {
   const role = String(session?.role || "").trim().toLowerCase();
   const allowed = ALLOWED.has(role);
 
-  async function loadRows() {
+  const loadRows = useCallback(async () => {
     const res = await fetch("/api/work-locations?all=1", { headers: getAuthHeaders() });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "LOAD_FAILED");
     setRows(data.rows || []);
-  }
+  }, [getAuthHeaders]);
 
   useEffect(() => {
     if (loading) return;
     if (!allowed) {
-      router.replace("/dashboard");
+      router.replace("/admin");
       return;
     }
     loadRows().catch((e) => setError(String(e.message || e)));
-  }, [loading, allowed, router]);
+  }, [loading, allowed, loadRows, router]);
 
   async function createLocation(e) {
     e.preventDefault();
