@@ -26,10 +26,12 @@ export default function LocationBoundaryMap({
   clearSignal,
 }) {
   const hasExplicitCircleCenter = Number.isFinite(latitude) && Number.isFinite(longitude);
+  const isShapeDrawingMode = boundaryType === "rectangle" || boundaryType === "polygon";
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState("");
   const [mapNotice, setMapNotice] = useState("");
   const [currentLocation, setCurrentLocation] = useState(null);
+  const [polygonDraftCount, setPolygonDraftCount] = useState(0);
   const [initialCenter, setInitialCenter] = useState(() => {
     if (hasExplicitCircleCenter) {
       return [latitude, longitude];
@@ -90,6 +92,7 @@ export default function LocationBoundaryMap({
   };
 
   const publishPolygonDraft = useCallback((points) => {
+    setPolygonDraftCount(points.length);
     if (typeof latestConfigRef.current.onPolygonDraftChange === "function") {
       latestConfigRef.current.onPolygonDraftChange({ points });
     }
@@ -191,6 +194,20 @@ export default function LocationBoundaryMap({
     locateCurrentArea();
   }, [initialCenterResolved, locateCurrentArea]);
 
+  useEffect(() => {
+    const map = mapRef.current;
+    const { satellite, street, osm } = tileLayersRef.current;
+    if (!map || !street || !osm || !isShapeDrawingMode) return;
+
+    if (satellite && map.hasLayer(satellite)) {
+      map.removeLayer(satellite);
+    }
+
+    if (!map.hasLayer(street) && !map.hasLayer(osm)) {
+      street.addTo(map);
+    }
+  }, [isShapeDrawingMode]);
+
   const drawCornerMarkers = useCallback(() => {
     const L = leafletRef.current;
     const markerLayer = cornerMarkerLayerRef.current;
@@ -244,7 +261,7 @@ export default function LocationBoundaryMap({
         offset: [0, -8],
       });
 
-      if (Number.isFinite(currentLocation.accuracy) && currentLocation.accuracy > 0) {
+      if (!isShapeDrawingMode && Number.isFinite(currentLocation.accuracy) && currentLocation.accuracy > 0) {
         L.circle([currentLocation.latitude, currentLocation.longitude], {
           radius: currentLocation.accuracy,
           color: "#14B8A6",
@@ -334,7 +351,7 @@ export default function LocationBoundaryMap({
 
     drawCurrentLocationOverlay();
     drawCornerMarkers();
-  }, [boundaryJson, boundaryType, currentLocation, drawCornerMarkers, latitude, longitude, radiusMeters]);
+  }, [boundaryJson, boundaryType, currentLocation, drawCornerMarkers, isShapeDrawingMode, latitude, longitude, radiusMeters]);
 
   const handleUndoPolygonPoint = useCallback(() => {
     if (polygonDraftRef.current.length === 0) return;
@@ -488,6 +505,7 @@ export default function LocationBoundaryMap({
       polygonDraftRef.current = [];
       publishPolygonDraft([]);
       publishCurrentLocation(null);
+      setPolygonDraftCount(0);
       tileLayersRef.current = { satellite: null, street: null, osm: null };
       hasAutoCenteredRef.current = false;
     };
@@ -501,6 +519,7 @@ export default function LocationBoundaryMap({
     firstCornerRef.current = null;
     polygonDraftRef.current = [];
     publishPolygonDraft([]);
+    setPolygonDraftCount(0);
     drawCornerMarkers();
   }, [clearSignal, drawCornerMarkers, publishPolygonDraft]);
 
@@ -528,7 +547,7 @@ export default function LocationBoundaryMap({
               type="button"
               className="rounded border border-[#D0D8E4] bg-white px-2 py-1 text-xs text-[#334260] disabled:cursor-not-allowed disabled:opacity-50"
               onClick={handleUndoPolygonPoint}
-              disabled={polygonDraftRef.current.length === 0}
+              disabled={polygonDraftCount === 0}
             >
               Undo last point
             </button>
@@ -536,7 +555,7 @@ export default function LocationBoundaryMap({
               type="button"
               className="rounded bg-[#1352A3] px-2 py-1 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
               onClick={handleFinishPolygon}
-              disabled={polygonDraftRef.current.length < 3}
+              disabled={polygonDraftCount < 3}
             >
               Finish polygon
             </button>
