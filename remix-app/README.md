@@ -47,6 +47,19 @@ wrangler secret put LINE_CHANNEL_ACCESS_TOKEN
 wrangler secret put LINE_ADMIN_API_KEY
 ```
 
+### One-shot setup (Windows PowerShell)
+
+```bash
+npm run cf:setup
+```
+
+Optional flags (run script directly):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File ./scripts/setup-cloudflare.ps1 -WorkerName tdone-remix
+powershell -ExecutionPolicy Bypass -File ./scripts/setup-cloudflare.ps1 -WorkerName tdone-remix -EnvironmentName production
+```
+
 ## Deploy to Cloudflare
 
 ```bash
@@ -59,5 +72,7 @@ npm run deploy
 1. Configure Cloudflare Cron Trigger for:
 	- `GET /api/cron/cleanup-cancelled-leave-files`
 	- Header `Authorization: Bearer <CRON_SECRET>`
-2. Verify LIFF endpoint points to production domain.
-3. Run smoke tests for login, scan in/out, request flows, and slip flows.
+2. Verify cron endpoint response manually:
+	- `curl -H "Authorization: Bearer <CRON_SECRET>" https://tdone-erp.com/api/cron/cleanup-cancelled-leave-files`
+3. Verify LIFF endpoint points to production domain.
+4. Run smoke tests for login, scan in/out, request flows, and slip flows.
