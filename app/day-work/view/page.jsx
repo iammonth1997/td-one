@@ -1,4 +1,3 @@
-ทำต่อ
 "use client";
 
 import { Suspense } from "react";
