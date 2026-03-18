@@ -53,11 +53,23 @@ wrangler secret put LINE_ADMIN_API_KEY
 npm run cf:setup
 ```
 
+### One-shot setup (Linux/macOS)
+
+```bash
+npm run cf:setup:sh
+```
+
 Optional flags (run script directly):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File ./scripts/setup-cloudflare.ps1 -WorkerName tdone-remix
 powershell -ExecutionPolicy Bypass -File ./scripts/setup-cloudflare.ps1 -WorkerName tdone-remix -EnvironmentName production
+```
+
+```bash
+bash ./scripts/setup-cloudflare.sh --worker-name tdone-remix
+bash ./scripts/setup-cloudflare.sh --worker-name tdone-remix --env production
+bash ./scripts/setup-cloudflare.sh --worker-name tdone-remix --skip-login --skip-deploy
 ```
 
 ## Deploy to Cloudflare
