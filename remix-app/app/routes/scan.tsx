@@ -15,6 +15,70 @@ type GpsState = {
   timestamp: number;
 };
 
+type LiffInstance = {
+  init: (args: { liffId: string }) => Promise<void>;
+  isLoggedIn: () => boolean;
+  login: (args?: { redirectUri?: string }) => void;
+  getIDToken: () => string | null;
+};
+
+declare global {
+  interface Window {
+    liff?: LiffInstance;
+  }
+}
+
+const DEFAULT_LIFF_ID = "2009413188-4647l7eA";
+
+function resolveLiffId() {
+  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+  return env?.NEXT_PUBLIC_LIFF_ID || DEFAULT_LIFF_ID;
+}
+
+function loadLiffSdk() {
+  return new Promise<void>((resolve, reject) => {
+    if (typeof window === "undefined") {
+      reject(new Error("LIFF SDK can only run in browser"));
+      return;
+    }
+
+    if (window.liff) {
+      resolve();
+      return;
+    }
+
+    const existing = document.querySelector('script[data-sdk="line-liff"]') as HTMLScriptElement | null;
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener("error", () => reject(new Error("Failed to load LIFF SDK")), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://static.line-scdn.net/liff/edge/2/sdk.js";
+    script.async = true;
+    script.dataset.sdk = "line-liff";
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load LIFF SDK"));
+    document.head.appendChild(script);
+  });
+}
+
+async function getLiffIdToken() {
+  if (typeof window === "undefined") return "";
+  await loadLiffSdk();
+  const liff = window.liff;
+  if (!liff) return "";
+
+  await liff.init({ liffId: resolveLiffId() });
+
+  if (!liff.isLoggedIn()) {
+    return "";
+  }
+
+  return String(liff.getIDToken() || "").trim();
+}
+
 function makeDeviceId() {
   const key = "tdone_device_id";
   const existing = localStorage.getItem(key);
@@ -98,6 +162,7 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const [selfieDataUrl, setSelfieDataUrl] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState("");
+  const [lineIdToken, setLineIdToken] = useState("");
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -107,10 +172,17 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
     return () => clearInterval(timer);
   }, []);
 
+  function attendanceHeaders(extra?: Record<string, string>) {
+    return {
+      ...(extra || {}),
+      ...(lineIdToken ? { "x-line-id-token": lineIdToken } : {}),
+    };
+  }
+
   async function loadToday() {
     const [todayRes, locationRes] = await Promise.all([
-      fetch("/api/attendance/today"),
-      fetch("/api/work-locations"),
+      fetch("/api/attendance/today", { headers: attendanceHeaders() }),
+      fetch("/api/work-locations", { headers: attendanceHeaders() }),
     ]);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -127,7 +199,7 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
   async function verifyLocation(position: GpsState, clientFlags: string[] = []) {
     const res = await fetch("/api/attendance/verify-location", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: attendanceHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         latitude: position.latitude,
         longitude: position.longitude,
@@ -247,7 +319,7 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
 
       const res = await fetch("/api/attendance/scan", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: attendanceHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           latitude: gps.latitude,
           longitude: gps.longitude,
@@ -286,6 +358,29 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
     loadToday().catch((err: unknown) => {
       setFeedback({ type: "error", message: err instanceof Error ? err.message : "LOAD_TODAY_FAILED" });
     });
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getLiffIdToken()
+      .then((token) => {
+        if (!cancelled) {
+          setLineIdToken(token);
+          if (!token) {
+            setFeedback((prev) => prev.message ? prev : { type: "error", message: "ไม่พบ LINE token: กรุณาเปิดผ่าน LINE LIFF" });
+          }
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setFeedback((prev) => prev.message ? prev : { type: "error", message: "ไม่สามารถเริ่ม LIFF ได้" });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
