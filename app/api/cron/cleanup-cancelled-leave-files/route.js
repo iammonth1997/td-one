@@ -19,7 +19,7 @@ export async function GET(req) {
   const nowIso = new Date().toISOString();
   const { data: rows, error: queryError } = await supabaseServer
     .from("leave_requests")
-    .select("id, employee_id, leave_type_code, status, attachment_url, attachment_public_id, attachment_resource_type")
+    .select("id, employee_id, status, attachment_url, attachment_public_id, attachment_resource_type")
     .eq("status", "cancelled")
     .eq("attachment_active", false)
     .is("attachment_deleted_at", null)
@@ -28,6 +28,19 @@ export async function GET(req) {
     .limit(500);
 
   if (queryError) {
+    const message = String(queryError.message || "");
+    if (message.includes("does not exist")) {
+      return Response.json({
+        success: true,
+        skipped: true,
+        reason: "SCHEMA_NOT_READY",
+        detail: message,
+        scanned: 0,
+        deleted: 0,
+        failed: 0,
+        failures: [],
+      });
+    }
     return Response.json({ error: "CLEANUP_QUERY_FAILED", detail: queryError.message }, { status: 500 });
   }
 
@@ -68,7 +81,7 @@ export async function GET(req) {
         .upsert({
           request_id: row.id,
           employee_id: row.employee_id,
-          leave_type_code: row.leave_type_code,
+          leave_type_code: "unknown",
           status: row.status,
           cloudinary_public_id: publicId,
           deleted_at: deletedAt,
