@@ -3,12 +3,12 @@
 import * as legacy from "../../../app/api/cloudinary/sign/route.js";
 import { proxyLegacyApi } from "~/lib/legacy-api-bridge.server";
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  return proxyLegacyApi(request, legacy);
+export async function loader({ request, context }: LoaderFunctionArgs) {
+  return proxyLegacyApi(request, legacy, context);
 }
 
-export async function action({ request }: ActionFunctionArgs) {
-  return proxyLegacyApi(request, legacy);
+export async function action({ request, context }: ActionFunctionArgs) {
+  return proxyLegacyApi(request, legacy, context);
 }
 
 

@@ -10,6 +10,12 @@ type LegacyModule = {
   DELETE?: LegacyHandler;
 };
 
+type ContextWithCloudflare = {
+  cloudflare?: {
+    env?: Record<string, unknown>;
+  };
+};
+
 async function withAuthorizationHeaderFromCookie(request: Request) {
   const existingAuth = request.headers.get("authorization");
   if (existingAuth) {
@@ -33,7 +39,38 @@ async function withAuthorizationHeaderFromCookie(request: Request) {
   } as RequestInit);
 }
 
-export async function proxyLegacyApi(request: Request, mod: LegacyModule) {
+function hydrateProcessEnvFromContext(context: unknown) {
+  const cfContext = context as ContextWithCloudflare | undefined;
+  const env = cfContext?.cloudflare?.env;
+  const proc = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process;
+  const processEnv = proc?.env;
+
+  if (!env || !processEnv) {
+    return () => {};
+  }
+
+  const keys = Object.keys(env);
+  const previous = new Map<string, string | undefined>();
+
+  for (const key of keys) {
+    const value = env[key];
+    if (typeof value !== "string") continue;
+    previous.set(key, processEnv[key]);
+    processEnv[key] = value;
+  }
+
+  return () => {
+    for (const [key, value] of previous.entries()) {
+      if (value === undefined) {
+        delete processEnv[key];
+      } else {
+        processEnv[key] = value;
+      }
+    }
+  };
+}
+
+export async function proxyLegacyApi(request: Request, mod: LegacyModule, context?: unknown) {
   const method = request.method.toUpperCase() as keyof LegacyModule;
   const handler = mod[method];
 
@@ -45,5 +82,10 @@ export async function proxyLegacyApi(request: Request, mod: LegacyModule) {
   }
 
   const adaptedRequest = await withAuthorizationHeaderFromCookie(request);
-  return handler(adaptedRequest);
+  const restoreEnv = hydrateProcessEnvFromContext(context);
+  try {
+    return await handler(adaptedRequest);
+  } finally {
+    restoreEnv();
+  }
 }

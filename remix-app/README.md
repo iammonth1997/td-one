@@ -1,79 +1,63 @@
-# Welcome to React Router!
+# TDOne Remix App (Cloudflare)
 
-A modern, production-ready template for building full-stack React applications using React Router.
+Employee portal migration from Next.js to React Router/Remix runtime, deployed on Cloudflare Workers.
 
-## Features
-
-- 🚀 Server-side rendering
-- ⚡️ Hot Module Replacement (HMR)
-- 📦 Asset bundling and optimization
-- 🔄 Data loading and mutations
-- 🔒 TypeScript by default
-- 🎉 TailwindCSS for styling
-- 📖 [React Router docs](https://reactrouter.com/)
-
-## Getting Started
-
-### Installation
-
-Install the dependencies:
+## Local Development
 
 ```bash
 npm install
-```
-
-### Development
-
-Start the development server with HMR:
-
-```bash
 npm run dev
 ```
 
-Your application will be available at `http://localhost:5173`.
-
-## Previewing the Production Build
-
-Preview the production build locally:
+## Validate Before Deploy
 
 ```bash
-npm run preview
-```
-
-## Building for Production
-
-Create a production build:
-
-```bash
+npm run typecheck
 npm run build
 ```
 
-## Deployment
+## Required Environment Variables
 
-Deployment is done using the Wrangler CLI.
+Use `.env.example` as the source of truth.
 
-To build and deploy directly to production:
+### Non-secret vars (`wrangler.jsonc -> vars`)
 
-```sh
+- `NEXT_PUBLIC_APP_BASE_URL`
+- `NEXT_PUBLIC_LIFF_ID`
+- `LINE_LOGIN_CHANNEL_ID`
+- `ATTENDANCE_ALLOW_DEV_WITHOUT_LIFF`
+- `ATTENDANCE_MIN_RADIUS_METERS`
+- `ATTENDANCE_MAX_RADIUS_METERS`
+- `ATTENDANCE_DEFAULT_RADIUS_METERS`
+- `OT_MAX_HOURS_PER_DAY`
+- `OT_MAX_PAST_DAYS`
+
+### Secrets (set in Cloudflare)
+
+```bash
+wrangler secret put NEXT_PUBLIC_SUPABASE_URL
+wrangler secret put NEXT_PUBLIC_SUPABASE_ANON_KEY
+wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+wrangler secret put RESET_PIN_SECRET
+wrangler secret put CRON_SECRET
+wrangler secret put NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+wrangler secret put CLOUDINARY_API_KEY
+wrangler secret put CLOUDINARY_API_SECRET
+wrangler secret put LINE_CHANNEL_ACCESS_TOKEN
+wrangler secret put LINE_ADMIN_API_KEY
+```
+
+## Deploy to Cloudflare
+
+```bash
+npx wrangler login
 npm run deploy
 ```
 
-To deploy a preview URL:
+## Post-Deploy Operations
 
-```sh
-npx wrangler versions upload
-```
-
-You can then promote a version to production after verification or roll it out progressively.
-
-```sh
-npx wrangler versions deploy
-```
-
-## Styling
-
-This template comes with [Tailwind CSS](https://tailwindcss.com/) already configured for a simple default starting experience. You can use whatever CSS framework you prefer.
-
----
-
-Built with ❤️ using React Router.
+1. Configure Cloudflare Cron Trigger for:
+	- `GET /api/cron/cleanup-cancelled-leave-files`
+	- Header `Authorization: Bearer <CRON_SECRET>`
+2. Verify LIFF endpoint points to production domain.
+3. Run smoke tests for login, scan in/out, request flows, and slip flows.
