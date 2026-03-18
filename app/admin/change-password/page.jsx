@@ -67,14 +67,14 @@ export default function AdminChangePasswordPage() {
 
   if (loading || !session) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#F5F7FA] text-[#1A2B4A]">
+      <div className="flex min-h-screen items-center justify-center bg-white text-[#555555]">
         Loading...
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] text-[#1A2B4A]">
+    <div className="min-h-screen bg-white text-[#111111]">
       <Header portal="admin_portal" loginPath="/admin/login" />
 
       <div className="max-w-2xl mx-auto p-6">
@@ -82,57 +82,57 @@ export default function AdminChangePasswordPage() {
           <button
             type="button"
             onClick={() => router.push("/admin")}
-            className="text-sm text-[#1352A3] hover:underline"
+            className="text-sm text-[#DC2626] transition hover:text-[#991B1B]"
           >
             ← กลับหน้า Admin Portal
           </button>
         </div>
 
-        <div className="rounded-xl border border-[#D0D8E4] bg-white p-6 shadow-[0_2px_12px_rgba(13,59,122,0.06)]">
+        <div className="rounded-[1rem] border border-[#FECACA] bg-white p-6 shadow-[0_4px_24px_rgba(220,38,38,0.10)]">
           <h1 className="text-2xl font-bold">เปลี่ยนรหัสผ่าน Admin</h1>
-          <p className="text-sm text-[#6B7A99] mt-1">บัญชี: {session.emp_id}</p>
+          <p className="mt-1 text-sm text-[#777777]">บัญชี: {session.emp_id}</p>
 
           <form onSubmit={handleSubmit} className="mt-5 space-y-4">
             <div>
-              <label className="text-sm font-medium text-[#334260]">รหัสผ่านเดิม</label>
+              <label className="text-sm font-medium text-[#555555]">รหัสผ่านเดิม</label>
               <input
                 type="password"
                 value={oldPassword}
                 onChange={(e) => setOldPassword(e.target.value)}
-                className="w-full mt-1 p-2.5 rounded-lg bg-[#F5F7FA] text-[#1A2B4A] border border-[#D0D8E4] focus:outline-none focus:border-[#1352A3] focus:ring-1 focus:ring-[#1352A3]"
+                className="mt-1 w-full rounded-xl border border-[#FECACA] bg-white p-2.5 text-[#111111] focus:outline-none focus:border-[#DC2626] focus:ring-1 focus:ring-[#DC2626]"
                 disabled={busy}
               />
             </div>
 
             <div>
-              <label className="text-sm font-medium text-[#334260]">รหัสผ่านใหม่ (ขั้นต่ำ 8 ตัว)</label>
+              <label className="text-sm font-medium text-[#555555]">รหัสผ่านใหม่ (ขั้นต่ำ 8 ตัว)</label>
               <input
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full mt-1 p-2.5 rounded-lg bg-[#F5F7FA] text-[#1A2B4A] border border-[#D0D8E4] focus:outline-none focus:border-[#1352A3] focus:ring-1 focus:ring-[#1352A3]"
+                className="mt-1 w-full rounded-xl border border-[#FECACA] bg-white p-2.5 text-[#111111] focus:outline-none focus:border-[#DC2626] focus:ring-1 focus:ring-[#DC2626]"
                 disabled={busy}
               />
             </div>
 
             <div>
-              <label className="text-sm font-medium text-[#334260]">ยืนยันรหัสผ่านใหม่</label>
+              <label className="text-sm font-medium text-[#555555]">ยืนยันรหัสผ่านใหม่</label>
               <input
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full mt-1 p-2.5 rounded-lg bg-[#F5F7FA] text-[#1A2B4A] border border-[#D0D8E4] focus:outline-none focus:border-[#1352A3] focus:ring-1 focus:ring-[#1352A3]"
+                className="mt-1 w-full rounded-xl border border-[#FECACA] bg-white p-2.5 text-[#111111] focus:outline-none focus:border-[#DC2626] focus:ring-1 focus:ring-[#DC2626]"
                 disabled={busy}
               />
             </div>
 
-            {error ? <p className="text-red-600 text-sm">{error}</p> : null}
-            {success ? <p className="text-green-700 text-sm">{success}</p> : null}
+            {error ? <p className="text-sm text-[#FCA5A5]">{error}</p> : null}
+            {success ? <p className="text-sm text-[#86EFAC]">{success}</p> : null}
 
             <button
               type="submit"
               disabled={busy}
-              className="w-full md:w-auto px-5 py-2.5 bg-[#1352A3] hover:bg-[#0D3B7A] disabled:opacity-50 text-white font-semibold rounded-lg transition"
+              className="w-full rounded-xl bg-[#DC2626] px-5 py-2.5 font-semibold text-white shadow-[0_10px_24px_rgba(220,38,38,0.24)] transition hover:bg-[#991B1B] disabled:opacity-50 md:w-auto"
             >
               {busy ? "Saving..." : "บันทึกรหัสผ่านใหม่"}
             </button>

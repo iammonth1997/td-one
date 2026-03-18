@@ -23,17 +23,17 @@ export default function DayWorkSelectPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#F5F7FA] px-4 py-6 sm:px-6 sm:py-10">
-      <section className="mx-auto w-full max-w-md rounded-2xl border border-[#D0D8E4] bg-white p-5 shadow-[0_4px_24px_rgba(13,59,122,0.10)] sm:max-w-lg sm:p-7">
-        <h1 className="text-2xl font-bold text-[#1352A3] sm:text-3xl">{L.title}</h1>
+    <main className="min-h-screen bg-white px-4 py-6 sm:px-6 sm:py-10">
+      <section className="mx-auto w-full max-w-md rounded-[1rem] border border-[#FECACA] bg-white p-5 shadow-[0_4px_24px_rgba(220,38,38,0.10)] sm:max-w-lg sm:p-7">
+        <h1 className="text-2xl font-bold text-[#DC2626] sm:text-3xl">{L.title}</h1>
 
         <div className="mt-6 space-y-5">
           <div>
-            <label className="mb-2 block text-sm font-semibold text-[#334260]">{L.selectYear}</label>
+            <label className="mb-2 block text-sm font-semibold text-[#555555]">{L.selectYear}</label>
             <select
               value={year}
               onChange={(e) => setYear(Number(e.target.value))}
-              className="block w-full rounded-lg border border-[#D0D8E4] bg-white px-3 py-2 text-[#1A2B4A] outline-none focus:border-[#1352A3]"
+              className="block w-full rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-[#111111] outline-none focus:border-[#DC2626]"
             >
               <option value="2025">2025</option>
               <option value="2026">2026</option>
@@ -42,11 +42,11 @@ export default function DayWorkSelectPage() {
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-semibold text-[#334260]">{L.selectMonth}</label>
+            <label className="mb-2 block text-sm font-semibold text-[#555555]">{L.selectMonth}</label>
             <select
               value={month}
               onChange={(e) => setMonth(Number(e.target.value))}
-              className="block w-full rounded-lg border border-[#D0D8E4] bg-white px-3 py-2 text-[#1A2B4A] outline-none focus:border-[#1352A3]"
+              className="block w-full rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-[#111111] outline-none focus:border-[#DC2626]"
             >
               {L.months.map((name, i) => (
                 <option key={i + 1} value={i + 1}>{name}</option>
@@ -58,7 +58,7 @@ export default function DayWorkSelectPage() {
         <button
           type="button"
           onClick={handleSubmit}
-          className="mt-7 w-full rounded-lg bg-[#1352A3] px-4 py-3 font-semibold text-white transition hover:bg-[#0D3B7A] active:scale-[0.99]"
+          className="mt-7 w-full rounded-xl bg-[#DC2626] px-4 py-3 font-semibold text-white shadow-[0_10px_24px_rgba(220,38,38,0.24)] transition hover:bg-[#991B1B] active:scale-[0.99]"
         >
           {L.viewBtn}
         </button>

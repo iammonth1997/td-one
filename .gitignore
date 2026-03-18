@@ -41,7 +41,6 @@ yarn-error.log*
 tmpclaude-*
 dev.log
 nul
-time-attendance.html
 .claude/
 
 # typescript

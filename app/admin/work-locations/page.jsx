@@ -129,7 +129,7 @@ export default function WorkLocationsAdminPage() {
     }
   }
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-white text-[#555555]">Loading...</div>;
   if (!allowed) return null;
 
   const isRectangle = form.boundary_type === "rectangle";
@@ -149,21 +149,21 @@ export default function WorkLocationsAdminPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#F5F7FA] p-6 text-[#1A2B4A]">
+    <main className="min-h-screen bg-white p-6 text-[#111111]">
       <div className="mx-auto max-w-6xl space-y-4">
         <h1 className="text-2xl font-bold">Manage Work Locations</h1>
 
-        <form onSubmit={createLocation} className="rounded-xl border border-[#D0D8E4] bg-white p-5 space-y-4">
+        <form onSubmit={createLocation} className="space-y-4 rounded-[1rem] border border-[#FECACA] bg-white p-5 shadow-[0_12px_32px_rgba(220,38,38,0.12)]">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <input
-              className="border rounded px-3 py-2"
+              className="rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-[#111111] placeholder:text-[#777777] focus:outline-none focus:border-[#DC2626]"
               placeholder="Name"
               value={form.name}
               onChange={(e) => setForm((state) => ({ ...state, name: e.target.value }))}
             />
 
             <select
-              className="border rounded px-3 py-2 bg-white"
+              className="rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-[#111111] focus:outline-none focus:border-[#DC2626]"
               value={form.boundary_type}
               onChange={(e) => {
                 const nextBoundaryType = e.target.value;
@@ -252,7 +252,7 @@ export default function WorkLocationsAdminPage() {
           />
 
           {currentLocation ? (
-            <div className="rounded-lg border border-[#BFE7E2] bg-[#F0FDFA] px-3 py-2 text-sm text-[#134E4A]">
+            <div className="rounded-xl border border-[#14532D] bg-[#0F1F14] px-3 py-2 text-sm text-[#86EFAC]">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                 <span className="font-medium">Current location</span>
                 <span>Lat: {currentLocation.latitude.toFixed(6)}</span>
@@ -264,31 +264,31 @@ export default function WorkLocationsAdminPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <input
-              className="border rounded px-3 py-2"
+              className="rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-[#111111] placeholder:text-[#777777] focus:outline-none focus:border-[#DC2626] disabled:opacity-60"
               placeholder="Latitude"
               value={form.latitude}
               onChange={(e) => setForm((state) => ({ ...state, latitude: e.target.value }))}
               disabled={isShapeBoundary}
             />
             <input
-              className="border rounded px-3 py-2"
+              className="rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-[#111111] placeholder:text-[#777777] focus:outline-none focus:border-[#DC2626] disabled:opacity-60"
               placeholder="Longitude"
               value={form.longitude}
               onChange={(e) => setForm((state) => ({ ...state, longitude: e.target.value }))}
               disabled={isShapeBoundary}
             />
             <input
-              className="border rounded px-3 py-2"
+              className="rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-[#111111] placeholder:text-[#777777] focus:outline-none focus:border-[#DC2626] disabled:opacity-60"
               placeholder="Radius meters"
               value={form.radius_meters}
               onChange={(e) => setForm((state) => ({ ...state, radius_meters: e.target.value }))}
               disabled={isShapeBoundary}
             />
-            <button disabled={busy} className="bg-[#1352A3] text-white rounded px-4 py-2 font-semibold">Add Location</button>
+            <button disabled={busy} className="rounded-xl bg-[#DC2626] px-4 py-2 font-semibold text-white shadow-[0_10px_24px_rgba(220,38,38,0.24)] transition hover:bg-[#991B1B] disabled:opacity-50">Add Location</button>
           </div>
 
           {isShapeBoundary && (
-            <div className="rounded-lg border border-[#D0D8E4] bg-[#F5F7FA] px-3 py-2 text-sm text-[#334260]">
+            <div className="rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-sm text-[#444444]">
               {isRectangle && form.boundary_json ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   <span>South / West: {form.boundary_json.south.toFixed(6)}, {form.boundary_json.west.toFixed(6)}</span>
@@ -308,7 +308,7 @@ export default function WorkLocationsAdminPage() {
                 <span>
                   {isRectangle
                     ? "Draw 2 opposite corners on the map to create a rectangular work area."
-                    : "Click around the work area to add polygon points, then press Finish polygon."}
+                    : "Click around the work area or click-and-drag to free-draw polygon points, then press Finish polygon."}
                 </span>
               )}
             </div>
@@ -317,7 +317,7 @@ export default function WorkLocationsAdminPage() {
           <div className="flex items-center gap-3 text-sm">
             <button
               type="button"
-              className="rounded border border-[#D0D8E4] px-3 py-2 bg-white"
+              className="rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-[#444444] transition hover:bg-[#FEF2F2]"
               onClick={() => {
                 setForm(DEFAULT_FORM);
                 setPolygonDraftPoints([]);
@@ -327,15 +327,15 @@ export default function WorkLocationsAdminPage() {
             >
               Reset Form
             </button>
-            <span className="text-[#6B7A99]">Tip: circle is for a single building, rectangle for box-like areas, polygon for real site outlines.</span>
+            <span className="text-[#777777]">Tip: circle is for a single building, rectangle for box-like areas, polygon for real site outlines.</span>
           </div>
         </form>
 
-        {error ? <p className="text-red-600 text-sm">{error}</p> : null}
+        {error ? <p className="text-sm text-[#FCA5A5]">{error}</p> : null}
 
-        <div className="rounded-xl border border-[#D0D8E4] bg-white overflow-x-auto">
+        <div className="overflow-x-auto rounded-[1rem] border border-[#FECACA] bg-white shadow-[0_12px_28px_rgba(0,0,0,0.24)]">
           <table className="min-w-full text-sm">
-            <thead className="bg-[#E8F0FB]">
+            <thead className="bg-white text-[#555555]">
               <tr>
                 <th className="px-3 py-2 text-left">Name</th>
                 <th className="px-3 py-2 text-left">Type</th>
@@ -348,18 +348,18 @@ export default function WorkLocationsAdminPage() {
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.id} className="border-t">
-                  <td className="px-3 py-2">{row.name}</td>
-                  <td className="px-3 py-2 capitalize">{row.boundary_type || "circle"}</td>
-                  <td className="px-3 py-2">{row.latitude}</td>
-                  <td className="px-3 py-2">{row.longitude}</td>
-                  <td className="px-3 py-2 text-xs text-[#6B7A99]">
+                <tr key={row.id} className="border-t border-[#FECACA]">
+                  <td className="px-3 py-2 text-[#444444]">{row.name}</td>
+                  <td className="px-3 py-2 capitalize text-[#444444]">{row.boundary_type || "circle"}</td>
+                  <td className="px-3 py-2 font-mono text-[#888888]">{row.latitude}</td>
+                  <td className="px-3 py-2 font-mono text-[#888888]">{row.longitude}</td>
+                  <td className="px-3 py-2 text-xs font-mono text-[#888888]">
                     {renderBoundarySummary(row.boundary_type, row.boundary_json) || `${row.radius_meters} m`}
                   </td>
-                  <td className="px-3 py-2">{row.is_active ? "Yes" : "No"}</td>
+                  <td className="px-3 py-2 text-[#444444]">{row.is_active ? "Yes" : "No"}</td>
                   <td className="px-3 py-2 space-x-2">
-                    <button onClick={() => toggleActive(row)} className="px-2 py-1 rounded border">{row.is_active ? "Disable" : "Enable"}</button>
-                    <button onClick={() => removeLocation(row)} className="px-2 py-1 rounded border border-red-300 text-red-600">Delete</button>
+                    <button onClick={() => toggleActive(row)} className="rounded-lg border border-[#FECACA] bg-white px-2 py-1 text-[#444444] transition hover:bg-[#FEF2F2]">{row.is_active ? "Disable" : "Enable"}</button>
+                    <button onClick={() => removeLocation(row)} className="rounded-lg border border-red-800 bg-white px-2 py-1 text-red-400 transition hover:bg-[#FEF2F2]">Delete</button>
                   </td>
                 </tr>
               ))}

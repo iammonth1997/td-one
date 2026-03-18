@@ -129,81 +129,81 @@ export default function RequestOtPage() {
     }
   }
 
-  if (loading || !session) return <div className="min-h-screen flex items-center justify-center">{L.loading}</div>;
+  if (loading || !session) return <div className="flex min-h-screen items-center justify-center bg-white text-[#555555]">{L.loading}</div>;
 
   return (
-    <main className="min-h-screen bg-[#F5F7FA] px-4 py-6 sm:px-6 sm:py-10">
+    <main className="min-h-screen bg-white px-4 py-6 text-[#111111] sm:px-6 sm:py-10">
       <section className="mx-auto max-w-5xl space-y-4">
-        <div className="flex items-center justify-between rounded-2xl border border-[#D0D8E4] bg-white p-5">
+        <div className="flex items-center justify-between rounded-[1rem] border border-[#FECACA] bg-white p-5 shadow-[0_12px_32px_rgba(220,38,38,0.12)]">
           <div>
-            <h1 className="text-2xl font-bold text-[#1352A3]">{L.card3Title}</h1>
-            <p className="text-sm text-[#6B7A99] mt-1">{L.card3Desc}</p>
+            <h1 className="text-2xl font-bold text-[#111111]">{L.card3Title}</h1>
+            <p className="mt-1 text-sm text-[#555555]">{L.card3Desc}</p>
           </div>
-          <Link href="/request" className="text-sm text-[#1352A3] hover:underline">{L.backToRequest}</Link>
+          <Link href="/request" className="text-sm text-[#DC2626] transition hover:text-[#991B1B]">{L.backToRequest}</Link>
         </div>
 
-        <form onSubmit={onSubmit} className="rounded-2xl border border-[#D0D8E4] bg-white p-5 space-y-4">
-          <h3 className="text-lg font-bold text-[#1A2B4A]">{L.formTitle}</h3>
+        <form onSubmit={onSubmit} className="space-y-4 rounded-[1rem] border border-[#FECACA] bg-white p-5 shadow-[0_10px_28px_rgba(220,38,38,0.10)]">
+          <h3 className="text-lg font-bold text-[#DC2626]">{L.formTitle}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             <div>
-              <label className="text-sm font-semibold text-[#334260]">{L.otTypeLabel}</label>
-              <select value={form.ot_type_code} onChange={(e) => setForm((s) => ({ ...s, ot_type_code: e.target.value }))} className="mt-1 w-full rounded-lg border border-[#D0D8E4] px-3 py-2">
+              <label className="text-sm font-semibold text-[#555555]">{L.otTypeLabel}</label>
+              <select value={form.ot_type_code} onChange={(e) => setForm((s) => ({ ...s, ot_type_code: e.target.value }))} className="mt-1 w-full rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-[#111111] focus:border-[#DC2626]">
                 {otTypes.map((item) => (
                   <option key={item.code} value={item.code}>{displayTypeName(item)} ({Number(item.rate_multiplier).toFixed(1)}x)</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="text-sm font-semibold text-[#334260]">{L.dateLabel}</label>
-              <input type="date" value={form.date} onChange={(e) => setForm((s) => ({ ...s, date: e.target.value }))} className="mt-1 w-full rounded-lg border border-[#D0D8E4] px-3 py-2" />
+              <label className="text-sm font-semibold text-[#555555]">{L.dateLabel}</label>
+              <input type="date" value={form.date} onChange={(e) => setForm((s) => ({ ...s, date: e.target.value }))} className="mt-1 w-full rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-[#111111] focus:border-[#DC2626]" />
             </div>
             <div>
-              <label className="text-sm font-semibold text-[#334260]">{L.rateLabel}</label>
-              <div className="mt-1 w-full rounded-lg border border-[#D0D8E4] px-3 py-2 bg-[#F8FAFD]">{selectedType ? `${Number(selectedType.rate_multiplier).toFixed(1)}x` : "-"}</div>
+              <label className="text-sm font-semibold text-[#555555]">{L.rateLabel}</label>
+              <div className="mt-1 w-full rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-[#444444]">{selectedType ? `${Number(selectedType.rate_multiplier).toFixed(1)}x` : "-"}</div>
             </div>
             <div>
-              <label className="text-sm font-semibold text-[#334260]">{L.startTimeLabel}</label>
-              <input type="time" value={form.start_time} onChange={(e) => setForm((s) => ({ ...s, start_time: e.target.value }))} className="mt-1 w-full rounded-lg border border-[#D0D8E4] px-3 py-2" />
+              <label className="text-sm font-semibold text-[#555555]">{L.startTimeLabel}</label>
+              <input type="time" value={form.start_time} onChange={(e) => setForm((s) => ({ ...s, start_time: e.target.value }))} className="mt-1 w-full rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-[#111111] focus:border-[#DC2626]" />
             </div>
             <div>
-              <label className="text-sm font-semibold text-[#334260]">{L.endTimeLabel}</label>
-              <input type="time" value={form.end_time} onChange={(e) => setForm((s) => ({ ...s, end_time: e.target.value }))} className="mt-1 w-full rounded-lg border border-[#D0D8E4] px-3 py-2" />
+              <label className="text-sm font-semibold text-[#555555]">{L.endTimeLabel}</label>
+              <input type="time" value={form.end_time} onChange={(e) => setForm((s) => ({ ...s, end_time: e.target.value }))} className="mt-1 w-full rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-[#111111] focus:border-[#DC2626]" />
             </div>
             <div>
-              <label className="text-sm font-semibold text-[#334260]">{L.totalHoursLabel}</label>
-              <div className="mt-1 w-full rounded-lg border border-[#D0D8E4] px-3 py-2 bg-[#F8FAFD]">{calc.totalHours.toFixed(2)} {L.hourUnit}{calc.crossMidnight ? ` (${L.nextDay})` : ""}</div>
+              <label className="text-sm font-semibold text-[#555555]">{L.totalHoursLabel}</label>
+              <div className="mt-1 w-full rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-[#444444]">{calc.totalHours.toFixed(2)} {L.hourUnit}{calc.crossMidnight ? ` (${L.nextDay})` : ""}</div>
             </div>
           </div>
 
           <div>
-            <label className="text-sm font-semibold text-[#334260]">{L.reasonLabel}</label>
-            <textarea value={form.reason} onChange={(e) => setForm((s) => ({ ...s, reason: e.target.value }))} className="mt-1 w-full rounded-lg border border-[#D0D8E4] px-3 py-2 min-h-24" placeholder={L.reasonPlaceholder} />
+            <label className="text-sm font-semibold text-[#555555]">{L.reasonLabel}</label>
+            <textarea value={form.reason} onChange={(e) => setForm((s) => ({ ...s, reason: e.target.value }))} className="mt-1 min-h-24 w-full rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-[#111111] focus:border-[#DC2626]" placeholder={L.reasonPlaceholder} />
           </div>
 
           <div>
-            <label className="text-sm font-semibold text-[#334260]">{L.projectRefLabel}</label>
-            <input value={form.project_ref} onChange={(e) => setForm((s) => ({ ...s, project_ref: e.target.value }))} className="mt-1 w-full rounded-lg border border-[#D0D8E4] px-3 py-2" placeholder={L.projectRefPlaceholder} />
+            <label className="text-sm font-semibold text-[#555555]">{L.projectRefLabel}</label>
+            <input value={form.project_ref} onChange={(e) => setForm((s) => ({ ...s, project_ref: e.target.value }))} className="mt-1 w-full rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-[#111111] focus:border-[#DC2626]" placeholder={L.projectRefPlaceholder} />
           </div>
 
-          {duplicateInfo.has_ot ? <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">{L.warningDuplicate}</div> : null}
-          {duplicateInfo.has_leave ? <div className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{L.warningLeave}</div> : null}
-          <p className="text-xs text-[#6B7A99]">{L.limitHint.replace("{min}", String(limits.minHours)).replace("{max}", String(limits.maxHours)).replace("{days}", String(limits.maxPastDays))}</p>
+          {duplicateInfo.has_ot ? <div className="rounded-xl border border-[#FCD34D] bg-[#FFF7ED] px-3 py-2 text-sm text-[#B45309]">{L.warningDuplicate}</div> : null}
+          {duplicateInfo.has_leave ? <div className="rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-3 py-2 text-sm text-[#B91C1C]">{L.warningLeave}</div> : null}
+          <p className="text-xs text-[#555555]">{L.limitHint.replace("{min}", String(limits.minHours)).replace("{max}", String(limits.maxHours)).replace("{days}", String(limits.maxPastDays))}</p>
 
-          {error ? <div className="text-sm text-red-600">{error}</div> : null}
-          {success ? <div className="text-sm text-green-600">{success}</div> : null}
+          {error ? <div className="text-sm text-[#FCA5A5]">{error}</div> : null}
+          {success ? <div className="text-sm text-[#86EFAC]">{success}</div> : null}
 
-          <button disabled={busy || !canSubmit || duplicateInfo.has_leave} className="w-full md:w-auto rounded-lg bg-[#1352A3] px-6 py-2.5 font-semibold text-white disabled:opacity-50">{busy ? L.submitLoading : L.submitBtn}</button>
+          <button disabled={busy || !canSubmit || duplicateInfo.has_leave} className="w-full rounded-xl bg-[#DC2626] px-6 py-2.5 font-semibold text-white shadow-[0_10px_24px_rgba(220,38,38,0.24)] transition hover:bg-[#991B1B] disabled:opacity-50 md:w-auto">{busy ? L.submitLoading : L.submitBtn}</button>
         </form>
 
-        <section className="rounded-2xl border border-[#D0D8E4] bg-white p-5">
-          <h3 className="text-lg font-bold text-[#1A2B4A] mb-3">{L.myRequestsTitle}</h3>
-          {!rows.length ? <p className="text-sm text-[#6B7A99]">{L.noData}</p> : (
+        <section className="rounded-[1rem] border border-[#FECACA] bg-white p-5 shadow-[0_10px_28px_rgba(220,38,38,0.10)]">
+          <h3 className="mb-3 text-lg font-bold text-[#DC2626]">{L.myRequestsTitle}</h3>
+          {!rows.length ? <p className="text-sm text-[#555555]">{L.noData}</p> : (
             <div className="space-y-2">
               {rows.map((row) => (
-                <div key={row.id} className="rounded-lg border border-[#E1E7F0] p-3 text-sm">
-                  <p className="font-semibold text-[#1A2B4A]">{displayTypeName(row.ot_type)} - {row.date}</p>
-                  <p>{row.start_time} - {row.end_time} ({row.total_hours} {L.hourUnit})</p>
-                  <p className="text-xs text-[#6B7A99] mt-1">{row.reason}</p>
+                <div key={row.id} className="rounded-xl border border-[#FECACA] bg-white p-3 text-sm">
+                  <p className="font-semibold text-[#111111]">{displayTypeName(row.ot_type)} - {row.date}</p>
+                  <p className="text-[#444444]">{row.start_time} - {row.end_time} ({row.total_hours} {L.hourUnit})</p>
+                  <p className="mt-1 text-xs text-[#555555]">{row.reason}</p>
                 </div>
               ))}
             </div>

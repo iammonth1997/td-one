@@ -26,10 +26,10 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#F5F7FA] text-[#1A2B4A]">
+      <div className="flex min-h-screen items-center justify-center bg-white text-[#111111]">
         <div className="animate-pulse">
-          <div className="h-6 w-48 bg-[#D0D8E4] rounded mb-2"></div>
-          <div className="h-4 w-64 bg-[#D0D8E4] rounded"></div>
+          <div className="mb-2 h-6 w-48 rounded bg-[#FEF2F2]"></div>
+          <div className="h-4 w-64 rounded bg-[#FEF2F2]"></div>
         </div>
       </div>
     );
@@ -72,7 +72,7 @@ export default function Dashboard() {
           <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" />
         </svg>
       ),
-      iconBg: "bg-[#1352A3]",
+      iconBg: "bg-[#DC2626]",
     },
     {
       key: "ot",
@@ -85,7 +85,7 @@ export default function Dashboard() {
           <polyline points="12 6 12 12 16 14" />
         </svg>
       ),
-      iconBg: "bg-[#F5A623]",
+      iconBg: "bg-[#F59E0B]",
     },
     {
       key: "salary",
@@ -99,7 +99,7 @@ export default function Dashboard() {
           <path d="M7 15h4" />
         </svg>
       ),
-      iconBg: "bg-[#1E6CC8]",
+      iconBg: "bg-[#DC2626]",
     },
     {
       key: "otSlip",
@@ -115,12 +115,12 @@ export default function Dashboard() {
           <polyline points="10 9 9 9 8 9" />
         </svg>
       ),
-      iconBg: "bg-[#0D3B7A]",
+      iconBg: "bg-[#991B1B]",
     },
   ];
 
   return (
-    <div className="flex bg-[#F5F7FA] min-h-screen text-[#1A2B4A]">
+    <div className="flex min-h-screen bg-white text-[#111111]">
       {!isEmployee && <Sidebar />}
 
       <div className="flex-1 flex flex-col">
@@ -128,7 +128,7 @@ export default function Dashboard() {
 
         <div className="flex-1 p-4 sm:p-6 lg:p-8">
           {/* Hero Welcome Banner */}
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0D3B7A] via-[#1352A3] to-[#1E6CC8] p-6 sm:p-8 text-white shadow-[0_8px_32px_rgba(13,59,122,0.25)]">
+          <div className="relative overflow-hidden rounded-[1rem] border border-[#FECACA] bg-gradient-to-br from-[#450A0A] via-[#991B1B] to-[#DC2626] p-6 text-white shadow-[0_12px_32px_rgba(220,38,38,0.16)] sm:p-8">
             {/* Decorative circles */}
             <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/5"></div>
             <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full bg-white/5"></div>
@@ -136,7 +136,7 @@ export default function Dashboard() {
 
             <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
               {/* Avatar */}
-              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white/15 backdrop-blur-sm border-2 border-white/30 flex items-center justify-center flex-shrink-0">
+              <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full border-2 border-white/30 bg-white/15 backdrop-blur-sm sm:h-20 sm:w-20">
                 <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                   <circle cx="12" cy="7" r="4" />
@@ -158,8 +158,8 @@ export default function Dashboard() {
           {/* Services Section */}
           <div className="mt-8">
             <div className="flex items-center gap-3 mb-5">
-              <div className="w-1 h-6 rounded-full bg-[#1352A3]"></div>
-              <h2 className="text-xl font-bold text-[#1A2B4A]">{L.servicesTitle}</h2>
+              <div className="h-6 w-1 rounded-full bg-[#DC2626]"></div>
+              <h2 className="text-xl font-bold text-[#111111]">{L.servicesTitle}</h2>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
@@ -171,29 +171,29 @@ export default function Dashboard() {
                     key={svc.key}
                     type={isClickable ? "button" : undefined}
                     onClick={isClickable ? () => router.push(svc.href) : undefined}
-                    className={`group relative bg-white rounded-xl border border-[#D0D8E4] p-5 sm:p-6 shadow-[0_2px_12px_rgba(13,59,122,0.06)] transition-all duration-200 text-left ${
+                    className={`group relative rounded-[1rem] border border-[#FECACA] bg-white p-5 text-left shadow-[0_10px_28px_rgba(220,38,38,0.10)] transition-all duration-200 sm:p-6 ${
                       isClickable
-                        ? "cursor-pointer hover:shadow-[0_8px_32px_rgba(13,59,122,0.14)] hover:border-[#1352A3]/30 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#1352A3] focus:ring-offset-2"
+                        ? "cursor-pointer hover:-translate-y-0.5 hover:border-[#DC2626]/50 hover:shadow-[0_16px_36px_rgba(220,38,38,0.18)] focus:outline-none focus:ring-2 focus:ring-[#DC2626] focus:ring-offset-2 focus:ring-offset-white"
                         : "opacity-60"
                     }`}
                   >
                     <div className="flex items-start gap-4">
                       {/* Icon */}
-                      <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl ${svc.iconBg} text-white flex items-center justify-center flex-shrink-0 shadow-sm`}>
+                      <div className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl ${svc.iconBg} text-white shadow-[0_10px_20px_rgba(0,0,0,0.18)] sm:h-14 sm:w-14`}>
                         {svc.icon}
                       </div>
 
                       {/* Text */}
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-base sm:text-lg font-bold text-[#1A2B4A] group-hover:text-[#1352A3] transition-colors">
+                        <h3 className="text-base font-bold text-[#111111] transition-colors group-hover:text-[#DC2626] sm:text-lg">
                           {svc.title}
                         </h3>
-                        <p className="text-sm text-[#6B7A99] mt-1 leading-relaxed">{svc.desc}</p>
+                        <p className="mt-1 text-sm leading-relaxed text-[#555555]">{svc.desc}</p>
                       </div>
 
                       {/* Arrow */}
                       {isClickable && (
-                        <div className="flex-shrink-0 mt-1 text-[#D0D8E4] group-hover:text-[#1352A3] transition-all group-hover:translate-x-0.5">
+                        <div className="mt-1 flex-shrink-0 text-[#777777] transition-all group-hover:translate-x-0.5 group-hover:text-[#DC2626]">
                           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <polyline points="9 18 15 12 9 6" />
                           </svg>

@@ -183,59 +183,59 @@ export default function RequestLeavePage() {
     }
   }
 
-  if (loading || !session) return <div className="min-h-screen flex items-center justify-center">{L.loading}</div>;
+  if (loading || !session) return <div className="flex min-h-screen items-center justify-center bg-white text-[#555555]">{L.loading}</div>;
 
   const totalBalance = balance?.total_days ?? selectedLeaveType?.max_days_per_year ?? 0;
   const usedBalance = balance?.used_days ?? 0;
   const remaining = selectedLeaveType?.max_days_per_year === null ? "-" : Math.max(totalBalance - usedBalance, 0);
 
   return (
-    <main className="min-h-screen bg-[#F5F7FA] px-4 py-6 sm:px-6 sm:py-10">
+    <main className="min-h-screen bg-white px-4 py-6 text-[#111111] sm:px-6 sm:py-10">
       <section className="mx-auto max-w-5xl space-y-4">
-        <div className="flex items-center justify-between rounded-2xl border border-[#D0D8E4] bg-white p-5">
+        <div className="flex items-center justify-between rounded-[1rem] border border-[#FECACA] bg-white p-5 shadow-[0_12px_32px_rgba(220,38,38,0.12)]">
           <div>
-            <h1 className="text-2xl font-bold text-[#1352A3]">{L.card1Title}</h1>
-            <p className="text-sm text-[#6B7A99] mt-1">{L.card1Desc}</p>
+            <h1 className="text-2xl font-bold text-[#111111]">{L.card1Title}</h1>
+            <p className="mt-1 text-sm text-[#555555]">{L.card1Desc}</p>
           </div>
-          <Link href="/request" className="text-sm text-[#1352A3] hover:underline">{L.backToRequest}</Link>
+          <Link href="/request" className="text-sm text-[#DC2626] transition hover:text-[#991B1B]">{L.backToRequest}</Link>
         </div>
 
-        <form onSubmit={onSubmit} className="rounded-2xl border border-[#D0D8E4] bg-white p-5 space-y-4">
+        <form onSubmit={onSubmit} className="space-y-4 rounded-[1rem] border border-[#FECACA] bg-white p-5 shadow-[0_10px_28px_rgba(220,38,38,0.10)]">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="text-sm font-semibold text-[#334260]">{L.leaveTypeLabel}</label>
-              <select value={form.leave_type_code} onChange={(e) => setForm((s) => ({ ...s, leave_type_code: e.target.value }))} className="mt-1 w-full rounded-lg border border-[#D0D8E4] px-3 py-2">
+              <label className="text-sm font-semibold text-[#555555]">{L.leaveTypeLabel}</label>
+              <select value={form.leave_type_code} onChange={(e) => setForm((s) => ({ ...s, leave_type_code: e.target.value }))} className="mt-1 w-full rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-[#111111] focus:border-[#DC2626]">
                 {leaveTypes.map((item) => (
                   <option key={item.code} value={item.code}>{displayLeaveTypeName(item)}</option>
                 ))}
               </select>
             </div>
 
-            <div className="rounded-lg border border-[#D0D8E4] bg-[#F8FAFD] px-3 py-2 text-sm text-[#334260]">
+            <div className="rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-sm text-[#444444]">
               <p>{L.leaveRemaining}: <strong>{remaining}</strong></p>
               <p>{L.leaveUsed}: <strong>{usedBalance}</strong></p>
             </div>
 
             <div>
-              <label className="text-sm font-semibold text-[#334260]">{L.startDateLabel}</label>
-              <input type="date" value={form.start_date} onChange={(e) => setForm((s) => ({ ...s, start_date: e.target.value }))} className="mt-1 w-full rounded-lg border border-[#D0D8E4] px-3 py-2" />
+              <label className="text-sm font-semibold text-[#555555]">{L.startDateLabel}</label>
+              <input type="date" value={form.start_date} onChange={(e) => setForm((s) => ({ ...s, start_date: e.target.value }))} className="mt-1 w-full rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-[#111111] focus:border-[#DC2626]" />
             </div>
 
             <div>
-              <label className="text-sm font-semibold text-[#334260]">{L.endDateLabel}</label>
-              <input type="date" value={form.end_date} onChange={(e) => setForm((s) => ({ ...s, end_date: e.target.value }))} className="mt-1 w-full rounded-lg border border-[#D0D8E4] px-3 py-2" />
+              <label className="text-sm font-semibold text-[#555555]">{L.endDateLabel}</label>
+              <input type="date" value={form.end_date} onChange={(e) => setForm((s) => ({ ...s, end_date: e.target.value }))} className="mt-1 w-full rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-[#111111] focus:border-[#DC2626]" />
             </div>
           </div>
 
-          <p className="text-sm text-[#334260]">{L.totalDaysLabel}: <strong>{totalDays}</strong></p>
+          <p className="text-sm text-[#444444]">{L.totalDaysLabel}: <strong>{totalDays}</strong></p>
 
           <div>
-            <label className="text-sm font-semibold text-[#334260]">{L.reasonLabel}</label>
-            <textarea value={form.reason} onChange={(e) => setForm((s) => ({ ...s, reason: e.target.value }))} className="mt-1 w-full rounded-lg border border-[#D0D8E4] px-3 py-2 min-h-24" />
+            <label className="text-sm font-semibold text-[#555555]">{L.reasonLabel}</label>
+            <textarea value={form.reason} onChange={(e) => setForm((s) => ({ ...s, reason: e.target.value }))} className="mt-1 min-h-24 w-full rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-[#111111] focus:border-[#DC2626]" />
           </div>
 
           <div>
-            <label className="text-sm font-semibold text-[#334260]">{L.attachmentLabel}</label>
+            <label className="text-sm font-semibold text-[#555555]">{L.attachmentLabel}</label>
             <input
               type="file"
               accept="image/*,.pdf"
@@ -257,35 +257,35 @@ export default function RequestLeavePage() {
                 setError("");
                 setForm((s) => ({ ...s, attachment_file: file }));
               }}
-              className="mt-1 w-full rounded-lg border border-[#D0D8E4] px-3 py-2"
+              className="mt-1 w-full rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-[#111111] focus:border-[#DC2626]"
             />
-            <p className="mt-1 text-xs text-[#6B7A99]">รองรับเฉพาะ JPG, PNG, WEBP, PDF ขนาดไม่เกิน {MAX_ATTACHMENT_MB}MB</p>
+            <p className="mt-1 text-xs text-[#555555]">รองรับเฉพาะ JPG, PNG, WEBP, PDF ขนาดไม่เกิน {MAX_ATTACHMENT_MB}MB</p>
           </div>
 
-          {error ? <div className="text-sm text-red-600">{error}</div> : null}
-          {success ? <div className="text-sm text-green-600">{success}</div> : null}
+          {error ? <div className="text-sm text-[#FCA5A5]">{error}</div> : null}
+          {success ? <div className="text-sm text-[#86EFAC]">{success}</div> : null}
 
-          <button disabled={busy || !totalDays} className="w-full md:w-auto rounded-lg bg-[#1352A3] px-6 py-2.5 font-semibold text-white disabled:opacity-50">
+          <button disabled={busy || !totalDays} className="w-full rounded-xl bg-[#DC2626] px-6 py-2.5 font-semibold text-white shadow-[0_10px_24px_rgba(220,38,38,0.24)] transition hover:bg-[#991B1B] disabled:opacity-50 md:w-auto">
             {busy ? L.submitLoading : L.submitBtn}
           </button>
         </form>
 
-        <section className="rounded-2xl border border-[#D0D8E4] bg-white p-5">
-          <h3 className="text-lg font-bold text-[#1A2B4A] mb-3">{L.leaveHistoryTitle}</h3>
-          {!rows.length ? <p className="text-sm text-[#6B7A99]">{L.noData}</p> : (
+        <section className="rounded-[1rem] border border-[#FECACA] bg-white p-5 shadow-[0_10px_28px_rgba(220,38,38,0.10)]">
+          <h3 className="mb-3 text-lg font-bold text-[#DC2626]">{L.leaveHistoryTitle}</h3>
+          {!rows.length ? <p className="text-sm text-[#555555]">{L.noData}</p> : (
             <div className="space-y-2">
               {rows.map((row) => (
-                <div key={row.id} className="rounded-lg border border-[#E1E7F0] p-3 text-sm">
-                  <p className="font-semibold text-[#1A2B4A]">{row.leave_type_code} ({row.start_date} - {row.end_date})</p>
-                  <p>{row.total_days} {L.dayUnit}</p>
-                  <p className="text-xs mt-1">Status: <span className="font-semibold">{row.status}</span></p>
-                  <p className="text-xs text-[#6B7A99] mt-1">{row.reason || "-"}</p>
+                <div key={row.id} className="rounded-xl border border-[#FECACA] bg-white p-3 text-sm">
+                  <p className="font-semibold text-[#111111]">{row.leave_type_code} ({row.start_date} - {row.end_date})</p>
+                  <p className="text-[#444444]">{row.total_days} {L.dayUnit}</p>
+                  <p className="mt-1 text-xs text-[#444444]">Status: <span className="font-semibold">{row.status}</span></p>
+                  <p className="mt-1 text-xs text-[#555555]">{row.reason || "-"}</p>
                   {(row.status === "pending" || row.status === "approved") ? (
                     <button
                       type="button"
                       disabled={busy}
                       onClick={() => cancelLeaveRequest(row.id)}
-                      className="mt-2 rounded-md border border-[#D0D8E4] px-3 py-1.5 text-xs text-[#334260] hover:bg-[#F8FAFD] disabled:opacity-50"
+                      className="mt-2 rounded-lg border border-[#FECACA] bg-white px-3 py-1.5 text-xs text-[#444444] transition hover:bg-[#FEF2F2] disabled:opacity-50"
                     >
                       {L.cancelBtn || "Cancel"}
                     </button>

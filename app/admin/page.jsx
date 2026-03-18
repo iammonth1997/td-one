@@ -49,21 +49,21 @@ export default function AdminHomePage() {
 
   if (loading || !session) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#F5F7FA] text-[#1A2B4A]">
+      <div className="flex min-h-screen items-center justify-center bg-white text-[#111111]">
         Loading...
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] text-[#1A2B4A]">
+    <div className="min-h-screen bg-white text-[#111111]">
       <Header portal="admin_portal" loginPath="/admin/login" />
 
       <div className="max-w-6xl mx-auto p-6">
-        <div className="rounded-2xl bg-gradient-to-br from-[#0D3B7A] via-[#1352A3] to-[#1E6CC8] p-6 text-white shadow-[0_8px_32px_rgba(13,59,122,0.20)]">
-          <p className="text-white/80 text-sm">Admin Portal</p>
-          <h1 className="text-2xl font-bold mt-1">ระบบบริหาร</h1>
-          <p className="text-sm text-white/80 mt-2">รหัสพนักงาน: {session.emp_id} • role: {role}</p>
+        <div className="rounded-[1rem] border border-[#FECACA] bg-gradient-to-br from-[#450A0A] via-[#991B1B] to-[#DC2626] p-6 text-white shadow-[0_12px_32px_rgba(220,38,38,0.16)]">
+          <p className="text-sm text-white/80">Admin Portal</p>
+          <h1 className="mt-1 text-2xl font-bold">ระบบบริหาร</h1>
+          <p className="mt-2 text-sm text-white/80">รหัสพนักงาน: {session.emp_id} • role: {role}</p>
         </div>
 
         <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -72,10 +72,10 @@ export default function AdminHomePage() {
               key={item.href}
               type="button"
               onClick={() => router.push(item.href)}
-              className="bg-white rounded-xl border border-[#D0D8E4] p-5 text-left shadow-[0_2px_12px_rgba(13,59,122,0.06)] hover:shadow-[0_8px_24px_rgba(13,59,122,0.14)] transition"
+              className="rounded-[1rem] border border-[#FECACA] bg-white p-5 text-left shadow-[0_10px_28px_rgba(220,38,38,0.10)] transition hover:-translate-y-0.5 hover:border-[#DC2626]/50 hover:shadow-[0_16px_36px_rgba(220,38,38,0.16)]"
             >
-              <h2 className="text-lg font-bold text-[#1A2B4A]">{item.title}</h2>
-              <p className="text-sm text-[#6B7A99] mt-1">{item.description}</p>
+              <h2 className="text-lg font-bold text-[#111111]">{item.title}</h2>
+              <p className="mt-1 text-sm text-[#555555]">{item.description}</p>
             </button>
           ))}
         </div>

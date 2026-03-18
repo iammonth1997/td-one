@@ -46,7 +46,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  themeColor: "#1352A3",
+  themeColor: "#DC2626",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -55,7 +55,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="th"
       className={`${notoSans.variable} ${notoSansThai.variable} ${notoSansLao.variable} ${inter.variable}`}
     >
-      <body className="bg-[#F5F7FA] text-[#1A2B4A]">
+      <body className="bg-white text-[#111111] antialiased">
         <LanguageProvider>{children}</LanguageProvider>
         <PWARegister />
       </body>

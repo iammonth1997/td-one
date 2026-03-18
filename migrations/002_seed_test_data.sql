@@ -37,43 +37,44 @@ VALUES
 ON CONFLICT (emp_id) DO NOTHING;
 
 -- INSERT into monthly_daywork_summary
-INSERT INTO monthly_daywork_summary (emp_id, year, month, total_work_days, sick_leave, personal_leave, annual_leave, absent_days, forgot_scan, normal_work_hours, overtime_hours, created_at)
+-- NOTE: Updated to use new schema with detailed work/leave tracking
+INSERT INTO monthly_daywork_summary (emp_id, year, month, work_days, sl_days, pl_days, vl_days, no_scan, off_days, total_leave, total_paid_days, attendance_rate, normal_work_hours, overtime_hours, created_at)
 VALUES
     -- February 2026 — Employee L2207014 เพียว่าง
-    ('L2207014', 2026, 2, 20, 0, 0, 0, 0, 1, 160, 2.5, now()),
+    ('L2207014', 2026, 2, 20, 0, 0, 0, 1, 4, 0, 28, '0.83', 160, 2.5, now()),
 
     -- February 2026 — Employee L2210007 สีสะหวาด
-    ('L2210007', 2026, 2, 19, 1, 0, 0, 0, 0, 152, 0, now()),
+    ('L2210007', 2026, 2, 8, 0, 0, 4, 0, 14, 4, 28, '0.29', 64, 0, now()),
 
     -- February 2026 — Employee L2210009 แดนสะหวัน
-    ('L2210009', 2026, 2, 21, 0, 0, 0, 0, 0, 168, 5.0, now()),
+    ('L2210009', 2026, 2, 15, 0, 0, 3, 0, 5, 7, 28, '0.54', 120, 5.0, now()),
 
     -- February 2026 — Employee L2210013 มะโนสัก
-    ('L2210013', 2026, 2, 20, 0, 1, 0, 0, 0, 160, 3.5, now()),
+    ('L2210013', 2026, 2, 20, 0, 1, 0, 0, 7, 1, 28, '0.71', 160, 3.5, now()),
 
     -- February 2026 — Employee L2211017 เสกไช
-    ('L2211017', 2026, 2, 22, 0, 0, 0, 0, 0, 176, 8.0, now()),
+    ('L2211017', 2026, 2, 22, 0, 0, 0, 0, 6, 0, 28, '0.79', 176, 8.0, now()),
 
     -- February 2026 — Employee L2211018 สอนวิไช
-    ('L2211018', 2026, 2, 18, 0, 0, 1, 1, 2, 144, 1.0, now()),
+    ('L2211018', 2026, 2, 16, 0, 0, 1, 2, 9, 1, 28, '0.57', 128, 1.0, now()),
 
     -- February 2026 — Employee L2211020 ธีระพงศ์
-    ('L2211020', 2026, 2, 20, 0, 0, 0, 0, 0, 160, 0, now()),
+    ('L2211020', 2026, 2, 22, 0, 0, 1, 0, 4, 1, 28, '0.79', 176, 0, now()),
 
     -- February 2026 — Employee L2211030 หูนคำ
-    ('L2211030', 2026, 2, 21, 0, 0, 0, 0, 0, 168, 4.5, now()),
+    ('L2211030', 2026, 2, 9, 0, 3, 0, 0, 14, 3, 28, '0.32', 72, 4.5, now()),
 
     -- February 2026 — Employee L2211032 อาลิสา
-    ('L2211032', 2026, 2, 19, 1, 0, 0, 1, 1, 152, 2.0, now()),
+    ('L2211032', 2026, 2, 15, 0, 0, 0, 1, 10, 0, 28, '0.54', 120, 2.0, now()),
 
     -- February 2026 — Employee L2212043 ต้นจักกิด
-    ('L2212043', 2026, 2, 20, 0, 0, 0, 0, 0, 160, 6.0, now()),
+    ('L2212043', 2026, 2, 18, 0, 0, 0, 0, 8, 0, 28, '0.64', 144, 6.0, now()),
 
     -- January 2026 — Employee L2207014 เพียว่าง (history)
-    ('L2207014', 2026, 1, 21, 0, 0, 0, 0, 0, 168, 3.0, now()),
+    ('L2207014', 2026, 1, 21, 0, 0, 0, 0, 7, 0, 28, '0.75', 168, 3.0, now()),
 
     -- January 2026 — Employee L2210009 แดนสะหวัน (history)
-    ('L2210009', 2026, 1, 22, 0, 0, 0, 0, 0, 176, 6.0, now())
+    ('L2210009', 2026, 1, 22, 0, 0, 0, 0, 6, 0, 28, '0.79', 176, 6.0, now())
 ON CONFLICT (emp_id, year, month) DO NOTHING;
 
 -- ============================================================================

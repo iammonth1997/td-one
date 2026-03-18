@@ -8,8 +8,8 @@ import { readStoredSession } from "@/lib/clientSession";
 
 function CenterCard({ children }) {
   return (
-    <main className="min-h-screen bg-slate-100 px-4 py-6 sm:px-6 sm:py-10">
-      <section className="mx-auto w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-lg sm:max-w-xl sm:p-7">
+    <main className="min-h-screen bg-white px-4 py-6 sm:px-6 sm:py-10">
+      <section className="mx-auto w-full max-w-md rounded-[1rem] border border-[#FECACA] bg-white p-5 shadow-[0_4px_24px_rgba(220,38,38,0.10)] sm:max-w-xl sm:p-7">
         {children}
       </section>
     </main>
@@ -31,10 +31,10 @@ function SlipOTViewContent() {
   if (errorMsg) {
     return (
       <CenterCard>
-        <p className="mt-2 text-slate-600">{errorMsg}</p>
+        <p className="mt-2 text-[#555555]">{errorMsg}</p>
         <Link
           href="/slip/ot"
-          className="mt-6 inline-block rounded-lg bg-[#1352A3] px-4 py-2 font-semibold text-white transition hover:bg-[#0D3B7A]"
+          className="mt-6 inline-block rounded-xl border border-[#FECACA] bg-white px-4 py-2 font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
         >
           {L.backBtn}
         </Link>
@@ -44,9 +44,9 @@ function SlipOTViewContent() {
 
   return (
     <CenterCard>
-      <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
-        <h2 className="text-lg font-bold text-slate-900">{L.empInfoTitle}</h2>
-        <div className="mt-2 space-y-1 text-sm text-slate-700">
+      <div className="mb-6 rounded-[1rem] border border-[#FECACA] bg-white p-4">
+        <h2 className="text-lg font-bold text-[#DC2626]">{L.empInfoTitle}</h2>
+        <div className="mt-2 space-y-1 text-sm text-[#555555]">
           <p>{L.empIdLabel}: {empInfo?.empId || "-"}</p>
           <p>{L.dayLabel}: {day}</p>
           <p>{L.monthLabel}: {month}</p>
@@ -54,15 +54,15 @@ function SlipOTViewContent() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-yellow-300 bg-yellow-50 p-6 text-center">
+      <div className="rounded-[1rem] border border-[#FCD34D] bg-[#FFF7ED] p-6 text-center">
         <p className="text-2xl mb-2">🚧</p>
-        <h2 className="text-xl font-bold text-yellow-700">{L.comingSoon}</h2>
-        <p className="mt-2 text-sm text-yellow-600">{L.comingSoonDesc}</p>
+        <h2 className="text-xl font-bold text-[#B45309]">{L.comingSoon}</h2>
+        <p className="mt-2 text-sm text-[#92400E]">{L.comingSoonDesc}</p>
       </div>
 
       <Link
         href="/slip/ot"
-        className="mt-6 inline-block rounded-lg border border-slate-300 px-4 py-2 font-semibold text-slate-700 transition hover:bg-slate-50"
+        className="mt-6 inline-block rounded-xl border border-[#FECACA] bg-white px-4 py-2 font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
       >
         {L.backBtn}
       </Link>
@@ -78,7 +78,7 @@ export default function SlipOTViewPage() {
     <Suspense
       fallback={
         <CenterCard>
-          <p className="text-slate-700">{L.loading}</p>
+          <p className="text-[#555555]">{L.loading}</p>
         </CenterCard>
       }
     >

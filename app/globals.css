@@ -2,28 +2,28 @@
 @import "leaflet/dist/leaflet.css";
 
 :root {
-  --blue-primary:   #1352A3;
-  --blue-dark:      #0D3B7A;
-  --blue-darker:    #082A5C;
-  --blue-light:     #1E6CC8;
-  --blue-pale:      #E8F0FB;
-  --yellow-accent:  #F5A623;
-  --white:          #FFFFFF;
-  --gray-light:     #F5F7FA;
-  --gray-mid:       #D0D8E4;
-  --gray-text:      #6B7A99;
-  --text-dark:      #1A2B4A;
-  --text-body:      #334260;
-  --shadow-card:    0 4px 24px rgba(13,59,122,0.10);
-  --shadow-nav:     0 2px 12px rgba(13,59,122,0.12);
-
-  --background: #F5F7FA;
-  --foreground: #1A2B4A;
+  --primary:        #DC2626;
+  --primary-dark:   #991B1B;
+  --primary-darker: #7F1D1D;
+  --primary-light:  #EF4444;
+  --accent:         #F59E0B;
+  --background:     #FFFFFF;
+  --foreground:     #111111;
+  --surface:        #FEF2F2;
+  --surface-light:  #FEE2E2;
+  --border:         #FECACA;
+  --text-secondary: #555555;
+  --text-muted:     #888888;
+  --success:        #16A34A;
+  --shadow-card:    0 4px 24px rgba(220,38,38,0.12);
+  --shadow-nav:     0 2px 12px rgba(220,38,38,0.10);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: #FFFFFF;
+  color: #111111;
+  background-image: radial-gradient(circle at top right, rgba(220, 38, 38, 0.05), transparent 40%);
+  color-scheme: light;
   font-family:
     var(--font-noto-sans),
     var(--font-noto-sans-thai),
@@ -34,7 +34,8 @@ body {
 }
 
 .leaflet-container {
-  background: #dbeafe;
+  background: #F5F5F5;
+  color: #111111;
 }
 
 .leaflet-container .leaflet-tile {
@@ -53,4 +54,22 @@ body {
 .leaflet-container svg,
 .leaflet-container canvas {
   transform-origin: 0 0;
+}
+
+.leaflet-control-zoom a,
+.leaflet-bar a {
+  background: #1A1A1A !important;
+  border-color: #222222 !important;
+  color: #FFFFFF !important;
+}
+
+.leaflet-control-zoom a:hover,
+.leaflet-bar a:hover {
+  background: #2A2A2A !important;
+}
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: #1A1A1A;
+  color: #FFFFFF;
 }

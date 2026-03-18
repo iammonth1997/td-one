@@ -134,7 +134,7 @@ export default function PinResetAuditPage() {
 
   if (sessionLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F5F7FA] text-[#6B7A99]">
+      <div className="flex min-h-screen items-center justify-center bg-white text-[#555555]">
         Loading...
       </div>
     );
@@ -145,14 +145,14 @@ export default function PinResetAuditPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#F5F7FA] p-4 sm:p-6 lg:p-8 text-[#1A2B4A]">
+    <main className="min-h-screen bg-white p-4 text-[#111111] sm:p-6 lg:p-8">
       <div className="mx-auto max-w-6xl">
         <h1 className="text-2xl sm:text-3xl font-bold">{L.title}</h1>
-        <p className="text-sm text-[#6B7A99] mt-1">{L.subtitle}</p>
+        <p className="mt-1 text-sm text-[#777777]">{L.subtitle}</p>
 
-        <div className="mt-5 rounded-xl border border-[#D0D8E4] bg-white p-4">
+        <div className="mt-5 rounded-[1rem] border border-[#FECACA] bg-white p-4 shadow-[0_12px_28px_rgba(220,38,38,0.12)]">
           <h2 className="text-lg font-semibold">Issue Temporary PIN (One-time)</h2>
-          <p className="text-xs text-[#6B7A99] mt-1">Temporary PIN expires in 15 minutes and user must change PIN after login.</p>
+          <p className="mt-1 text-xs text-[#777777]">Temporary PIN expires in 15 minutes and user must change PIN after login.</p>
 
           <div className="mt-3 flex flex-col sm:flex-row gap-3">
             <input
@@ -160,28 +160,28 @@ export default function PinResetAuditPage() {
               value={issueEmpId}
               onChange={(e) => setIssueEmpId(e.target.value)}
               placeholder="Employee ID"
-              className="w-full sm:w-72 rounded-lg border border-[#D0D8E4] bg-white px-3 py-2 text-sm focus:outline-none focus:border-[#1352A3]"
+              className="w-full rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-sm text-[#111111] placeholder:text-[#777777] focus:outline-none focus:border-[#DC2626] sm:w-72"
               disabled={!canIssue || issueLoading}
             />
             <button
               type="button"
               onClick={issueTempPin}
               disabled={!canIssue || issueLoading}
-              className="rounded-lg bg-[#1352A3] hover:bg-[#0D3B7A] disabled:opacity-60 text-white px-4 py-2 text-sm font-semibold transition"
+              className="rounded-xl bg-[#DC2626] px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(220,38,38,0.24)] transition hover:bg-[#991B1B] disabled:opacity-60"
             >
               {issueLoading ? "Issuing..." : "Issue Temp PIN"}
             </button>
           </div>
 
           {!canIssue && (
-            <p className="mt-3 text-sm text-red-600">Only HR Payroll or Super Admin can issue temporary PIN.</p>
+            <p className="mt-3 text-sm text-[#FCA5A5]">Only HR Payroll or Super Admin can issue temporary PIN.</p>
           )}
-          {issueError && <p className="mt-3 text-sm text-red-600">{issueError}</p>}
+          {issueError && <p className="mt-3 text-sm text-[#FCA5A5]">{issueError}</p>}
           {issuedTempPin && (
-            <div className="mt-3 rounded-lg border border-[#D0D8E4] bg-[#F5F7FA] p-3">
-              <p className="text-xs text-[#6B7A99]">Share this PIN securely with employee (shown only once).</p>
-              <p className="text-xl font-bold tracking-wider text-[#1352A3] mt-1">{issuedTempPin}</p>
-              <p className="text-xs text-[#6B7A99] mt-1">Expires: {new Date(issuedExpiry).toLocaleString()}</p>
+            <div className="mt-3 rounded-xl border border-[#FCD34D] bg-[#FFF7ED] p-3">
+              <p className="text-xs text-[#92400E]">Share this PIN securely with employee (shown only once).</p>
+              <p className="mt-1 text-xl font-bold tracking-wider text-[#B45309]">{issuedTempPin}</p>
+              <p className="mt-1 text-xs text-[#92400E]">Expires: {new Date(issuedExpiry).toLocaleString()}</p>
             </div>
           )}
         </div>
@@ -192,12 +192,12 @@ export default function PinResetAuditPage() {
             value={searchEmpId}
             onChange={(e) => setSearchEmpId(e.target.value)}
             placeholder={L.searchPlaceholder}
-            className="w-full sm:w-72 rounded-lg border border-[#D0D8E4] bg-white px-3 py-2 text-sm focus:outline-none focus:border-[#1352A3]"
+            className="w-full rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-sm text-[#111111] placeholder:text-[#777777] focus:outline-none focus:border-[#DC2626] sm:w-72"
           />
           <button
             type="button"
             onClick={() => loadRows(searchEmpId)}
-            className="rounded-lg bg-[#1352A3] hover:bg-[#0D3B7A] text-white px-4 py-2 text-sm font-semibold transition"
+            className="rounded-xl bg-[#DC2626] px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(220,38,38,0.24)] transition hover:bg-[#991B1B]"
           >
             {L.searchBtn}
           </button>
@@ -207,17 +207,17 @@ export default function PinResetAuditPage() {
               setSearchEmpId("");
               loadRows("");
             }}
-            className="rounded-lg border border-[#D0D8E4] bg-white px-4 py-2 text-sm font-semibold text-[#334260] hover:bg-[#F5F7FA] transition"
+            className="rounded-xl border border-[#FECACA] bg-white px-4 py-2 text-sm font-semibold text-[#444444] transition hover:bg-[#FEF2F2]"
           >
             {L.clearBtn}
           </button>
         </div>
 
-        {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+        {error && <p className="mt-4 text-sm text-[#FCA5A5]">{error}</p>}
 
-        <div className="mt-5 overflow-x-auto rounded-xl border border-[#D0D8E4] bg-white">
+        <div className="mt-5 overflow-x-auto rounded-[1rem] border border-[#FECACA] bg-white shadow-[0_12px_28px_rgba(0,0,0,0.24)]">
           <table className="min-w-full text-sm">
-            <thead className="bg-[#E8F0FB] text-[#1A2B4A]">
+            <thead className="bg-white text-[#555555]">
               <tr>
                 <th className="px-3 py-2 text-left">{L.colTime}</th>
                 <th className="px-3 py-2 text-left">{L.colTarget}</th>
@@ -229,20 +229,20 @@ export default function PinResetAuditPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td className="px-3 py-4 text-[#6B7A99]" colSpan={5}>{L.loading}</td>
+                  <td className="px-3 py-4 text-[#555555]" colSpan={5}>{L.loading}</td>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
-                  <td className="px-3 py-4 text-[#6B7A99]" colSpan={5}>{L.noData}</td>
+                  <td className="px-3 py-4 text-[#555555]" colSpan={5}>{L.noData}</td>
                 </tr>
               ) : (
                 rows.map((row) => (
-                  <tr key={row.id} className="border-t border-[#EEF2F7]">
-                    <td className="px-3 py-2 whitespace-nowrap">{new Date(row.created_at).toLocaleString()}</td>
-                    <td className="px-3 py-2 whitespace-nowrap font-semibold">{row.target_emp_id}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">{row.reset_by_emp_id}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">{row.reset_by_role}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">{row.ip_address || "-"}</td>
+                  <tr key={row.id} className="border-t border-[#FECACA]">
+                    <td className="whitespace-nowrap px-3 py-2 font-mono text-[#888888]">{new Date(row.created_at).toLocaleString()}</td>
+                    <td className="whitespace-nowrap px-3 py-2 font-semibold text-[#444444]">{row.target_emp_id}</td>
+                    <td className="whitespace-nowrap px-3 py-2 text-[#444444]">{row.reset_by_emp_id}</td>
+                    <td className="whitespace-nowrap px-3 py-2 text-[#444444]">{row.reset_by_role}</td>
+                    <td className="whitespace-nowrap px-3 py-2 font-mono text-[#888888]">{row.ip_address || "-"}</td>
                   </tr>
                 ))
               )}

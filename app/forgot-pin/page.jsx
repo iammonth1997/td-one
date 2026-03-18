@@ -80,19 +80,19 @@ export default function ForgotPinPage() {
 
   if (sessionLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#E8F0FB]">
-        <div className="text-[#6B7A99]">Loading...</div>
+      <div className="flex min-h-screen items-center justify-center bg-white">
+        <div className="text-[#555555]">Loading...</div>
       </div>
     );
   }
 
   if (!canResetPin(session?.role)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#E8F0FB] px-4">
-        <div className="w-full max-w-sm bg-white border border-[#D0D8E4] rounded-2xl p-8 shadow-[0_4px_24px_rgba(13,59,122,0.10)] text-center">
-          <h1 className="text-xl font-bold text-[#1A2B4A]">{L.title}</h1>
-          <p className="text-sm text-red-600 mt-3">{L.errForbidden}</p>
-          <Link href="/dashboard" className="inline-block mt-5 text-[#1352A3] hover:underline font-medium">
+      <div className="flex min-h-screen items-center justify-center bg-white px-4">
+        <div className="w-full max-w-sm rounded-[1rem] border border-[#FECACA] bg-white p-8 text-center shadow-[0_4px_24px_rgba(220,38,38,0.10)]">
+          <h1 className="text-xl font-bold text-[#111111]">{L.title}</h1>
+          <p className="mt-3 text-sm text-[#FCA5A5]">{L.errForbidden}</p>
+          <Link href="/dashboard" className="mt-5 inline-block font-medium text-[#DC2626] transition hover:text-[#991B1B]">
             {L.backToLogin}
           </Link>
         </div>
@@ -101,15 +101,15 @@ export default function ForgotPinPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#E8F0FB]">
-      <div className="w-full max-w-sm bg-white border border-[#D0D8E4] rounded-2xl p-8 shadow-[0_4px_24px_rgba(13,59,122,0.10)]">
+    <div className="flex min-h-screen items-center justify-center bg-white px-4">
+      <div className="w-full max-w-sm rounded-[1rem] border border-[#FECACA] bg-white p-8 shadow-[0_4px_24px_rgba(220,38,38,0.10)]">
 
         <div className="flex justify-end mb-4">
           <LanguageSwitcher />
         </div>
 
         <div className="flex justify-center mb-4">
-          <div className="w-14 h-14 bg-[#1352A3] rounded-full flex items-center justify-center shadow-[0_2px_10px_rgba(19,82,163,0.30)]">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#DC2626] shadow-[0_10px_24px_rgba(220,38,38,0.28)]">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
               <path d="M7 11V7a5 5 0 0 1 9.9-1" />
@@ -117,28 +117,28 @@ export default function ForgotPinPage() {
           </div>
         </div>
 
-        <h1 className="text-2xl font-bold text-center text-[#1A2B4A] mb-1">
+        <h1 className="mb-1 text-center text-2xl font-bold text-[#111111]">
           {L.title}
         </h1>
-        <p className="text-center text-[#6B7A99] text-sm mb-6">
+        <p className="mb-6 text-center text-sm text-[#777777]">
           {L.subtitle}
         </p>
 
-        <label className="text-[#334260] text-sm font-medium">{L.empIdLabel}</label>
+        <label className="text-sm font-medium text-[#555555]">{L.empIdLabel}</label>
         <input
           type="text"
           value={empId}
           onChange={(e) => setEmpId(e.target.value)}
-          className="w-full mt-1 mb-4 p-2.5 rounded-lg bg-[#F5F7FA] text-[#1A2B4A] border border-[#D0D8E4] focus:outline-none focus:border-[#1352A3] focus:ring-1 focus:ring-[#1352A3]"
+          className="mb-4 mt-1 w-full rounded-xl border border-[#FECACA] bg-white p-2.5 text-[#111111] placeholder:text-[#777777] focus:outline-none focus:border-[#DC2626] focus:ring-1 focus:ring-[#DC2626]"
           placeholder={L.empIdPlaceholder}
           disabled={loading}
         />
 
-        <label className="text-[#334260] text-sm font-medium">{L.startMonthLabel}</label>
+        <label className="text-sm font-medium text-[#555555]">{L.startMonthLabel}</label>
         <select
           value={startMonth}
           onChange={(e) => setStartMonth(e.target.value)}
-          className="w-full mt-1 mb-4 p-2.5 rounded-lg bg-[#F5F7FA] text-[#1A2B4A] border border-[#D0D8E4] focus:outline-none focus:border-[#1352A3] focus:ring-1 focus:ring-[#1352A3]"
+          className="mb-4 mt-1 w-full rounded-xl border border-[#FECACA] bg-white p-2.5 text-[#111111] focus:outline-none focus:border-[#DC2626] focus:ring-1 focus:ring-[#DC2626]"
           disabled={loading}
         >
           <option value="">{L.startMonthLabel}</option>
@@ -147,11 +147,11 @@ export default function ForgotPinPage() {
           ))}
         </select>
 
-        <label className="text-[#334260] text-sm font-medium">{L.startYearLabel}</label>
+        <label className="text-sm font-medium text-[#555555]">{L.startYearLabel}</label>
         <select
           value={startYear}
           onChange={(e) => setStartYear(e.target.value)}
-          className="w-full mt-1 mb-4 p-2.5 rounded-lg bg-[#F5F7FA] text-[#1A2B4A] border border-[#D0D8E4] focus:outline-none focus:border-[#1352A3] focus:ring-1 focus:ring-[#1352A3]"
+          className="mb-4 mt-1 w-full rounded-xl border border-[#FECACA] bg-white p-2.5 text-[#111111] focus:outline-none focus:border-[#DC2626] focus:ring-1 focus:ring-[#DC2626]"
           disabled={loading}
         >
           <option value="">{L.startYearLabel}</option>
@@ -160,29 +160,29 @@ export default function ForgotPinPage() {
           ))}
         </select>
 
-        <label className="text-[#334260] text-sm font-medium">{L.dobLabel}</label>
+        <label className="text-sm font-medium text-[#555555]">{L.dobLabel}</label>
         <input
           type="date"
           value={dob}
           onChange={(e) => setDob(e.target.value)}
-          className="w-full mt-1 mb-4 p-2.5 rounded-lg bg-[#F5F7FA] text-[#1A2B4A] border border-[#D0D8E4] focus:outline-none focus:border-[#1352A3] focus:ring-1 focus:ring-[#1352A3]"
+          className="mb-4 mt-1 w-full rounded-xl border border-[#FECACA] bg-white p-2.5 text-[#111111] focus:outline-none focus:border-[#DC2626] focus:ring-1 focus:ring-[#DC2626]"
           disabled={loading}
         />
 
         {error && (
-          <p className="text-red-500 text-sm mb-3 text-center">{error}</p>
+          <p className="mb-3 text-center text-sm text-[#FCA5A5]">{error}</p>
         )}
 
         <button
           onClick={handleVerify}
           disabled={loading}
-          className="w-full py-2.5 mt-2 bg-[#1352A3] hover:bg-[#0D3B7A] disabled:opacity-50 text-white font-semibold rounded-lg shadow transition"
+          className="mt-2 w-full rounded-xl bg-[#DC2626] py-2.5 font-semibold text-white shadow-[0_10px_24px_rgba(220,38,38,0.25)] transition hover:bg-[#991B1B] disabled:opacity-50"
         >
           {loading ? L.loadingBtn : L.verifyBtn}
         </button>
 
-        <p className="text-center text-[#6B7A99] text-xs mt-4">
-          <Link href="/login" className="text-[#1352A3] hover:underline font-medium">
+        <p className="mt-4 text-center text-xs text-[#555555]">
+          <Link href="/login" className="font-medium text-[#DC2626] transition hover:text-[#991B1B]">
             {L.backToLogin}
           </Link>
         </p>

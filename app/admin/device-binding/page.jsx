@@ -61,30 +61,30 @@ export default function DeviceBindingAdminPage() {
     }
   }
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  if (loading) return <div className="flex min-h-screen items-center justify-center bg-white text-[#555555]">Loading...</div>;
   if (!allowed) return null;
 
   return (
-    <main className="min-h-screen bg-[#F5F7FA] p-6 text-[#1A2B4A]">
+    <main className="min-h-screen bg-white p-6 text-[#111111]">
       <div className="mx-auto max-w-6xl space-y-4">
         <h1 className="text-2xl font-bold">Reset Device Binding</h1>
 
-        <form onSubmit={resetByCode} className="rounded-xl border border-[#D0D8E4] bg-white p-4 flex flex-col sm:flex-row gap-3">
+        <form onSubmit={resetByCode} className="flex flex-col gap-3 rounded-[1rem] border border-[#FECACA] bg-white p-4 shadow-[0_12px_28px_rgba(220,38,38,0.12)] sm:flex-row">
           <input
-            className="border rounded px-3 py-2 w-full sm:w-72"
+            className="w-full rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-[#111111] placeholder:text-[#777777] focus:outline-none focus:border-[#DC2626] sm:w-72"
             placeholder="Employee code (e.g. L2506110)"
             value={empCode}
             onChange={(e) => setEmpCode(e.target.value)}
           />
-          <button disabled={busy} className="bg-[#1352A3] text-white rounded px-4 py-2 font-semibold">Reset Device</button>
+          <button disabled={busy} className="rounded-xl bg-[#DC2626] px-4 py-2 font-semibold text-white shadow-[0_10px_24px_rgba(220,38,38,0.24)] transition hover:bg-[#991B1B] disabled:opacity-50">Reset Device</button>
         </form>
 
-        {error ? <p className="text-red-600 text-sm">{error}</p> : null}
-        {success ? <p className="text-green-600 text-sm">{success}</p> : null}
+        {error ? <p className="text-sm text-[#FCA5A5]">{error}</p> : null}
+        {success ? <p className="text-sm text-[#86EFAC]">{success}</p> : null}
 
-        <div className="rounded-xl border border-[#D0D8E4] bg-white overflow-x-auto">
+        <div className="overflow-x-auto rounded-[1rem] border border-[#FECACA] bg-white shadow-[0_12px_28px_rgba(0,0,0,0.24)]">
           <table className="min-w-full text-sm">
-            <thead className="bg-[#E8F0FB]">
+            <thead className="bg-white text-[#555555]">
               <tr>
                 <th className="px-3 py-2 text-left">Employee ID (UUID)</th>
                 <th className="px-3 py-2 text-left">Device ID</th>
@@ -95,12 +95,12 @@ export default function DeviceBindingAdminPage() {
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.id} className="border-t">
-                  <td className="px-3 py-2 font-mono text-xs">{row.employee_id}</td>
-                  <td className="px-3 py-2 font-mono text-xs">{row.device_id}</td>
-                  <td className="px-3 py-2">{row.device_name || "-"}</td>
-                  <td className="px-3 py-2">{row.is_active ? "Yes" : "No"}</td>
-                  <td className="px-3 py-2">{new Date(row.registered_at).toLocaleString()}</td>
+                <tr key={row.id} className="border-t border-[#FECACA]">
+                  <td className="px-3 py-2 font-mono text-xs text-[#888888]">{row.employee_id}</td>
+                  <td className="px-3 py-2 font-mono text-xs text-[#888888]">{row.device_id}</td>
+                  <td className="px-3 py-2 text-[#444444]">{row.device_name || "-"}</td>
+                  <td className="px-3 py-2 text-[#444444]">{row.is_active ? "Yes" : "No"}</td>
+                  <td className="px-3 py-2 font-mono text-[#888888]">{new Date(row.registered_at).toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>

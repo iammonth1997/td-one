@@ -352,25 +352,25 @@ export default function ScanPage() {
 
   if (loading || !session || !todayData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F4F7FC] text-[#1A2B4A]">
+      <div className="flex min-h-screen items-center justify-center bg-white text-[#111111]">
         <p>{L.loading}</p>
       </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#F4F7FC] px-3 pb-6 pt-4 sm:px-6">
-      <div className="mx-auto w-full max-w-md rounded-[28px] bg-white p-4 shadow-[0_8px_26px_rgba(15,31,61,0.1)] sm:p-5">
+    <main className="min-h-screen bg-white px-3 pb-6 pt-4 text-[#111111] sm:px-6">
+      <div className="mx-auto w-full max-w-md rounded-[28px] border border-[#FECACA] bg-white p-4 shadow-[0_16px_40px_rgba(220,38,38,0.12)] sm:p-5">
         <header className="mb-3 flex items-center gap-2">
           <button
             type="button"
             onClick={() => router.back()}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-[#EEF4FF] text-xl font-bold text-[#1F4FBF]"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-[#FEF2F2] text-xl font-bold text-[#F59E0B]"
             aria-label="Back"
           >
             ←
           </button>
-          <h1 className="flex-1 text-center text-[1.85rem] font-extrabold tracking-tight text-[#122448]">
+          <h1 className="flex-1 text-center text-[1.85rem] font-extrabold tracking-tight text-[#111111]">
             {L.title || "บันทึกเวลาเข้างาน"}
           </h1>
           <div className="flex items-center gap-1">
@@ -385,8 +385,8 @@ export default function ScanPage() {
                 onClick={() => setLang(item.code)}
                 className={`rounded-full border px-2 py-1 text-[10px] font-bold transition ${
                   lang === item.code
-                    ? "border-[#1F4FBF] bg-[#1F4FBF] text-white"
-                    : "border-[#D5DFEF] bg-[#F8FBFF] text-[#5B6E93]"
+                    ? "border-[#DC2626] bg-[#DC2626] text-white"
+                    : "border-[#FECACA] bg-white text-[#555555]"
                 }`}
               >
                 {item.label}
@@ -395,7 +395,7 @@ export default function ScanPage() {
           </div>
         </header>
 
-        <section className="rounded-2xl border border-[#DCE3F0] bg-white p-3 shadow-sm">
+        <section className="rounded-2xl border border-[#FECACA] bg-white p-3 shadow-[0_10px_24px_rgba(0,0,0,0.2)]">
           <div className="grid grid-cols-[96px_1fr] gap-3">
             <img
               src={profile?.pictureUrl || "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?q=80&w=300&auto=format&fit=crop"}
@@ -403,37 +403,37 @@ export default function ScanPage() {
               className="h-24 w-24 rounded-xl object-cover"
             />
             <div>
-              <h2 className="text-[1.15rem] font-bold text-[#122448]">{todayData.employee?.name || profile?.displayName || "-"}</h2>
-              <p className="text-base text-[#5E6F8D]">EMP: {todayData.employee?.employee_code || session.emp_id}</p>
-              <div className="my-2 h-px bg-[#E2E8F4]" />
+              <h2 className="text-[1.15rem] font-bold text-[#111111]">{todayData.employee?.name || profile?.displayName || "-"}</h2>
+              <p className="text-base text-[#555555]">EMP: {todayData.employee?.employee_code || session.emp_id}</p>
+              <div className="my-2 h-px bg-[#222222]" />
               <p className="text-xl font-semibold text-[#D62828]">{todayData.shift_name || "Night Shift"}</p>
-              <p className="text-[1.45rem] text-[#334260]">{todayData.shift_time || "19:00 - 07:00"}</p>
+              <p className="text-[1.45rem] text-[#444444]">{todayData.shift_time || "19:00 - 07:00"}</p>
             </div>
           </div>
         </section>
 
-        <section className="mt-3 rounded-2xl border border-[#DCE3F0] bg-white p-3 shadow-sm">
+        <section className="mt-3 rounded-2xl border border-[#FECACA] bg-white p-3 shadow-[0_10px_24px_rgba(0,0,0,0.2)]">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <div className="flex items-center gap-2 text-[1.2rem] font-bold text-[#1B2E52]">
+              <div className="flex items-center gap-2 text-[1.2rem] font-bold text-[#111111]">
                 <span>📅</span>
                 <span>{L.today || "วันที่"}</span>
               </div>
-              <p className="mt-1 text-[1.75rem] text-[#334260]">{currentDateLabel}</p>
+              <p className="mt-1 text-[1.75rem] text-[#444444]">{currentDateLabel}</p>
             </div>
-            <div className="text-[3.4rem] font-extrabold leading-none text-[#122448]">{currentTimeLabel}</div>
+            <div className="text-[3.4rem] font-extrabold leading-none text-[#111111]">{currentTimeLabel}</div>
           </div>
         </section>
 
-        <section className="mt-3 rounded-2xl border border-[#DCE3F0] bg-white p-3 shadow-sm">
-          <div className="mb-2 flex items-center gap-2 text-[1.15rem] font-bold text-[#1B2E52]">
+        <section className="mt-3 rounded-2xl border border-[#FECACA] bg-white p-3 shadow-sm">
+          <div className="mb-2 flex items-center gap-2 text-[1.15rem] font-bold text-[#111111]">
             <span>📍</span>
             <span>{L.workplace || "พื้นที่ทำงาน"}</span>
           </div>
           <select
             value={selectedWorkArea}
             onChange={(e) => setSelectedWorkArea(e.target.value)}
-            className="w-full rounded-xl border border-[#D5DFEF] bg-white px-3 py-2 text-lg text-[#122448]"
+            className="w-full rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-lg text-[#111111]"
           >
             <option value="">{lang === "en" ? "Select Area" : lang === "lo" ? "ເລືອກພື້ນທີ່" : "เลือกพื้นที่"}</option>
             {areaOptions.map((item, idx) => {
@@ -446,32 +446,32 @@ export default function ScanPage() {
           </select>
         </section>
 
-        <section className="mt-3 rounded-2xl border border-[#DCE3F0] bg-white p-3 shadow-sm">
-          <div className="mb-2 flex items-center gap-2 text-[1.2rem] font-bold text-[#1B2E52]">
-            <span className="text-green-600">✔</span>
+        <section className="mt-3 rounded-2xl border border-[#FECACA] bg-white p-3 shadow-sm">
+          <div className="mb-2 flex items-center gap-2 text-[1.2rem] font-bold text-[#111111]">
+            <span className="text-green-500">✔</span>
             <span>{L.gpsStatus || "GPS Status"}</span>
           </div>
-          <div className="rounded-xl border border-[#DCE3F0] bg-[#FBFDFF] p-3">
+          <div className="rounded-xl border border-[#FECACA] bg-white p-3">
             <div className="flex items-start gap-2">
-              <span className="mt-0.5 text-green-600">✔</span>
+              <span className="mt-0.5 text-green-500">✔</span>
               <div>
-                <p className="text-lg font-semibold text-[#1B2E52]">{L.statusLabel || "Location Verified"}: {statusLabel}</p>
-                <p className="text-base text-[#334260]">{locationCheck?.nearest?.name || selectedWorkArea || "Pit A Mining Area"}</p>
-                <p className="text-base text-[#4E607F]">
+                <p className="text-lg font-semibold text-[#111111]">{L.statusLabel || "Location Verified"}: {statusLabel}</p>
+                <p className="text-base text-[#555555]">{locationCheck?.nearest?.name || selectedWorkArea || "Pit A Mining Area"}</p>
+                <p className="text-base text-[#555555]">
                   {L.gpsCoords || "GPS"}: {gps ? `${gps.latitude.toFixed(3)} , ${gps.longitude.toFixed(3)}` : "-"}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="mt-3 overflow-hidden rounded-xl border border-[#D5DFEF]">
+          <div className="mt-3 overflow-hidden rounded-xl border border-[#FECACA]">
             {gps ? (
               <iframe title="scan-map" src={mapSrc} className="h-36 w-full" />
             ) : (
-              <div className="relative h-36 w-full bg-gradient-to-br from-[#DCEBDD] to-[#D5E3F4]">
-                <div className="absolute left-[-10%] top-[56%] h-2 w-[130%] -rotate-[14deg] bg-[#F4A92B]" />
-                <div className="absolute left-1/2 top-[46%] h-8 w-8 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[50%_50%_50%_0] bg-[#6AAE67] shadow-md" />
-                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-white/90 px-3 py-1 text-sm font-semibold text-[#2E426A]">
+              <div className="relative h-36 w-full bg-gradient-to-br from-[#111111] to-[#1A1A1A]">
+                <div className="absolute left-[-10%] top-[56%] h-2 w-[130%] -rotate-[14deg] bg-[#F59E0B]" />
+                <div className="absolute left-1/2 top-[46%] h-8 w-8 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[50%_50%_50%_0] bg-[#DC2626] shadow-md" />
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/70 px-3 py-1 text-sm font-semibold text-white">
                   {selectedWorkArea || "Pit A"}
                 </div>
               </div>
@@ -489,23 +489,23 @@ export default function ScanPage() {
         <button
           type="button"
           onClick={refreshGps}
-          className="mt-3 w-full rounded-xl bg-gradient-to-b from-[#F04747] to-[#E53935] py-3 text-[1.45rem] font-extrabold text-white shadow-[0_8px_14px_rgba(229,57,53,0.3)] transition hover:brightness-105 active:translate-y-[1px] active:brightness-95"
+          className="mt-3 w-full rounded-xl bg-gradient-to-b from-[#DC2626] to-[#991B1B] py-3 text-[1.45rem] font-extrabold text-white shadow-[0_8px_14px_rgba(220,38,38,0.3)] transition hover:brightness-105 active:translate-y-[1px] active:brightness-95"
         >
           {L.refreshGps || "ตรวจสอบตำแหน่ง GPS"}
         </button>
 
-        <section className="mt-3 rounded-2xl border border-[#DCE3F0] bg-white p-3 shadow-sm">
-          <div className="mb-2 flex items-center gap-2 text-[1.2rem] font-bold text-[#1B2E52]">
+        <section className="mt-3 rounded-2xl border border-[#FECACA] bg-white p-3 shadow-sm">
+          <div className="mb-2 flex items-center gap-2 text-[1.2rem] font-bold text-[#111111]">
             <span>☑</span>
             <span>{L.todayHistory || "ลงเวลาล่าสุด"}</span>
           </div>
-          <div className="rounded-xl border border-[#DCE3F0] bg-[#FBFDFF] px-3 py-2 text-xl text-[#233656]">
+          <div className="rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-xl text-[#444444]">
             {latestRecord ? `${latestRecord.type === "scan_out" ? L.scanOut : L.scanIn} ${new Date(latestRecord.time).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })}` : (L.noHistory || "Check In 06:49")}
           </div>
 
-          <div className="my-3 h-px bg-[#E2E8F4]" />
+          <div className="my-3 h-px bg-[#222222]" />
 
-          <div className="flex items-center justify-around gap-3 text-[1.15rem] font-semibold text-[#2A3D63]">
+          <div className="flex items-center justify-around gap-3 text-[1.15rem] font-semibold text-[#111111]">
             <div className="flex items-center gap-1">
               <span className="text-green-600">✔</span>
               <span>{lang === "en" ? "Device Verified" : lang === "lo" ? "ຢືນຢັນອຸປະກອນ" : "Device Verified"}</span>
@@ -517,8 +517,8 @@ export default function ScanPage() {
           </div>
         </section>
 
-        <section className="mt-3 rounded-2xl border border-[#DCE3F0] bg-white p-3 shadow-sm">
-          <div className="flex items-center gap-2 text-sm text-[#334260]">
+        <section className="mt-3 rounded-2xl border border-[#FECACA] bg-white p-3 shadow-sm">
+          <div className="flex items-center gap-2 text-sm text-[#111111]">
             <input
               id="camera-optional"
               type="checkbox"
@@ -527,16 +527,16 @@ export default function ScanPage() {
             />
             <label htmlFor="camera-optional">{L.faceOptional}</label>
           </div>
-          <p className="mt-1 text-xs text-[#6B7A99]">{L.faceNote}</p>
+          <p className="mt-1 text-xs text-[#555555]">{L.faceNote}</p>
 
           {cameraEnabled ? (
-            <div className="mt-2 rounded-xl border border-[#D0D8E4] p-3 space-y-2">
+            <div className="mt-2 space-y-2 rounded-xl border border-[#FECACA] bg-white p-3">
               <video ref={videoRef} className="w-full max-h-64 rounded-lg bg-black" muted playsInline />
               <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={takeSelfie} className="rounded-lg border border-[#1352A3] px-3 py-1.5 text-[#1352A3] text-sm">{L.captureSelfie || "Capture Selfie"}</button>
-                <button type="button" onClick={() => setSelfieDataUrl(null)} className="rounded-lg border border-[#D0D8E4] px-3 py-1.5 text-[#334260] text-sm">{L.retakeSelfie || "Retake"}</button>
+                <button type="button" onClick={takeSelfie} className="rounded-lg border border-[#DC2626] px-3 py-1.5 text-sm text-[#F87171]">{L.captureSelfie || "Capture Selfie"}</button>
+                <button type="button" onClick={() => setSelfieDataUrl(null)} className="rounded-lg border border-[#FECACA] px-3 py-1.5 text-sm text-[#444444]">{L.retakeSelfie || "Retake"}</button>
               </div>
-              {selfieDataUrl ? <img src={selfieDataUrl} alt="selfie-preview" className="w-36 h-36 object-cover rounded-lg border border-[#D0D8E4]" /> : null}
+              {selfieDataUrl ? <img src={selfieDataUrl} alt="selfie-preview" className="h-36 w-36 rounded-lg border border-[#FECACA] object-cover" /> : null}
               {cameraError ? <p className="text-xs text-red-600">{cameraError}</p> : null}
             </div>
           ) : null}
@@ -548,8 +548,8 @@ export default function ScanPage() {
           disabled={busy || !canScan}
           className={`mt-3 w-full rounded-2xl py-3 text-[1.75rem] font-extrabold text-white transition hover:brightness-105 active:translate-y-[1px] active:brightness-95 ${
             !canScan
-              ? "bg-[#A8B4CC]"
-              : "bg-gradient-to-b from-[#2F6BDB] to-[#1F4FBF] shadow-[0_10px_16px_rgba(31,79,191,0.32)]"
+              ? "bg-[#333333]"
+              : "bg-gradient-to-b from-[#DC2626] to-[#991B1B] shadow-[0_10px_16px_rgba(220,38,38,0.32)]"
           }`}
         >
           {busy ? L.scanning : suggestedAction === "scan_out" ? (L.scanOut || "Scan Out") : (L.scanIn || "ยืนยันเวลาเข้างาน")}
@@ -562,11 +562,11 @@ export default function ScanPage() {
         ) : null}
 
         {todayData.history?.length ? (
-          <section className="mt-3 rounded-2xl border border-[#DCE3F0] bg-white p-3 shadow-sm">
-            <h2 className="mb-2 text-sm font-bold text-[#1A2B4A]">{L.todayHistory}</h2>
+          <section className="mt-3 rounded-2xl border border-[#FECACA] bg-white p-3 shadow-[0_10px_24px_rgba(0,0,0,0.2)]">
+            <h2 className="mb-2 text-sm font-bold text-[#111111]">{L.todayHistory}</h2>
             <div className="space-y-2">
               {todayData.history.map((item, idx) => (
-                <div key={`${item.type}-${idx}`} className="rounded-lg border border-[#E5EAF0] p-2 text-sm text-[#334260]">
+                <div key={`${item.type}-${idx}`} className="rounded-lg border border-[#FECACA] p-2 text-sm text-[#444444]">
                   <p className="font-semibold">{item.type === "scan_in" ? L.scanIn : L.scanOut}</p>
                   <p>{L.time}: {formatDateTime(item.time, lang)}</p>
                 </div>

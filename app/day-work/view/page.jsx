@@ -1,3 +1,4 @@
+ทำต่อ
 "use client";
 
 import { Suspense } from "react";
@@ -9,11 +10,27 @@ import { readStoredSession, removeStoredSession } from "@/lib/clientSession";
 
 function CenterCard({ children }) {
   return (
-    <main className="min-h-screen bg-[#F5F7FA] px-4 py-6 sm:px-6 sm:py-10">
-      <section className="mx-auto w-full max-w-md rounded-2xl border border-[#D0D8E4] bg-white p-5 shadow-[0_4px_24px_rgba(13,59,122,0.10)] sm:max-w-xl sm:p-7">
+    <main className="min-h-screen bg-white px-4 py-6 sm:px-6 sm:py-10">
+      <section className="mx-auto w-full max-w-md rounded-[1rem] border border-[#FECACA] bg-white p-5 shadow-[0_4px_24px_rgba(220,38,38,0.15)] sm:max-w-xl sm:p-7">
         {children}
       </section>
     </main>
+  );
+}
+
+function parseDates(str) {
+  if (!str) return [];
+  return str.split(",").map((d) => d.trim()).filter(Boolean);
+}
+
+function DatesList({ dateStr, label }) {
+  const dates = parseDates(dateStr);
+  if (!dates.length) return null;
+  return (
+    <div className="mt-2 text-[10px] text-[#555555] leading-relaxed">
+      <span className="text-[#777777]">{label} </span>
+      {dates.join(", ")}
+    </div>
   );
 }
 
@@ -115,7 +132,7 @@ function DayWorkViewContent() {
   if (loading) {
     return (
       <CenterCard>
-        <div className="flex items-center gap-3 text-[#1352A3]">
+        <div className="flex items-center gap-3 text-[#DC2626]">
           <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
           <span className="font-medium">{L.loading}</span>
         </div>
@@ -126,11 +143,11 @@ function DayWorkViewContent() {
   if (errorMsg) {
     return (
       <CenterCard>
-        <h2 className="text-xl font-bold text-[#1A2B4A]">{L.errTitle}</h2>
-        <p className="mt-2 text-[#6B7A99]">{errorMsg}</p>
+        <h2 className="text-xl font-bold text-[#DC2626]">{L.errTitle}</h2>
+        <p className="mt-2 text-[#555555]">{errorMsg}</p>
         <Link
           href="/day-work"
-          className="mt-6 inline-block rounded-lg bg-[#1352A3] px-4 py-2 font-semibold text-white transition hover:bg-[#0D3B7A]"
+          className="mt-6 inline-block rounded-xl border border-[#DC2626] bg-white px-4 py-2 font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
         >
           {L.backBtn}
         </Link>
@@ -141,14 +158,14 @@ function DayWorkViewContent() {
   if (!daywork) {
     return (
       <CenterCard>
-        <h2 className="text-xl font-bold text-[#1A2B4A]">{L.noDataTitle}</h2>
-        <p className="mt-2 text-[#6B7A99]">{L.noDataMsg}</p>
-        <p className="mt-2 text-sm text-[#6B7A99]">
+        <h2 className="text-xl font-bold text-[#DC2626]">{L.noDataTitle}</h2>
+        <p className="mt-2 text-[#555555]">{L.noDataMsg}</p>
+        <p className="mt-2 text-sm text-[#555555]">
           Employee: {empId || "-"}, {L.yearLabel}: {year || "-"}, {L.monthLabel}: {month || "-"}
         </p>
         <Link
           href="/day-work"
-          className="mt-6 inline-block rounded-lg bg-[#1352A3] px-4 py-2 font-semibold text-white transition hover:bg-[#0D3B7A]"
+          className="mt-6 inline-block rounded-xl border border-[#DC2626] bg-white px-4 py-2 font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
         >
           {L.changeMonthYear}
         </Link>
@@ -158,9 +175,9 @@ function DayWorkViewContent() {
 
   return (
     <CenterCard>
-      <div className="mb-6 rounded-xl border border-[#D0D8E4] bg-[#E8F0FB] p-4">
-        <h2 className="text-lg font-bold text-[#1352A3]">{L.empInfoTitle}</h2>
-        <div className="mt-2 space-y-1 text-sm text-[#334260]">
+      <div className="mb-6 rounded-[1rem] border border-[#FECACA] bg-[#FEF2F2] p-4">
+        <h2 className="text-lg font-bold text-[#DC2626]">{L.empInfoTitle}</h2>
+        <div className="mt-2 space-y-1 text-sm text-[#444444]">
           <p>{L.empIdLabel}: <span className="font-semibold">{empInfo?.employeeCode || empId || "-"}</span></p>
           <p>
             {L.nameLabel}: <span className="font-semibold">{empInfo?.firstName || "-"} {empInfo?.lastName || ""}</span>
@@ -171,49 +188,94 @@ function DayWorkViewContent() {
         </div>
       </div>
 
-      <h2 className="text-2xl font-bold text-[#1A2B4A] sm:text-3xl">{L.resultTitle}</h2>
+      <h2 className="text-2xl font-bold text-[#DC2626] sm:text-3xl">{L.resultTitle}</h2>
 
-      <div className="mt-4 text-[#334260] text-sm space-y-1 mb-4">
-        <p>{L.yearLabel}: <span className="font-semibold">{year}</span></p>
-        <p>{L.monthLabel}: <span className="font-semibold">{month}</span></p>
+      <div className="mb-4 mt-4 space-y-1 text-sm text-[#555555]">
+        <p>{L.yearLabel}: <span className="font-semibold text-[#111111]">{year}</span></p>
+        <p>{L.monthLabel}: <span className="font-semibold text-[#111111]">{month}</span></p>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <div className="rounded-xl border border-[#D0D8E4] bg-white p-4 text-center shadow-sm">
-          <div className="text-2xl font-bold text-[#1352A3]">{daywork.total_work_days ?? "-"}</div>
-          <div className="text-xs text-[#6B7A99] mt-1">{L.totalWorkDays}</div>
-          <div className="text-[10px] text-[#6B7A99]">{L.dayUnit}</div>
+        <div className="rounded-[1rem] border border-[#FECACA] bg-white p-4 text-center shadow-[0_4px_16px_rgba(220,38,38,0.08)]">
+          <div className="text-2xl font-bold text-[#DC2626]">{daywork.work_days ?? "-"}</div>
+          <div className="mt-1 text-xs text-[#555555]">{L.workDays}</div>
+          <div className="text-[10px] text-[#888888]">{L.dayUnit}</div>
         </div>
-        <div className="rounded-xl border border-[#D0D8E4] bg-white p-4 text-center shadow-sm">
-          <div className="text-2xl font-bold text-[#F5A623]">{daywork.sick_leave ?? 0}</div>
-          <div className="text-xs text-[#6B7A99] mt-1">{L.sickLeave}</div>
-          <div className="text-[10px] text-[#6B7A99]">{L.dayUnit}</div>
+        <div className="rounded-[1rem] border border-[#FECACA] bg-white p-4 text-center shadow-[0_4px_16px_rgba(220,38,38,0.08)]">
+          <div className="text-2xl font-bold text-[#EF4444]">{daywork.sl_days ?? 0}</div>
+          <div className="mt-1 text-xs text-[#555555]">{L.sickLeave}</div>
+          <div className="text-[10px] text-[#888888]">{L.dayUnit}</div>
+          <DatesList dateStr={daywork.sl_date} label={L.datesLabel} />
         </div>
-        <div className="rounded-xl border border-[#D0D8E4] bg-white p-4 text-center shadow-sm">
-          <div className="text-2xl font-bold text-[#1E6CC8]">{daywork.personal_leave ?? 0}</div>
-          <div className="text-xs text-[#6B7A99] mt-1">{L.personalLeave}</div>
-          <div className="text-[10px] text-[#6B7A99]">{L.dayUnit}</div>
+        <div className="rounded-[1rem] border border-[#FECACA] bg-white p-4 text-center shadow-[0_4px_16px_rgba(220,38,38,0.08)]">
+          <div className="text-2xl font-bold text-[#3B82F6]">{daywork.pl_days ?? 0}</div>
+          <div className="mt-1 text-xs text-[#555555]">{L.personalLeave}</div>
+          <div className="text-[10px] text-[#888888]">{L.dayUnit}</div>
+          <DatesList dateStr={daywork.pl_date} label={L.datesLabel} />
         </div>
-        <div className="rounded-xl border border-[#D0D8E4] bg-white p-4 text-center shadow-sm">
-          <div className="text-2xl font-bold text-[#0D3B7A]">{daywork.annual_leave ?? 0}</div>
-          <div className="text-xs text-[#6B7A99] mt-1">{L.annualLeave}</div>
-          <div className="text-[10px] text-[#6B7A99]">{L.dayUnit}</div>
+        <div className="rounded-[1rem] border border-[#FECACA] bg-white p-4 text-center shadow-[0_4px_16px_rgba(220,38,38,0.08)]">
+          <div className="text-2xl font-bold text-[#F59E0B]">{daywork.vl_days ?? 0}</div>
+          <div className="mt-1 text-xs text-[#555555]">{L.annualLeave}</div>
+          <div className="text-[10px] text-[#888888]">{L.dayUnit}</div>
+          <DatesList dateStr={daywork.vl_date} label={L.datesLabel} />
         </div>
-        <div className="rounded-xl border border-[#D0D8E4] bg-white p-4 text-center shadow-sm">
-          <div className="text-2xl font-bold text-red-500">{daywork.absent_days ?? 0}</div>
-          <div className="text-xs text-[#6B7A99] mt-1">{L.absentDays}</div>
-          <div className="text-[10px] text-[#6B7A99]">{L.dayUnit}</div>
+        <div className="rounded-[1rem] border border-[#FECACA] bg-white p-4 text-center shadow-[0_4px_16px_rgba(220,38,38,0.08)]">
+          <div className="text-2xl font-bold text-red-500">{daywork.opl_days ?? 0}</div>
+          <div className="mt-1 text-xs text-[#555555]">{L.unpaidLeave}</div>
+          <div className="text-[10px] text-[#888888]">{L.dayUnit}</div>
+          <DatesList dateStr={daywork.opl_date} label={L.datesLabel} />
         </div>
-        <div className="rounded-xl border border-[#D0D8E4] bg-white p-4 text-center shadow-sm">
-          <div className="text-2xl font-bold text-[#6B7A99]">{daywork.forgot_scan ?? 0}</div>
-          <div className="text-xs text-[#6B7A99] mt-1">{L.forgotScan}</div>
-          <div className="text-[10px] text-[#6B7A99]">{L.dayUnit}</div>
+        <div className="rounded-[1rem] border border-[#FECACA] bg-white p-4 text-center shadow-[0_4px_16px_rgba(220,38,38,0.08)]">
+          <div className="text-2xl font-bold text-[#555555]">{daywork.no_scan ?? 0}</div>
+          <div className="mt-1 text-xs text-[#555555]">{L.noScan}</div>
+          <div className="text-[10px] text-[#888888]">{L.dayUnit}</div>
+          <DatesList dateStr={daywork.noscan_date} label={L.datesLabel} />
+        </div>
+        <div className="rounded-[1rem] border border-[#FECACA] bg-white p-4 text-center shadow-[0_4px_16px_rgba(220,38,38,0.08)]">
+          <div className="text-2xl font-bold text-[#A855F7]">{daywork.rt_days ?? 0}</div>
+          <div className="mt-1 text-xs text-[#555555]">{L.restDays}</div>
+          <div className="text-[10px] text-[#888888]">{L.dayUnit}</div>
+          <DatesList dateStr={daywork.rt_date} label={L.datesLabel} />
+        </div>
+        <div className="rounded-[1rem] border border-[#FECACA] bg-white p-4 text-center shadow-[0_4px_16px_rgba(220,38,38,0.08)]">
+          <div className="text-2xl font-bold text-[#F97316]">{daywork.off_days ?? 0}</div>
+          <div className="mt-1 text-xs text-[#555555]">{L.officialOff}</div>
+          <div className="text-[10px] text-[#888888]">{L.dayUnit}</div>
+          <DatesList dateStr={daywork.off_date} label={L.datesLabel} />
+        </div>
+        <div className="rounded-[1rem] border border-[#FECACA] bg-white p-4 text-center shadow-[0_4px_16px_rgba(220,38,38,0.08)]">
+          <div className="text-2xl font-bold text-[#22C55E]">{daywork.night_shift_count ?? 0}</div>
+          <div className="mt-1 text-xs text-[#555555]">{L.nightShift}</div>
+          <div className="text-[10px] text-[#888888]">{L.dayUnit}</div>
+          <DatesList dateStr={daywork.night_shift_dates} label={L.datesLabel} />
+        </div>
+      </div>
+
+      <div className="mt-6 rounded-[1rem] border border-[#FECACA] bg-[#FEF2F2] p-4">
+        <h3 className="text-sm font-semibold text-[#DC2626]">{L.attendanceMetrics}</h3>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <div>
+            <div className="text-sm text-[#555555]">{L.attendanceRate}</div>
+            <div className="text-lg font-bold text-[#DC2626]">{daywork.attendance_rate != null ? Math.round(parseFloat(daywork.attendance_rate) * 100) : "0"}%</div>
+          </div>
+          <div>
+            <div className="text-sm text-[#555555]">{L.totalLeave}</div>
+            <div className="text-lg font-bold text-[#F59E0B]">{daywork.total_leave ?? 0}</div>
+          </div>
+          <div>
+            <div className="text-sm text-[#555555]">{L.totalUnpaid}</div>
+            <div className="text-lg font-bold text-red-500">{daywork.total_unpaid ?? 0}</div>
+          </div>
+          <div>
+            <div className="text-sm text-[#555555]">{L.totalPaidDays}</div>
+            <div className="text-lg font-bold text-[#16A34A]">{daywork.total_paid_days ?? 28}</div>
+          </div>
         </div>
       </div>
 
       <Link
         href="/day-work"
-        className="mt-6 inline-block rounded-lg border border-[#D0D8E4] px-4 py-2 font-semibold text-[#1352A3] transition hover:bg-[#E8F0FB]"
+        className="mt-6 inline-block rounded-xl border border-[#DC2626] bg-white px-4 py-2 font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
       >
         {L.backBtn}
       </Link>
@@ -229,7 +291,7 @@ export default function DayWorkViewPage() {
     <Suspense
       fallback={
         <CenterCard>
-          <p className="text-[#1352A3]">{L.loading}</p>
+          <p className="text-[#555555]">{L.loading}</p>
         </CenterCard>
       }
     >

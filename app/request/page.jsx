@@ -46,40 +46,40 @@ export default function RequestHomePage() {
 
   if (loading || !session) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F5F7FA] text-[#1A2B4A]">
+      <div className="flex min-h-screen items-center justify-center bg-white text-[#555555]">
         <p>{L.loading}</p>
       </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#F5F7FA] px-4 py-6 sm:px-6 sm:py-10">
+    <main className="min-h-screen bg-white px-4 py-6 text-[#111111] sm:px-6 sm:py-10">
       <section className="mx-auto max-w-6xl space-y-4">
-        <div className="rounded-2xl border border-[#D0D8E4] bg-white p-5">
-          <h1 className="text-2xl font-bold text-[#1352A3]">{L.title}</h1>
-          <p className="text-sm text-[#6B7A99] mt-1">{L.subtitle}</p>
+        <div className="rounded-[1rem] border border-[#FECACA] bg-white p-5 shadow-[0_12px_32px_rgba(220,38,38,0.12)]">
+          <h1 className="text-2xl font-bold text-[#111111]">{L.title}</h1>
+          <p className="mt-1 text-sm text-[#555555]">{L.subtitle}</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Link href="/request/leave" className="rounded-xl border border-[#D0D8E4] bg-white p-5 hover:border-[#1352A3] transition">
-            <h2 className="font-bold text-[#1A2B4A]">{L.card1Title}</h2>
-            <p className="text-sm text-[#6B7A99] mt-1">{L.card1Desc}</p>
+          <Link href="/request/leave" className="rounded-[1rem] border border-[#FECACA] bg-white p-5 shadow-[0_10px_28px_rgba(220,38,38,0.10)] transition hover:-translate-y-0.5 hover:border-[#DC2626]/50 hover:shadow-[0_16px_36px_rgba(220,38,38,0.16)]">
+            <h2 className="font-bold text-[#111111]">{L.card1Title}</h2>
+            <p className="mt-1 text-sm text-[#555555]">{L.card1Desc}</p>
           </Link>
 
-          <Link href="/request/time-correction" className="rounded-xl border border-[#D0D8E4] bg-white p-5 hover:border-[#1352A3] transition">
-            <h2 className="font-bold text-[#1A2B4A]">{L.card2Title}</h2>
-            <p className="text-sm text-[#6B7A99] mt-1">{L.card2Desc}</p>
+          <Link href="/request/time-correction" className="rounded-[1rem] border border-[#FECACA] bg-white p-5 shadow-[0_10px_28px_rgba(220,38,38,0.10)] transition hover:-translate-y-0.5 hover:border-[#DC2626]/50 hover:shadow-[0_16px_36px_rgba(220,38,38,0.16)]">
+            <h2 className="font-bold text-[#111111]">{L.card2Title}</h2>
+            <p className="mt-1 text-sm text-[#555555]">{L.card2Desc}</p>
           </Link>
 
-          <Link href="/request/ot" className="rounded-xl border border-[#0D3B7A] bg-gradient-to-br from-[#0D3B7A] to-[#1352A3] text-white p-5 hover:opacity-95 transition">
+          <Link href="/request/ot" className="rounded-[1rem] border border-[#450A0A] bg-gradient-to-br from-[#450A0A] via-[#991B1B] to-[#DC2626] p-5 text-white shadow-[0_12px_32px_rgba(220,38,38,0.16)] transition hover:opacity-95">
             <h2 className="font-bold">{L.card3Title}</h2>
             <p className="text-sm text-white/80 mt-1">{L.card3Desc}</p>
           </Link>
         </div>
 
-        <section className="rounded-2xl border border-[#D0D8E4] bg-white p-5 space-y-3">
+        <section className="space-y-3 rounded-[1rem] border border-[#FECACA] bg-white p-5 shadow-[0_10px_28px_rgba(220,38,38,0.10)]">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <h3 className="text-lg font-bold text-[#1A2B4A]">{L.historyTitle}</h3>
+            <h3 className="text-lg font-bold text-[#DC2626]">{L.historyTitle}</h3>
             <div className="flex flex-col sm:flex-row gap-2">
               <select
                 value={type}
@@ -88,7 +88,7 @@ export default function RequestHomePage() {
                   setType(v);
                   loadHistory(v, status);
                 }}
-                className="rounded-lg border border-[#D0D8E4] px-3 py-2 text-sm"
+                className="rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-sm text-[#111111] focus:border-[#DC2626]"
               >
                 <option value="all">{L.filterAllType}</option>
                 <option value="leave">{L.filterLeave}</option>
@@ -103,7 +103,7 @@ export default function RequestHomePage() {
                   setStatus(v);
                   loadHistory(type, v);
                 }}
-                className="rounded-lg border border-[#D0D8E4] px-3 py-2 text-sm"
+                className="rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-sm text-[#111111] focus:border-[#DC2626]"
               >
                 <option value="all">{L.filterAllStatus}</option>
                 <option value="pending">{L.statusPending}</option>
@@ -113,26 +113,26 @@ export default function RequestHomePage() {
             </div>
           </div>
 
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
-          {busy ? <p className="text-sm text-[#6B7A99]">{L.loading}</p> : null}
+          {error ? <p className="text-sm text-[#FCA5A5]">{error}</p> : null}
+          {busy ? <p className="text-sm text-[#555555]">{L.loading}</p> : null}
 
           {!busy && !rows.length ? (
-            <p className="text-sm text-[#6B7A99]">{L.noData}</p>
+            <p className="text-sm text-[#555555]">{L.noData}</p>
           ) : (
             <div className="space-y-2">
               {rows.map((row) => (
-                <div key={`${row.type}-${row.id}`} className="rounded-lg border border-[#E1E7F0] p-3">
+                <div key={`${row.type}-${row.id}`} className="rounded-xl border border-[#FECACA] bg-white p-3">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                    <div className="text-sm text-[#334260]">
-                      <p className="font-semibold text-[#1A2B4A]">{row.title}</p>
+                    <div className="text-sm text-[#444444]">
+                      <p className="font-semibold text-[#111111]">{row.title}</p>
                       <p>{row.date_label}</p>
                       <p>{row.amount_label}</p>
-                      {row.reason ? <p className="text-xs text-[#6B7A99] mt-1">{row.reason}</p> : null}
+                      {row.reason ? <p className="mt-1 text-xs text-[#555555]">{row.reason}</p> : null}
                     </div>
                     <div>
-                      {row.status_tag === "pending" ? <span className="text-xs rounded-full bg-amber-50 border border-amber-300 px-2 py-1 text-amber-700">{L.statusPendingIcon}</span> : null}
-                      {row.status_tag === "approved" ? <span className="text-xs rounded-full bg-green-50 border border-green-300 px-2 py-1 text-green-700">{L.statusApprovedIcon}</span> : null}
-                      {row.status_tag === "rejected" ? <span className="text-xs rounded-full bg-red-50 border border-red-300 px-2 py-1 text-red-700">{L.statusRejectedIcon}</span> : null}
+                      {row.status_tag === "pending" ? <span className="rounded-full border border-[#F59E0B]/40 bg-[#F59E0B]/20 px-2 py-1 text-xs text-[#FCD34D]">{L.statusPendingIcon}</span> : null}
+                      {row.status_tag === "approved" ? <span className="rounded-full border border-[#22C55E]/40 bg-[#22C55E]/20 px-2 py-1 text-xs text-[#86EFAC]">{L.statusApprovedIcon}</span> : null}
+                      {row.status_tag === "rejected" ? <span className="rounded-full border border-[#EF4444]/40 bg-[#EF4444]/20 px-2 py-1 text-xs text-[#FCA5A5]">{L.statusRejectedIcon}</span> : null}
                     </div>
                   </div>
                 </div>

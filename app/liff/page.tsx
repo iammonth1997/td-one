@@ -93,15 +93,15 @@ export default function LiffPage() {
   }, [liffId]);
 
   return (
-    <main className="min-h-screen bg-[#F5F7FA] text-[#1A2B4A] p-6">
-      <div className="mx-auto max-w-lg rounded-2xl bg-white border border-[#DDE3EA] p-6 shadow-sm">
+    <main className="min-h-screen bg-white p-6 text-[#111111]">
+      <div className="mx-auto max-w-lg rounded-[1rem] border border-[#FECACA] bg-white p-6 shadow-[0_12px_36px_rgba(220,38,38,0.15)]">
         <h1 className="text-2xl font-semibold">LINE LIFF</h1>
-        <p className="mt-2 text-sm text-[#4E5E7A]">Connection status between LINE app and TD One ERP.</p>
+        <p className="mt-2 text-sm text-[#555555]">Connection status between LINE app and TD One ERP.</p>
 
         {loading ? <p className="mt-4 text-sm">Initializing LIFF...</p> : null}
 
         {!loading && error ? (
-          <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <div className="mt-4 rounded-xl border border-[#FECACA] bg-[#FEF2F2] p-3 text-sm text-[#B91C1C]">
             {error}
           </div>
         ) : null}
@@ -109,11 +109,11 @@ export default function LiffPage() {
         {!loading && !error && profile ? (
           <div className="mt-5 space-y-3 text-sm">
             <div>
-              <p className="text-[#4E5E7A]">Display name</p>
+              <p className="text-[#555555]">Display name</p>
               <p className="font-medium">{profile.displayName}</p>
             </div>
             <div>
-              <p className="text-[#4E5E7A]">LINE User ID</p>
+              <p className="text-[#555555]">LINE User ID</p>
               <p className="font-mono break-all">{profile.userId}</p>
             </div>
             {profile.pictureUrl ? (
@@ -122,12 +122,12 @@ export default function LiffPage() {
                 alt="LINE profile"
                 width={64}
                 height={64}
-                className="h-16 w-16 rounded-full border border-[#DDE3EA]"
+                className="h-16 w-16 rounded-full border border-[#FECACA]"
               />
             ) : null}
 
             <button
-              className="mt-2 rounded-lg bg-[#1352A3] px-4 py-2 text-white hover:bg-[#0F4487]"
+              className="mt-2 rounded-xl bg-[#DC2626] px-4 py-2 text-white shadow-[0_10px_24px_rgba(220,38,38,0.24)] transition hover:bg-[#991B1B]"
               onClick={() => {
                 const liff = window.liff;
                 if (!liff) return;

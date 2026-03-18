@@ -60,69 +60,69 @@ export default function SetPinPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#E8F0FB]">
-      <div className="w-full max-w-sm bg-white border border-[#D0D8E4] rounded-2xl p-8 shadow-[0_4px_24px_rgba(13,59,122,0.10)]">
+    <div className="flex min-h-screen items-center justify-center bg-white px-4">
+      <div className="w-full max-w-sm rounded-[1rem] border border-[#FECACA] bg-white p-8 shadow-[0_4px_24px_rgba(220,38,38,0.10)]">
 
         <div className="flex justify-end mb-4">
           <LanguageSwitcher />
         </div>
 
-        <h1 className="text-2xl font-bold text-center text-[#1A2B4A] mb-6">
+        <h1 className="mb-6 text-center text-2xl font-bold text-[#111111]">
           {L.title}
         </h1>
 
-        <label className="text-[#334260] text-sm font-medium">{L.empIdLabel}</label>
+        <label className="text-sm font-medium text-[#555555]">{L.empIdLabel}</label>
         <input
           type="text"
           value={empId}
           onChange={(e) => setEmpId(e.target.value)}
-          className="w-full mt-1 mb-4 p-2.5 rounded-lg bg-[#F5F7FA] text-[#1A2B4A] border border-[#D0D8E4] focus:outline-none focus:border-[#1352A3] focus:ring-1 focus:ring-[#1352A3]"
+          className="mb-4 mt-1 w-full rounded-xl border border-[#FECACA] bg-white p-2.5 text-[#111111] placeholder:text-[#777777] focus:outline-none focus:border-[#DC2626] focus:ring-1 focus:ring-[#DC2626]"
           placeholder={L.empIdPlaceholder}
           disabled={loading}
         />
 
-        <label className="text-[#334260] text-sm font-medium">{L.dobLabel}</label>
+        <label className="text-sm font-medium text-[#555555]">{L.dobLabel}</label>
         <input
           type="date"
           value={dob}
           onChange={(e) => setDob(e.target.value)}
-          className="w-full mt-1 mb-4 p-2.5 rounded-lg bg-[#F5F7FA] text-[#1A2B4A] border border-[#D0D8E4] focus:outline-none focus:border-[#1352A3] focus:ring-1 focus:ring-[#1352A3]"
+          className="mb-4 mt-1 w-full rounded-xl border border-[#FECACA] bg-white p-2.5 text-[#111111] focus:outline-none focus:border-[#DC2626] focus:ring-1 focus:ring-[#DC2626]"
           disabled={loading}
         />
 
-        <label className="text-[#334260] text-sm font-medium">{L.pinLabel}</label>
+        <label className="text-sm font-medium text-[#555555]">{L.pinLabel}</label>
         <input
           type="password"
           value={pin}
           onChange={(e) => setPin(e.target.value)}
-          className="w-full mt-1 mb-4 p-2.5 rounded-lg bg-[#F5F7FA] text-[#1A2B4A] border border-[#D0D8E4] focus:outline-none focus:border-[#1352A3] focus:ring-1 focus:ring-[#1352A3]"
+          className="mb-4 mt-1 w-full rounded-xl border border-[#FECACA] bg-white p-2.5 text-[#111111] placeholder:text-[#777777] focus:outline-none focus:border-[#DC2626] focus:ring-1 focus:ring-[#DC2626]"
           placeholder={L.pinPlaceholder}
           disabled={loading}
         />
 
-        <label className="text-[#334260] text-sm font-medium">{L.confirmPinLabel}</label>
+        <label className="text-sm font-medium text-[#555555]">{L.confirmPinLabel}</label>
         <input
           type="password"
           value={confirmPin}
           onChange={(e) => setConfirmPin(e.target.value)}
-          className="w-full mt-1 mb-4 p-2.5 rounded-lg bg-[#F5F7FA] text-[#1A2B4A] border border-[#D0D8E4] focus:outline-none focus:border-[#1352A3] focus:ring-1 focus:ring-[#1352A3]"
+          className="mb-4 mt-1 w-full rounded-xl border border-[#FECACA] bg-white p-2.5 text-[#111111] placeholder:text-[#777777] focus:outline-none focus:border-[#DC2626] focus:ring-1 focus:ring-[#DC2626]"
           placeholder={L.confirmPinPlaceholder}
           disabled={loading}
         />
 
-        {error && <p className="text-red-500 text-sm mb-3 text-center">{error}</p>}
-        {success && <p className="text-green-600 text-sm mb-3 text-center">{success}</p>}
+        {error && <p className="mb-3 text-center text-sm text-[#FCA5A5]">{error}</p>}
+        {success && <p className="mb-3 text-center text-sm text-[#86EFAC]">{success}</p>}
 
         <button
           onClick={handleSetPin}
           disabled={loading}
-          className="w-full py-2.5 mt-2 bg-[#1352A3] hover:bg-[#0D3B7A] disabled:opacity-50 text-white font-semibold rounded-lg shadow transition"
+          className="mt-2 w-full rounded-xl bg-[#DC2626] py-2.5 font-semibold text-white shadow-[0_10px_24px_rgba(220,38,38,0.25)] transition hover:bg-[#991B1B] disabled:opacity-50"
         >
           {loading ? L.loadingBtn : L.setPinBtn}
         </button>
 
-        <p className="text-center text-[#6B7A99] text-xs mt-4">
-          <Link href="/login" className="text-[#1352A3] hover:underline font-medium">
+        <p className="mt-4 text-center text-xs text-[#555555]">
+          <Link href="/login" className="font-medium text-[#DC2626] transition hover:text-[#991B1B]">
             {L.backToLogin}
           </Link>
         </p>

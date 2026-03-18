@@ -94,7 +94,7 @@ export default function Home() {
 
   if (loading || checkingLink || (!linkChecked && profile)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F5F7FA] text-[#1A2B4A]">
+      <div className="min-h-screen flex items-center justify-center bg-white text-[#111111]">
         <p className="text-sm">Loading...</p>
       </div>
     );
@@ -102,8 +102,8 @@ export default function Home() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F5F7FA] p-6">
-        <div className="w-full max-w-md rounded-xl border border-red-200 bg-red-50 p-4 text-red-700 text-sm">
+      <div className="min-h-screen flex items-center justify-center bg-white p-6">
+        <div className="w-full max-w-md rounded-2xl border border-[#FECACA] bg-[#FEF2F2] p-5 text-sm text-[#B91C1C] shadow-[0_12px_36px_rgba(220,38,38,0.15)]">
           <p className="font-semibold">LIFF initialization failed</p>
           <p className="mt-1">{error}</p>
         </div>
@@ -113,8 +113,8 @@ export default function Home() {
 
   if (linkError) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F5F7FA] p-6">
-        <div className="w-full max-w-md rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-800 text-sm">
+      <div className="min-h-screen flex items-center justify-center bg-white p-6">
+        <div className="w-full max-w-md rounded-2xl border border-[#FCD34D] bg-[#FFF7ED] p-5 text-sm text-[#B45309] shadow-[0_12px_36px_rgba(220,38,38,0.15)]">
           <p className="font-semibold">LINE Login Issue</p>
           <p className="mt-1">{linkError}</p>
         </div>
@@ -126,8 +126,27 @@ export default function Home() {
     return <LinkAccountPage profile={profile} idToken={idToken} />;
   }
 
+  // Localhost: redirect to direct login page
+  const isLocalhost = typeof window !== 'undefined' && 
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  if (isLocalhost) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white p-6 text-[#111111]">
+        <div className="rounded-2xl border border-[#FECACA] bg-white px-8 py-10 text-center shadow-[0_12px_36px_rgba(220,38,38,0.15)]">
+          <p className="text-sm mb-4">🚀 Development Mode Detected</p>
+          <a 
+            href="/login" 
+            className="inline-block rounded-xl bg-[#DC2626] px-6 py-2.5 font-semibold text-white transition hover:bg-[#991B1B] shadow-[0_10px_24px_rgba(220,38,38,0.25)]"
+          >
+            Go to Login →
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F5F7FA] text-[#1A2B4A]">
+    <div className="min-h-screen flex items-center justify-center bg-white text-[#111111]">
       <p className="text-sm">Unable to continue LIFF login. Please try again.</p>
     </div>
   );

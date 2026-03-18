@@ -69,26 +69,26 @@ export default function SlipPage() {
   };
 
   if (loading || !session) {
-    return <div className="min-h-screen flex items-center justify-center">{L.loading || "Loading..."}</div>;
+    return <div className="flex min-h-screen items-center justify-center bg-white text-[#555555]">{L.loading || "Loading..."}</div>;
   }
 
   return (
-    <main className="min-h-screen bg-[#F5F7FA] px-4 py-6 sm:px-6 sm:py-10">
+    <main className="min-h-screen bg-white px-4 py-6 text-[#111111] sm:px-6 sm:py-10">
       <section className="mx-auto max-w-4xl space-y-5">
-        <div className="rounded-2xl border border-[#D0D8E4] bg-white p-5 sm:p-7">
-          <h1 className="text-2xl font-bold text-[#1352A3]">{L.title || "Slip"}</h1>
+        <div className="rounded-[1rem] border border-[#FECACA] bg-white p-5 shadow-[0_4px_24px_rgba(220,38,38,0.10)] sm:p-7">
+          <h1 className="text-2xl font-bold text-[#DC2626]">{L.title || "Slip"}</h1>
         </div>
 
-        <div className="rounded-2xl border border-[#D0D8E4] bg-white p-5 sm:p-7 space-y-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-xl bg-[#E8F0FB] p-1">
+        <div className="space-y-5 rounded-[1rem] border border-[#FECACA] bg-white p-5 shadow-[0_4px_24px_rgba(220,38,38,0.10)] sm:p-7">
+          <div className="grid grid-cols-1 gap-2 rounded-xl border border-[#FECACA] bg-white p-1 sm:grid-cols-2">
             <button
-              className={`rounded-lg px-3 py-2 text-sm font-semibold ${tab === "salary" ? "bg-white text-[#1352A3] shadow" : "text-[#334260]"}`}
+              className={`rounded-lg px-3 py-2 text-sm font-semibold ${tab === "salary" ? "bg-white text-[#DC2626] shadow-[0_10px_20px_rgba(220,38,38,0.16)]" : "bg-white text-[#555555]"}`}
               onClick={() => setTab("salary")}
             >
               {L.salaryTab || "Salary Slip"}
             </button>
             <button
-              className={`rounded-lg px-3 py-2 text-sm font-semibold ${tab === "ot" ? "bg-white text-[#1352A3] shadow" : "text-[#334260]"}`}
+              className={`rounded-lg px-3 py-2 text-sm font-semibold ${tab === "ot" ? "bg-white text-[#DC2626] shadow-[0_10px_20px_rgba(220,38,38,0.16)]" : "bg-white text-[#555555]"}`}
               onClick={() => setTab("ot")}
             >
               {L.otTab || "OT & Incentive Slip"}
@@ -97,8 +97,8 @@ export default function SlipPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-semibold text-[#334260]">{L.monthLabel || "Month"}</label>
-              <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="w-full rounded-lg border border-[#D0D8E4] px-3 py-2">
+              <label className="mb-1 block text-sm font-semibold text-[#555555]">{L.monthLabel || "Month"}</label>
+              <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="w-full rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-[#111111]">
                 {(t.dayWork?.months || []).map((name, idx) => (
                   <option key={idx + 1} value={idx + 1}>{name}</option>
                 ))}
@@ -106,8 +106,8 @@ export default function SlipPage() {
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-semibold text-[#334260]">{L.yearLabel || "Year"}</label>
-              <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="w-full rounded-lg border border-[#D0D8E4] px-3 py-2">
+              <label className="mb-1 block text-sm font-semibold text-[#555555]">{L.yearLabel || "Year"}</label>
+              <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="w-full rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-[#111111]">
                 {years.map((y) => (
                   <option key={y} value={y}>{y}</option>
                 ))}
@@ -115,17 +115,17 @@ export default function SlipPage() {
             </div>
           </div>
 
-          {slipLoading && <p className="text-sm text-[#6B7A99]">{L.loading || "Loading..."}</p>}
+          {slipLoading && <p className="text-sm text-[#555555]">{L.loading || "Loading..."}</p>}
 
-          {slipError && <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">{slipError}</div>}
+          {slipError && <div className="rounded-xl border border-[#FECACA] bg-[#FEF2F2] p-3 text-sm text-[#B91C1C]">{slipError}</div>}
 
           {slipData && (
             <div className="space-y-4">
-              <div className="rounded-lg bg-[#F8FAFD] border border-[#D0D8E4] p-4 space-y-2">
-                <p className="text-sm text-[#334260]">
+              <div className="space-y-2 rounded-xl border border-[#FECACA] bg-white p-4">
+                <p className="text-sm text-[#555555]">
                   <span className="font-semibold">{L.empCode}:</span> {slipData.employee?.employee_code || "-"}
                 </p>
-                <p className="text-sm text-[#334260]">
+                <p className="text-sm text-[#555555]">
                   <span className="font-semibold">{L.empName}:</span> {slipData.employee?.name || "-"}
                 </p>
               </div>
@@ -133,94 +133,94 @@ export default function SlipPage() {
               {slipData.slip ? (
                 tab === "salary" ? (
                   <div className="space-y-3">
-                    <h3 className="font-bold text-[#1A2B4A]">{L.salaryBreakdown || "Salary Breakdown"}</h3>
+                    <h3 className="font-bold text-[#DC2626]">{L.salaryBreakdown || "Salary Breakdown"}</h3>
                     <div className="space-y-2">
-                      <div className="flex justify-between text-sm py-2 border-b border-[#E5EAF0]">
+                      <div className="flex justify-between border-b border-[#FECACA] py-2 text-sm text-[#444444]">
                         <span>{L.basicSalary}</span>
                         <span className="font-semibold">{formatCurrency(slipData.slip.basic_salary)}</span>
                       </div>
-                      <div className="flex justify-between text-sm py-2 border-b border-[#E5EAF0]">
+                      <div className="flex justify-between border-b border-[#FECACA] py-2 text-sm text-[#444444]">
                         <span>{L.allowance}</span>
                         <span className="font-semibold">{formatCurrency(slipData.slip.allowance)}</span>
                       </div>
-                      <div className="flex justify-between text-sm py-2 border-b border-[#E5EAF0]">
+                      <div className="flex justify-between border-b border-[#FECACA] py-2 text-sm text-[#444444]">
                         <span>{L.bonus}</span>
                         <span className="font-semibold">{formatCurrency(slipData.slip.bonus)}</span>
                       </div>
-                      <div className="flex justify-between text-sm py-2 border-b border-[#E5EAF0]">
+                      <div className="flex justify-between border-b border-[#FECACA] py-2 text-sm text-[#444444]">
                         <span>{L.deduction}</span>
                         <span className="font-semibold text-red-600">{formatCurrency(slipData.slip.deduction)}</span>
                       </div>
-                      <div className="flex justify-between text-sm py-2 border-b border-[#E5EAF0]">
+                      <div className="flex justify-between border-b border-[#FECACA] py-2 text-sm text-[#444444]">
                         <span>{L.tax}</span>
                         <span className="font-semibold text-red-600">{formatCurrency(slipData.slip.tax)}</span>
                       </div>
-                      <div className="flex justify-between text-sm py-3 border-t-2 border-[#1352A3] bg-[#E8F0FB] px-3 rounded">
+                      <div className="flex justify-between rounded-xl border-t-2 border-[#DC2626] bg-white px-3 py-3 text-sm">
                         <span className="font-bold">{L.netSalary}</span>
-                        <span className="font-bold text-[#1352A3]">{formatCurrency(slipData.slip.net_salary)}</span>
+                        <span className="font-bold text-[#DC2626]">{formatCurrency(slipData.slip.net_salary)}</span>
                       </div>
                     </div>
                     {slipData.slip.notes && (
-                      <div className="text-xs text-[#6B7A99] mt-3">
+                      <div className="mt-3 text-xs text-[#555555]">
                         <span className="font-semibold">{L.notes}:</span> {slipData.slip.notes}
                       </div>
                     )}
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    <h3 className="font-bold text-[#1A2B4A]">{L.otBreakdown || "OT Breakdown"}</h3>
+                    <h3 className="font-bold text-[#DC2626]">{L.otBreakdown || "OT Breakdown"}</h3>
                     <div className="space-y-2">
-                      <div className="rounded-lg border border-[#D0D8E4] p-3 space-y-1 bg-[#F8FAFD]">
-                        <p className="text-sm font-semibold text-[#334260]">{L.normalOTHours}</p>
-                        <p className="text-lg font-bold text-[#1352A3]">{slipData.slip.ot_normal_hours || "-"} {L.hourUnit || "hrs"}</p>
+                      <div className="space-y-1 rounded-xl border border-[#FECACA] bg-white p-3">
+                        <p className="text-sm font-semibold text-[#444444]">{L.normalOTHours}</p>
+                        <p className="text-lg font-bold text-[#F59E0B]">{slipData.slip.ot_normal_hours || "-"} {L.hourUnit || "hrs"}</p>
                       </div>
-                      <div className="flex justify-between text-sm py-2 border-b border-[#E5EAF0]">
+                      <div className="flex justify-between border-b border-[#FECACA] py-2 text-sm text-[#444444]">
                         <span>{L.normalOTRate}</span>
                         <span className="font-semibold">{formatCurrency(slipData.slip.ot_normal_rate)}</span>
                       </div>
-                      <div className="flex justify-between text-sm py-2 border-b border-[#E5EAF0]">
+                      <div className="flex justify-between border-b border-[#FECACA] py-2 text-sm text-[#444444]">
                         <span>{L.normalOTAmount}</span>
                         <span className="font-semibold">{formatCurrency(slipData.slip.ot_normal_amount)}</span>
                       </div>
 
-                      <div className="rounded-lg border border-[#D0D8E4] p-3 space-y-1 bg-[#F8FAFD] mt-3">
-                        <p className="text-sm font-semibold text-[#334260]">{L.holidayOTHours}</p>
-                        <p className="text-lg font-bold text-[#1352A3]">{slipData.slip.ot_holiday_hours || "-"} {L.hourUnit || "hrs"}</p>
+                      <div className="mt-3 space-y-1 rounded-xl border border-[#FECACA] bg-white p-3">
+                        <p className="text-sm font-semibold text-[#444444]">{L.holidayOTHours}</p>
+                        <p className="text-lg font-bold text-[#F59E0B]">{slipData.slip.ot_holiday_hours || "-"} {L.hourUnit || "hrs"}</p>
                       </div>
-                      <div className="flex justify-between text-sm py-2 border-b border-[#E5EAF0]">
+                      <div className="flex justify-between border-b border-[#FECACA] py-2 text-sm text-[#444444]">
                         <span>{L.holidayOTRate}</span>
                         <span className="font-semibold">{formatCurrency(slipData.slip.ot_holiday_rate)}</span>
                       </div>
-                      <div className="flex justify-between text-sm py-2 border-b border-[#E5EAF0]">
+                      <div className="flex justify-between border-b border-[#FECACA] py-2 text-sm text-[#444444]">
                         <span>{L.holidayOTAmount}</span>
                         <span className="font-semibold">{formatCurrency(slipData.slip.ot_holiday_amount)}</span>
                       </div>
 
-                      <div className="flex justify-between text-sm py-2 border-b border-[#E5EAF0] mt-2">
+                      <div className="mt-2 flex justify-between border-b border-[#FECACA] py-2 text-sm text-[#444444]">
                         <span>{L.incentiveAmount}</span>
                         <span className="font-semibold text-green-600">{formatCurrency(slipData.slip.incentive_amount)}</span>
                       </div>
 
-                      <div className="flex justify-between text-sm py-3 border-t-2 border-[#1352A3] bg-[#E8F0FB] px-3 rounded">
+                      <div className="flex justify-between rounded-xl border-t-2 border-[#DC2626] bg-white px-3 py-3 text-sm">
                         <span className="font-bold">{L.totalOTIncentive}</span>
-                        <span className="font-bold text-[#1352A3]">{formatCurrency(slipData.slip.total_ot_incentive)}</span>
+                        <span className="font-bold text-[#DC2626]">{formatCurrency(slipData.slip.total_ot_incentive)}</span>
                       </div>
                     </div>
                     {slipData.slip.notes && (
-                      <div className="text-xs text-[#6B7A99] mt-3">
+                      <div className="mt-3 text-xs text-[#555555]">
                         <span className="font-semibold">{L.notes}:</span> {slipData.slip.notes}
                       </div>
                     )}
                   </div>
                 )
               ) : (
-                <div className="rounded-lg bg-amber-50 border border-amber-200 p-4 text-center">
-                  <p className="text-sm text-amber-800">{L.noData || "No slip data available for this period"}</p>
+                <div className="rounded-xl border border-[#FCD34D] bg-[#FFF7ED] p-4 text-center">
+                  <p className="text-sm text-[#B45309]">{L.noData || "No slip data available for this period"}</p>
                 </div>
               )}
 
               <div className="flex flex-col sm:flex-row gap-2 pt-4">
-                <button onClick={downloadPdf} disabled={!slipData?.slip} className="rounded-lg border border-[#1352A3] px-4 py-2.5 text-[#1352A3] font-semibold hover:bg-[#E8F0FB] disabled:opacity-50">
+                <button onClick={downloadPdf} disabled={!slipData?.slip} className="rounded-xl bg-[#DC2626] px-4 py-2.5 font-semibold text-white transition hover:bg-[#991B1B] disabled:opacity-50">
                   {L.downloadBtn || "Download PDF"}
                 </button>
               </div>
