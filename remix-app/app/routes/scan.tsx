@@ -15,6 +15,178 @@ type GpsState = {
   timestamp: number;
 };
 
+type LangCode = "th" | "en" | "lo";
+
+const SCAN_I18N: Record<LangCode, {
+  title: string;
+  loading: string;
+  back: string;
+  employeeInfo: string;
+  date: string;
+  workplace: string;
+  selectArea: string;
+  gpsStatus: string;
+  statusLabel: string;
+  nearest: string;
+  coords: string;
+  refreshGps: string;
+  mapPlaceholder: string;
+  suspicious: string;
+  latestScan: string;
+  noHistory: string;
+  todayHistory: string;
+  faceOptional: string;
+  faceNote: string;
+  captureSelfie: string;
+  retakeSelfie: string;
+  scanIn: string;
+  scanOut: string;
+  scanning: string;
+  scanInSuccess: string;
+  scanOutSuccess: string;
+  needGpsFirst: string;
+  gpsNotSupported: string;
+  gpsFailed: string;
+  cameraNotSupported: string;
+  cameraStartFailed: string;
+  loadFailed: string;
+  liffInitFailed: string;
+  liffTokenMissing: string;
+  statusWaiting: string;
+  statusInside: string;
+  statusOutside: string;
+  statusSuspicious: string;
+  savingPrefix: string;
+  timeLabel: string;
+}> = {
+  th: {
+    title: "สแกนเข้า/ออกงาน",
+    loading: "กำลังโหลดข้อมูล...",
+    back: "กลับ",
+    employeeInfo: "ข้อมูลพนักงาน",
+    date: "วันที่",
+    workplace: "พื้นที่ทำงาน",
+    selectArea: "เลือกพื้นที่",
+    gpsStatus: "สถานะ GPS",
+    statusLabel: "สถานะ",
+    nearest: "จุดใกล้สุด",
+    coords: "พิกัด",
+    refreshGps: "อัปเดต GPS",
+    mapPlaceholder: "กดอัปเดต GPS เพื่อแสดงแผนที่",
+    suspicious: "พบความผิดปกติ",
+    latestScan: "ลงเวลาล่าสุด",
+    noHistory: "ยังไม่มีประวัติการสแกนวันนี้",
+    todayHistory: "ประวัติการสแกนวันนี้",
+    faceOptional: "เปิดใช้งานการตรวจสอบใบหน้า (ไม่บังคับ)",
+    faceNote: "ฟังก์ชันตรวจใบหน้า/ตรวจการมีชีวิตจะเปิดใช้ในขั้นตอนถัดไป",
+    captureSelfie: "ถ่ายรูปเซลฟี่",
+    retakeSelfie: "ถ่ายใหม่",
+    scanIn: "สแกนเข้า",
+    scanOut: "สแกนออก",
+    scanning: "กำลังบันทึก...",
+    scanInSuccess: "สแกนเข้าเรียบร้อย",
+    scanOutSuccess: "สแกนออกเรียบร้อย",
+    needGpsFirst: "กรุณาตรวจสอบ GPS ก่อนสแกน",
+    gpsNotSupported: "อุปกรณ์นี้ไม่รองรับ GPS",
+    gpsFailed: "ไม่สามารถดึงตำแหน่งได้",
+    cameraNotSupported: "อุปกรณ์นี้ไม่รองรับกล้อง",
+    cameraStartFailed: "ไม่สามารถเปิดกล้องได้",
+    loadFailed: "โหลดข้อมูลไม่สำเร็จ",
+    liffInitFailed: "ไม่สามารถเริ่ม LIFF ได้",
+    liffTokenMissing: "ไม่พบ LINE token: กรุณาเปิดผ่าน LINE LIFF",
+    statusWaiting: "รอตรวจสอบตำแหน่ง",
+    statusInside: "อยู่ในพื้นที่ทำงาน",
+    statusOutside: "อยู่นอกพื้นที่ทำงาน",
+    statusSuspicious: "พบความผิดปกติของ GPS",
+    savingPrefix: "กำลังอัปโหลดรูปถ่าย...",
+    timeLabel: "เวลา",
+  },
+  en: {
+    title: "Scan In/Out",
+    loading: "Loading data...",
+    back: "Back",
+    employeeInfo: "Employee Information",
+    date: "Date",
+    workplace: "Work Area",
+    selectArea: "Select Area",
+    gpsStatus: "GPS Status",
+    statusLabel: "Status",
+    nearest: "Nearest",
+    coords: "Coordinates",
+    refreshGps: "Refresh GPS",
+    mapPlaceholder: "Press refresh GPS to show map",
+    suspicious: "Suspicious signals",
+    latestScan: "Latest scan",
+    noHistory: "No scan history for today",
+    todayHistory: "Today's scan history",
+    faceOptional: "Enable face verification (optional)",
+    faceNote: "Face match and liveness verification will be enabled in the next phase",
+    captureSelfie: "Capture Selfie",
+    retakeSelfie: "Retake",
+    scanIn: "Scan In",
+    scanOut: "Scan Out",
+    scanning: "Saving...",
+    scanInSuccess: "Scan in completed",
+    scanOutSuccess: "Scan out completed",
+    needGpsFirst: "Please verify GPS before scanning",
+    gpsNotSupported: "This device does not support GPS",
+    gpsFailed: "Unable to get location",
+    cameraNotSupported: "This device does not support camera",
+    cameraStartFailed: "Unable to open camera",
+    loadFailed: "Failed to load attendance data",
+    liffInitFailed: "Unable to initialize LIFF",
+    liffTokenMissing: "Missing LINE token: open this page from LINE LIFF",
+    statusWaiting: "Waiting for location check",
+    statusInside: "Inside work area",
+    statusOutside: "Outside work area",
+    statusSuspicious: "Suspicious GPS detected",
+    savingPrefix: "Uploading selfie...",
+    timeLabel: "Time",
+  },
+  lo: {
+    title: "ສະແກນເຂົ້າ/ອອກ",
+    loading: "ກຳລັງໂຫຼດຂໍ້ມູນ...",
+    back: "ກັບ",
+    employeeInfo: "ຂໍ້ມູນພະນັກງານ",
+    date: "ວັນທີ",
+    workplace: "ພື້ນທີ່ເຮັດວຽກ",
+    selectArea: "ເລືອກພື້ນທີ່",
+    gpsStatus: "ສະຖານະ GPS",
+    statusLabel: "ສະຖານະ",
+    nearest: "ຈຸດໃກ້ສຸດ",
+    coords: "ພິກັດ",
+    refreshGps: "ອັບເດດ GPS",
+    mapPlaceholder: "ກົດອັບເດດ GPS ເພື່ອສະແດງແຜນທີ່",
+    suspicious: "ສັນຍານຜິດປົກກະຕິ",
+    latestScan: "ສະແກນຫຼ້າສຸດ",
+    noHistory: "ຍັງບໍ່ມີປະຫວັດການສະແກນມື້ນີ້",
+    todayHistory: "ປະຫວັດການສະແກນມື້ນີ້",
+    faceOptional: "ເປີດໃຊ້ການກວດໃບໜ້າ (ບໍ່ບັງຄັບ)",
+    faceNote: "ການກວດໃບໜ້າ ແລະ liveness ຈະເປີດໃຊ້ໃນຂັ້ນຕໍ່ໄປ",
+    captureSelfie: "ຖ່າຍເຊວຟີ້",
+    retakeSelfie: "ຖ່າຍໃໝ່",
+    scanIn: "ສະແກນເຂົ້າ",
+    scanOut: "ສະແກນອອກ",
+    scanning: "ກຳລັງບັນທຶກ...",
+    scanInSuccess: "ສະແກນເຂົ້າສຳເລັດ",
+    scanOutSuccess: "ສະແກນອອກສຳເລັດ",
+    needGpsFirst: "ກະລຸນາກວດສອບ GPS ກ່ອນສະແກນ",
+    gpsNotSupported: "ອຸປະກອນນີ້ບໍ່ຮອງຮັບ GPS",
+    gpsFailed: "ບໍ່ສາມາດດຶງຕຳແໜ່ງໄດ້",
+    cameraNotSupported: "ອຸປະກອນນີ້ບໍ່ຮອງຮັບກ້ອງ",
+    cameraStartFailed: "ບໍ່ສາມາດເປີດກ້ອງໄດ້",
+    loadFailed: "ໂຫຼດຂໍ້ມູນບໍ່ສຳເລັດ",
+    liffInitFailed: "ບໍ່ສາມາດເລີ່ມ LIFF ໄດ້",
+    liffTokenMissing: "ບໍ່ພົບ LINE token: ກະລຸນາເປີດຜ່ານ LINE LIFF",
+    statusWaiting: "ກຳລັງລໍຖ້າການກວດສອບຕຳແໜ່ງ",
+    statusInside: "ຢູ່ໃນເຂດເຮັດວຽກ",
+    statusOutside: "ຢູ່ນອກເຂດເຮັດວຽກ",
+    statusSuspicious: "ພົບ GPS ຜິດປົກກະຕິ",
+    savingPrefix: "ກຳລັງອັບໂຫຼດຮູບ...",
+    timeLabel: "ເວລາ",
+  },
+};
+
 type LiffInstance = {
   init: (args: { liffId: string }) => Promise<void>;
   isLoggedIn: () => boolean;
@@ -147,6 +319,7 @@ async function uploadSelfieToCloudinary(dataUrl: string, folder: string) {
 }
 
 export default function ScanPage({ loaderData }: Route.ComponentProps) {
+  const [lang, setLang] = useState<LangCode>("th");
   const [now, setNow] = useState(new Date());
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [todayData, setTodayData] = useState<any>(null);
@@ -172,6 +345,18 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    const saved = localStorage.getItem("tdone_lang");
+    if (saved === "th" || saved === "en" || saved === "lo") {
+      setLang(saved);
+    }
+  }, []);
+
+  function changeLanguage(next: LangCode) {
+    setLang(next);
+    localStorage.setItem("tdone_lang", next);
+  }
+
   function attendanceHeaders(extra?: Record<string, string>) {
     return {
       ...(extra || {}),
@@ -190,7 +375,7 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const locationJson: any = await locationRes.json();
 
-    if (!todayRes.ok) throw new Error(todayJson.error || "LOAD_TODAY_FAILED");
+    if (!todayRes.ok) throw new Error(todayJson.error || SCAN_I18N[lang].loadFailed);
 
     setTodayData(todayJson);
     setLocations(locationJson.rows || []);
@@ -218,7 +403,7 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
 
   async function refreshGps() {
     if (!navigator.geolocation) {
-      setGpsError("อุปกรณ์ไม่รองรับ GPS");
+      setGpsError(SCAN_I18N[lang].gpsNotSupported);
       return;
     }
 
@@ -240,7 +425,7 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
     });
 
     if (!current) {
-      setGpsError("ไม่สามารถอ่านตำแหน่ง GPS ได้");
+      setGpsError(SCAN_I18N[lang].gpsFailed);
       return;
     }
 
@@ -269,7 +454,7 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
 
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
-        setCameraError("อุปกรณ์ไม่รองรับกล้อง");
+        setCameraError(SCAN_I18N[lang].cameraNotSupported);
         return;
       }
 
@@ -284,7 +469,7 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
         await videoRef.current.play().catch(() => null);
       }
     } catch (err: unknown) {
-      setCameraError(err instanceof Error ? err.message : "ไม่สามารถเปิดกล้องได้");
+      setCameraError(err instanceof Error ? err.message : SCAN_I18N[lang].cameraStartFailed);
     }
   }
 
@@ -302,7 +487,7 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
 
   async function handleScan() {
     if (!gps) {
-      setFeedback({ type: "error", message: "กรุณาตรวจสอบตำแหน่ง GPS ก่อน" });
+      setFeedback({ type: "error", message: SCAN_I18N[lang].needGpsFirst });
       return;
     }
 
@@ -313,7 +498,7 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
       let selfieUrl: string | null = null;
 
       if (cameraEnabled && selfieDataUrl) {
-        setFeedback({ type: "", message: "กำลังอัปโหลดรูปถ่าย..." });
+        setFeedback({ type: "", message: SCAN_I18N[lang].savingPrefix });
         selfieUrl = await uploadSelfieToCloudinary(selfieDataUrl, "tdone-attendance/scan");
       }
 
@@ -342,7 +527,7 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
 
       setFeedback({
         type: "success",
-        message: data.action === "scan_in" ? "สแกนเข้าเรียบร้อย" : "สแกนออกเรียบร้อย",
+        message: data.action === "scan_in" ? SCAN_I18N[lang].scanInSuccess : SCAN_I18N[lang].scanOutSuccess,
       });
 
       await loadToday();
@@ -356,9 +541,9 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
 
   useEffect(() => {
     loadToday().catch((err: unknown) => {
-      setFeedback({ type: "error", message: err instanceof Error ? err.message : "LOAD_TODAY_FAILED" });
+      setFeedback({ type: "error", message: err instanceof Error ? err.message : SCAN_I18N[lang].loadFailed });
     });
-  }, []);
+  }, [lineIdToken, lang]);
 
   useEffect(() => {
     let cancelled = false;
@@ -368,20 +553,20 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
         if (!cancelled) {
           setLineIdToken(token);
           if (!token) {
-            setFeedback((prev) => prev.message ? prev : { type: "error", message: "ไม่พบ LINE token: กรุณาเปิดผ่าน LINE LIFF" });
+            setFeedback((prev) => prev.message ? prev : { type: "error", message: SCAN_I18N[lang].liffTokenMissing });
           }
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setFeedback((prev) => prev.message ? prev : { type: "error", message: "ไม่สามารถเริ่ม LIFF ได้" });
+          setFeedback((prev) => prev.message ? prev : { type: "error", message: SCAN_I18N[lang].liffInitFailed });
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [lang]);
 
   useEffect(() => {
     if (cameraEnabled) {
@@ -401,11 +586,11 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
   const canScan = Boolean(locationCheck?.inside) && !locationCheck?.suspicious_gps && suggestedAction !== "completed";
 
   const statusLabel = useMemo(() => {
-    if (!locationCheck) return "ยังไม่ได้ตรวจสอบ";
-    if (locationCheck.suspicious_gps) return "ตำแหน่งน่าสงสัย";
-    if (locationCheck.inside) return "อยู่ในพื้นที่ทำงาน";
-    return "อยู่นอกพื้นที่ทำงาน";
-  }, [locationCheck]);
+    if (!locationCheck) return SCAN_I18N[lang].statusWaiting;
+    if (locationCheck.suspicious_gps) return SCAN_I18N[lang].statusSuspicious;
+    if (locationCheck.inside) return SCAN_I18N[lang].statusInside;
+    return SCAN_I18N[lang].statusOutside;
+  }, [locationCheck, lang]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const latestRecord = useMemo(() => {
@@ -429,10 +614,13 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
         { id: "workshop", name: "Workshop" },
       ];
 
+  const T = SCAN_I18N[lang];
+  const dateLocale = lang === "en" ? "en-US" : lang === "lo" ? "lo-LA" : "th-TH";
+
   if (!todayData) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-white text-[#111111]">
-        <p>กำลังโหลดข้อมูลสแกน...</p>
+        <p>{T.loading}</p>
       </div>
     );
   }
@@ -441,14 +629,30 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
     <main className="min-h-screen bg-white px-3 pb-6 pt-4 text-[#111111] sm:px-6">
       <div className="mx-auto w-full max-w-md rounded-[28px] border border-[#FECACA] bg-white p-4 shadow-[0_16px_40px_rgba(220,38,38,0.12)] sm:p-5">
         <header className="mb-3 flex items-center justify-between gap-2">
-          <h1 className="text-[1.8rem] font-extrabold tracking-tight text-[#111111]">บันทึกเวลาเข้างาน</h1>
+          <h1 className="text-[1.8rem] font-extrabold tracking-tight text-[#111111]">{T.title}</h1>
+          <div className="flex items-center gap-1">
+            {(["th", "en", "lo"] as LangCode[]).map((code) => (
+              <button
+                key={code}
+                type="button"
+                onClick={() => changeLanguage(code)}
+                className={`rounded-full border px-2 py-1 text-[10px] font-bold transition ${
+                  lang === code
+                    ? "border-[#DC2626] bg-[#DC2626] text-white"
+                    : "border-[#FECACA] bg-white text-[#555555]"
+                }`}
+              >
+                {code.toUpperCase()}
+              </button>
+            ))}
+          </div>
           <Link to="/dashboard" className="rounded-lg border border-[#FECACA] px-3 py-1.5 text-sm font-semibold text-[#991B1B]">
-            กลับ
+            {T.back}
           </Link>
         </header>
 
         <section className="rounded-2xl border border-[#FECACA] bg-white p-3 shadow-[0_10px_24px_rgba(0,0,0,0.2)]">
-          <h2 className="text-[1.1rem] font-bold text-[#111111]">พนักงาน</h2>
+          <h2 className="text-[1.1rem] font-bold text-[#111111]">{T.employeeInfo}</h2>
           <p className="mt-1 text-base text-[#555555]">{todayData.employee?.name || "-"}</p>
           <p className="text-sm text-[#555555]">EMP: {todayData.employee?.employee_code || loaderData.empId}</p>
           <p className="mt-2 text-sm text-[#D62828]">{todayData.shift_name || "Shift"} {todayData.shift_time ? `(${todayData.shift_time})` : ""}</p>
@@ -457,8 +661,8 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
         <section className="mt-3 rounded-2xl border border-[#FECACA] bg-white p-3 shadow-[0_10px_24px_rgba(0,0,0,0.2)]">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <p className="text-sm font-semibold text-[#555555]">วันที่</p>
-              <p className="mt-1 text-xl font-bold text-[#111111]">{now.toLocaleDateString("th-TH")}</p>
+              <p className="text-sm font-semibold text-[#555555]">{T.date}</p>
+              <p className="mt-1 text-xl font-bold text-[#111111]">{now.toLocaleDateString(dateLocale)}</p>
             </div>
             <div className="text-[2.1rem] font-extrabold leading-none text-[#111111]">
               {now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })}
@@ -467,13 +671,13 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
         </section>
 
         <section className="mt-3 rounded-2xl border border-[#FECACA] bg-white p-3 shadow-sm">
-          <h3 className="mb-2 text-base font-bold text-[#111111]">พื้นที่ทำงาน</h3>
+          <h3 className="mb-2 text-base font-bold text-[#111111]">{T.workplace}</h3>
           <select
             value={selectedWorkArea}
             onChange={(e) => setSelectedWorkArea(e.target.value)}
             className="w-full rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-base text-[#111111]"
           >
-            <option value="">เลือกพื้นที่</option>
+            <option value="">{T.selectArea}</option>
             {areaOptions.map((item, idx) => {
               const label = item.name || item.location_name || item.area_name || `Area ${idx + 1}`;
               const value = item.id || label;
@@ -485,11 +689,11 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
         </section>
 
         <section className="mt-3 rounded-2xl border border-[#FECACA] bg-white p-3 shadow-sm">
-          <h3 className="mb-2 text-base font-bold text-[#111111]">สถานะ GPS</h3>
+          <h3 className="mb-2 text-base font-bold text-[#111111]">{T.gpsStatus}</h3>
           <div className="rounded-xl border border-[#FECACA] bg-white p-3 text-sm text-[#444444]">
-            <p><span className="font-semibold">สถานะ:</span> {statusLabel}</p>
-            <p className="mt-1"><span className="font-semibold">จุดใกล้สุด:</span> {locationCheck?.nearest?.name || selectedWorkArea || "-"}</p>
-            <p className="mt-1"><span className="font-semibold">พิกัด:</span> {gps ? `${gps.latitude.toFixed(6)}, ${gps.longitude.toFixed(6)}` : "-"}</p>
+            <p><span className="font-semibold">{T.statusLabel}:</span> {statusLabel}</p>
+            <p className="mt-1"><span className="font-semibold">{T.nearest}:</span> {locationCheck?.nearest?.name || selectedWorkArea || "-"}</p>
+            <p className="mt-1"><span className="font-semibold">{T.coords}:</span> {gps ? `${gps.latitude.toFixed(6)}, ${gps.longitude.toFixed(6)}` : "-"}</p>
           </div>
 
           <div className="mt-3 overflow-hidden rounded-xl border border-[#FECACA]">
@@ -497,7 +701,7 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
               <iframe title="scan-map" src={mapSrc} className="h-36 w-full" />
             ) : (
               <div className="flex h-36 items-center justify-center bg-[#FEF2F2] text-sm text-[#555555]">
-                กรุณาตรวจสอบตำแหน่ง GPS
+                {T.mapPlaceholder}
               </div>
             )}
           </div>
@@ -505,7 +709,7 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
           {gpsError ? <p className="mt-2 text-sm text-red-600">{gpsError}</p> : null}
           {locationCheck?.suspicious_reasons?.length ? (
             <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800">
-              พบความผิดปกติ: {locationCheck.suspicious_reasons.join(", ")}
+              {T.suspicious}: {locationCheck.suspicious_reasons.join(", ")}
             </p>
           ) : null}
         </section>
@@ -515,15 +719,15 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
           onClick={() => void refreshGps()}
           className="mt-3 w-full rounded-xl bg-gradient-to-b from-[#DC2626] to-[#991B1B] py-3 text-[1.2rem] font-extrabold text-white shadow-[0_8px_14px_rgba(220,38,38,0.3)] transition hover:brightness-105 active:translate-y-[1px]"
         >
-          ตรวจสอบตำแหน่ง GPS
+          {T.refreshGps}
         </button>
 
         <section className="mt-3 rounded-2xl border border-[#FECACA] bg-white p-3 shadow-sm">
-          <h3 className="mb-2 text-base font-bold text-[#111111]">ลงเวลาล่าสุด</h3>
+          <h3 className="mb-2 text-base font-bold text-[#111111]">{T.latestScan}</h3>
           <div className="rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-base text-[#444444]">
             {latestRecord
-              ? `${latestRecord.type === "scan_out" ? "สแกนออก" : "สแกนเข้า"} ${new Date(latestRecord.time).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })}`
-              : "ยังไม่มีประวัติในวันนี้"}
+              ? `${latestRecord.type === "scan_out" ? T.scanOut : T.scanIn} ${new Date(latestRecord.time).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })}`
+              : T.noHistory}
           </div>
         </section>
 
@@ -535,16 +739,16 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
               checked={cameraEnabled}
               onChange={(e) => setCameraEnabled(e.target.checked)}
             />
-            <label htmlFor="camera-optional">เปิดกล้องเพื่อแนบรูปถ่าย (ไม่บังคับ)</label>
+            <label htmlFor="camera-optional">{T.faceOptional}</label>
           </div>
-          <p className="mt-1 text-xs text-[#555555]">ถ้าเปิดกล้อง ให้กดถ่ายรูปก่อนสแกนเพื่อแนบหลักฐาน</p>
+          <p className="mt-1 text-xs text-[#555555]">{T.faceNote}</p>
 
           {cameraEnabled ? (
             <div className="mt-2 space-y-2 rounded-xl border border-[#FECACA] bg-white p-3">
               <video ref={videoRef} className="max-h-64 w-full rounded-lg bg-black" muted playsInline />
               <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={takeSelfie} className="rounded-lg border border-[#DC2626] px-3 py-1.5 text-sm text-[#DC2626]">ถ่ายรูป</button>
-                <button type="button" onClick={() => setSelfieDataUrl(null)} className="rounded-lg border border-[#FECACA] px-3 py-1.5 text-sm text-[#444444]">ถ่ายใหม่</button>
+                <button type="button" onClick={takeSelfie} className="rounded-lg border border-[#DC2626] px-3 py-1.5 text-sm text-[#DC2626]">{T.captureSelfie}</button>
+                <button type="button" onClick={() => setSelfieDataUrl(null)} className="rounded-lg border border-[#FECACA] px-3 py-1.5 text-sm text-[#444444]">{T.retakeSelfie}</button>
               </div>
               {selfieDataUrl ? <img src={selfieDataUrl} alt="selfie-preview" className="h-36 w-36 rounded-lg border border-[#FECACA] object-cover" /> : null}
               {cameraError ? <p className="text-xs text-red-600">{cameraError}</p> : null}
@@ -562,7 +766,7 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
               : "bg-gradient-to-b from-[#DC2626] to-[#991B1B] shadow-[0_10px_16px_rgba(220,38,38,0.32)]"
           }`}
         >
-          {busy ? "กำลังบันทึก..." : suggestedAction === "scan_out" ? "สแกนออก" : "สแกนเข้า"}
+          {busy ? T.scanning : suggestedAction === "scan_out" ? T.scanOut : T.scanIn}
         </button>
 
         {feedback.message ? (
@@ -573,12 +777,12 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
 
         {todayData.history?.length ? (
           <section className="mt-3 rounded-2xl border border-[#FECACA] bg-white p-3 shadow-[0_10px_24px_rgba(0,0,0,0.2)]">
-            <h2 className="mb-2 text-sm font-bold text-[#111111]">ประวัติวันนี้</h2>
+            <h2 className="mb-2 text-sm font-bold text-[#111111]">{T.todayHistory}</h2>
             <div className="space-y-2">
               {todayData.history.map((item: { type: string; time: string }, idx: number) => (
                 <div key={`${item.type}-${idx}`} className="rounded-lg border border-[#FECACA] p-2 text-sm text-[#444444]">
-                  <p className="font-semibold">{item.type === "scan_in" ? "สแกนเข้า" : "สแกนออก"}</p>
-                  <p>เวลา: {new Date(item.time).toLocaleString("th-TH")}</p>
+                  <p className="font-semibold">{item.type === "scan_in" ? T.scanIn : T.scanOut}</p>
+                  <p>{T.timeLabel}: {new Date(item.time).toLocaleString(dateLocale)}</p>
                 </div>
               ))}
             </div>
