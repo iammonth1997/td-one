@@ -36,7 +36,7 @@ export async function GET(req) {
     }
 
     const { data: work, error: workError } = await supabaseServer
-      .from("td_attendance_monthly")
+      .from("attendance_monthly")
       .select("*")
       .eq("emp_id", emp_id)
       .eq("month", Number(month))
