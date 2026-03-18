@@ -1,9 +1,98 @@
+import { useEffect, useState } from "react";
 import { Link, redirect } from "react-router";
 import type { Route } from "./+types/dashboard";
 import { canManagePinReset } from "~/lib/role-access.server";
 import { getSupabaseServerClient } from "~/lib/supabase.server";
 import { sessionTokenCookie } from "~/lib/session-cookie.server";
 import { validateSession } from "~/lib/session-validation.server";
+
+type LangCode = "th" | "en" | "lo";
+
+const DASHBOARD_I18N: Record<LangCode, {
+  welcome: string;
+  empId: string;
+  role: string;
+  context: string;
+  servicesTitle: string;
+  dayWork: string;
+  dayWorkDesc: string;
+  changePin: string;
+  changePinDesc: string;
+  scanInOut: string;
+  scanInOutDesc: string;
+  requestMenu: string;
+  requestMenuDesc: string;
+  slip: string;
+  slipDesc: string;
+  admin: string;
+  adminDesc: string;
+  forgotPinHr: string;
+  logout: string;
+}> = {
+  th: {
+    welcome: "ยินดีต้อนรับ",
+    empId: "รหัสพนักงาน",
+    role: "บทบาท",
+    context: "บริบท",
+    servicesTitle: "บริการ",
+    dayWork: "ดูข้อมูลงานประจำวัน",
+    dayWorkDesc: "ดูสรุปการทำงานรายวัน",
+    changePin: "เปลี่ยน PIN",
+    changePinDesc: "อัปเดต PIN ปัจจุบัน",
+    scanInOut: "สแกนเข้า/ออกงาน",
+    scanInOutDesc: "ลงเวลางานด้วย GPS และอุปกรณ์ที่ผูกไว้",
+    requestMenu: "ศูนย์คำขอ",
+    requestMenuDesc: "ยื่นคำขอ OT และคำขออื่น",
+    slip: "สลิปเงินเดือน",
+    slipDesc: "ดูสลิปเงินเดือนและโอที",
+    admin: "ผู้ดูแลระบบ",
+    adminDesc: "เครื่องมือและการตั้งค่าผู้ดูแล",
+    forgotPinHr: "ลืม PIN (HR)",
+    logout: "ออกจากระบบ",
+  },
+  en: {
+    welcome: "Welcome",
+    empId: "Employee ID",
+    role: "Role",
+    context: "Context",
+    servicesTitle: "Services",
+    dayWork: "Check Day Work",
+    dayWorkDesc: "View daily work summary",
+    changePin: "Change PIN",
+    changePinDesc: "Update your current PIN",
+    scanInOut: "Scan In/Out",
+    scanInOutDesc: "Clock in/out with GPS and bound device",
+    requestMenu: "Request Center",
+    requestMenuDesc: "Submit OT and other requests",
+    slip: "Salary & OT Slip",
+    slipDesc: "View salary and OT slip information",
+    admin: "Admin",
+    adminDesc: "Admin tools and settings",
+    forgotPinHr: "Forgot PIN (HR)",
+    logout: "Logout",
+  },
+  lo: {
+    welcome: "ຍິນດີຕ້ອນຮັບ",
+    empId: "ລະຫັດພະນັກງານ",
+    role: "ບົດບາດ",
+    context: "ບໍລິບົດ",
+    servicesTitle: "ບໍລິການ",
+    dayWork: "ກວດສອບວັນງານ",
+    dayWorkDesc: "ເບິ່ງສະຫຼຸບການເຮັດວຽກປະຈຳວັນ",
+    changePin: "ປ່ຽນ PIN",
+    changePinDesc: "ອັບເດດ PIN ປັດຈຸບັນ",
+    scanInOut: "ສະແກນເຂົ້າ/ອອກ",
+    scanInOutDesc: "ລົງເວລາດ້ວຍ GPS ແລະ ອຸປະກອນທີ່ຜູກໄວ້",
+    requestMenu: "ສູນຄຳຂໍ",
+    requestMenuDesc: "ຍື່ນຄຳຂໍ OT ແລະ ຄຳຂໍອື່ນ",
+    slip: "ສລິບເງິນເດືອນ & OT",
+    slipDesc: "ເບິ່ງສລິບເງິນເດືອນ ແລະ OT",
+    admin: "ແອດມິນ",
+    adminDesc: "ເຄື່ອງມື ແລະ ການຕັ້ງຄ່າແອດມິນ",
+    forgotPinHr: "ລືມ PIN (HR)",
+    logout: "ອອກຈາກລະບົບ",
+  },
+};
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const { session, error } = await validateSession(request, context);
@@ -47,13 +136,27 @@ export async function action() {
 }
 
 export default function DashboardPage({ loaderData }: Route.ComponentProps) {
+  const [lang, setLang] = useState<LangCode>("th");
   const displayName = `${loaderData.first_name || ""} ${loaderData.last_name || ""}`.trim() || loaderData.emp_id;
+  const T = DASHBOARD_I18N[lang];
+
+  useEffect(() => {
+    const saved = localStorage.getItem("tdone_lang");
+    if (saved === "th" || saved === "en" || saved === "lo") {
+      setLang(saved);
+    }
+  }, []);
+
+  function changeLanguage(next: LangCode) {
+    setLang(next);
+    localStorage.setItem("tdone_lang", next);
+  }
 
   const services = [
     {
       key: "day-work",
-      title: "Day Work",
-      description: "View attendance summary by month",
+      title: T.dayWork,
+      description: T.dayWorkDesc,
       href: "/day-work",
       icon: (
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -68,8 +171,8 @@ export default function DashboardPage({ loaderData }: Route.ComponentProps) {
     },
     {
       key: "change-pin",
-      title: "Change PIN",
-      description: "Update your current PIN",
+      title: T.changePin,
+      description: T.changePinDesc,
       href: "/change-pin",
       icon: (
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -82,8 +185,8 @@ export default function DashboardPage({ loaderData }: Route.ComponentProps) {
     },
     {
       key: "scan",
-      title: "Scan In/Out",
-      description: "Scan attendance with GPS location verification",
+      title: T.scanInOut,
+      description: T.scanInOutDesc,
       href: "/scan",
       icon: (
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -96,8 +199,8 @@ export default function DashboardPage({ loaderData }: Route.ComponentProps) {
     },
     {
       key: "request",
-      title: "Request Module",
-      description: "Leave / OT / Time correction requests",
+      title: T.requestMenu,
+      description: T.requestMenuDesc,
       href: "/request",
       icon: (
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -111,8 +214,8 @@ export default function DashboardPage({ loaderData }: Route.ComponentProps) {
     },
     {
       key: "slip",
-      title: "Slip Module",
-      description: "Salary and OT slip information",
+      title: T.slip,
+      description: T.slipDesc,
       href: "/slip",
       icon: (
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -125,8 +228,8 @@ export default function DashboardPage({ loaderData }: Route.ComponentProps) {
     },
     {
       key: "admin",
-      title: "Admin",
-      description: "Admin tools and settings",
+      title: T.admin,
+      description: T.adminDesc,
       href: "/admin",
       icon: (
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -142,22 +245,40 @@ export default function DashboardPage({ loaderData }: Route.ComponentProps) {
     <div className="min-h-screen bg-white px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-5xl space-y-6">
         <div className="relative overflow-hidden rounded-2xl border border-[#FECACA] bg-gradient-to-br from-[#450A0A] via-[#991B1B] to-[#DC2626] p-6 text-white shadow-[0_12px_32px_rgba(220,38,38,0.16)] sm:p-8">
-          <h1 className="text-2xl font-bold sm:text-3xl">Welcome, {displayName}</h1>
+          <div className="flex items-start justify-between gap-3">
+            <h1 className="text-2xl font-bold sm:text-3xl">{T.welcome}, {displayName}</h1>
+            <div className="flex items-center gap-1">
+              {(["th", "en", "lo"] as LangCode[]).map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => changeLanguage(code)}
+                  className={`rounded-full border px-2 py-1 text-[10px] font-bold transition ${
+                    lang === code
+                      ? "border-white bg-white text-[#991B1B]"
+                      : "border-white/40 bg-white/10 text-white"
+                  }`}
+                >
+                  {code.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="mt-3 grid gap-1 text-sm text-white/90">
             <p>
-              Employee ID: <span className="font-semibold text-white">{loaderData.emp_id}</span>
+              {T.empId}: <span className="font-semibold text-white">{loaderData.emp_id}</span>
             </p>
             <p>
-              Role: <span className="font-semibold text-white">{loaderData.role}</span>
+              {T.role}: <span className="font-semibold text-white">{loaderData.role}</span>
             </p>
             <p>
-              Context: <span className="font-semibold text-white">{loaderData.login_context}</span>
+              {T.context}: <span className="font-semibold text-white">{loaderData.login_context}</span>
             </p>
           </div>
         </div>
 
         <div>
-          <h2 className="mb-4 text-xl font-bold text-[#111111]">Services</h2>
+          <h2 className="mb-4 text-xl font-bold text-[#111111]">{T.servicesTitle}</h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {services.map((service) => (
               <Link
@@ -194,18 +315,18 @@ export default function DashboardPage({ loaderData }: Route.ComponentProps) {
               to="/forgot-pin"
               className="rounded-lg border border-[#FECACA] bg-[#FEF2F2] px-4 py-2 text-sm font-medium text-[#991B1B] hover:bg-[#FEE2E2]"
             >
-              Forgot PIN (HR)
+              {T.forgotPinHr}
             </Link>
           )}
           <Link
             to="/change-pin"
             className="rounded-lg border border-[#FECACA] bg-[#FEF2F2] px-4 py-2 text-sm font-medium text-[#991B1B] hover:bg-[#FEE2E2]"
           >
-            Change PIN
+            {T.changePin}
           </Link>
           <form method="post">
             <button type="submit" className="rounded-lg bg-[#DC2626] px-4 py-2 text-sm font-semibold text-white hover:bg-[#991B1B]">
-              Logout
+              {T.logout}
             </button>
           </form>
         </div>
