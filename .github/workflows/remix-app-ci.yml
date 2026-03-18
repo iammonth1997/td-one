@@ -1,0 +1,46 @@
+name: Remix App CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "remix-app/**"
+      - ".github/workflows/remix-app-ci.yml"
+  pull_request:
+    paths:
+      - "remix-app/**"
+      - ".github/workflows/remix-app-ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: remix-app-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck-and-build:
+    name: Typecheck and Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: remix-app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: remix-app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
