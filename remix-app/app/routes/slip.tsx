@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Link, redirect } from "react-router";
+import { Link, redirect, useSearchParams } from "react-router";
 import type { Route } from "./+types/slip";
 import { validateSession } from "~/lib/session-validation.server";
 
@@ -148,6 +148,7 @@ type SlipData = {
 
 export default function SlipPage(_props: Route.ComponentProps) {
   const now = new Date();
+  const [searchParams] = useSearchParams();
   const [lang, setLang] = useState<LangCode>("th");
   const [tab, setTab] = useState<"salary" | "ot">("salary");
   const [year, setYear] = useState(now.getFullYear());
@@ -167,6 +168,24 @@ export default function SlipPage(_props: Route.ComponentProps) {
       setLang(saved);
     }
   }, []);
+
+  useEffect(() => {
+    const tabQuery = searchParams.get("tab");
+    const yearQuery = Number(searchParams.get("year"));
+    const monthQuery = Number(searchParams.get("month"));
+
+    if (tabQuery === "salary" || tabQuery === "ot") {
+      setTab(tabQuery);
+    }
+
+    if (Number.isFinite(yearQuery) && yearQuery >= 2020 && yearQuery <= 2100) {
+      setYear(yearQuery);
+    }
+
+    if (Number.isFinite(monthQuery) && monthQuery >= 1 && monthQuery <= 12) {
+      setMonth(monthQuery);
+    }
+  }, [searchParams]);
 
   function changeLanguage(next: LangCode) {
     setLang(next);
