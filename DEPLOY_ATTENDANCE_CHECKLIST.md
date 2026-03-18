@@ -23,25 +23,40 @@
 
 ## B) What you must do (outside code)
 
-### 1) Vercel environment variables (Production)
+### 1) Production environment variables (Vercel or Cloudflare)
 
-Set these in Vercel Project Settings -> Environment Variables:
+Set these in your deployment platform:
 
 - `NEXT_PUBLIC_APP_BASE_URL=https://tdone-erp.com`
 - `NEXT_PUBLIC_LIFF_ID=2009413188-4647l7eA`
 - `LINE_LOGIN_CHANNEL_ID=2009413188`
 - `ATTENDANCE_ALLOW_DEV_WITHOUT_LIFF=false`
+- `CRON_SECRET=<strong-random-secret>`
 - Keep existing Supabase variables unchanged.
 
-### 2) Deploy to Vercel
+### 2) Deploy
 
-Run in repo root:
+#### Option A: Vercel
 
 ```bash
 git add .
 git commit -m "feat(attendance): add scan in/out module with GPS, device binding, admin location/device tools"
 git push origin main
 ```
+
+#### Option B: Cloudflare Workers (OpenNext)
+
+```bash
+npm install
+npx wrangler login
+npm run cf:build
+npm run cf:deploy
+```
+
+If you use Cloudflare, also configure a scheduler to call:
+
+- `GET /api/cron/cleanup-cancelled-leave-files`
+- with header `Authorization: Bearer <CRON_SECRET>`
 
 ### 3) LINE Developers check
 

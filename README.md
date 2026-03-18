@@ -92,7 +92,37 @@ npm run build      # Build for production
 npm run test       # Run unit tests (vitest)
 npm run test:smoke # Smoke test against running server (requires npm run dev)
 npm run lint       # Run ESLint
+npm run cf:build   # Build OpenNext output for Cloudflare
+npm run cf:preview # Preview Cloudflare worker locally
+npm run cf:deploy  # Deploy to Cloudflare Workers
 ```
+
+## Deploy on Cloudflare
+
+This project can be deployed to Cloudflare Workers using OpenNext.
+
+1. Install dependencies:
+  ```bash
+  npm install
+  ```
+2. Authenticate Wrangler:
+  ```bash
+  npx wrangler login
+  ```
+3. Build and preview:
+  ```bash
+  npm run cf:build
+  npm run cf:preview
+  ```
+4. Deploy:
+  ```bash
+  npm run cf:deploy
+  ```
+
+Notes:
+- Worker config is in `wrangler.jsonc`.
+- Production secrets must be set in Cloudflare (`Workers & Pages -> Variables and Secrets`).
+- The cleanup cron route (`/api/cron/cleanup-cancelled-leave-files`) still requires a scheduler setup outside `vercel.json` when running on Cloudflare.
 
 ## Project Structure
 

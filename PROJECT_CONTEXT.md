@@ -3,7 +3,7 @@
 ## 1) Project Overview
 - Name: TD One ERP
 - Stack: Next.js App Router + Supabase
-- Deploy: Vercel (Production) + Cloudflare domain
+- Deploy: Vercel (current production) or Cloudflare Workers via OpenNext
 - Auth Model: Custom PIN login with server-side sessions table
 
 ## 2) Core Security Rules
@@ -59,6 +59,8 @@
 - If login/route fails on production, verify missing tracked files on `main` first.
 - Always run `npm run build` before pushing production fixes.
 - For Vercel failures, read first red build error line and fix incrementally.
+- For Cloudflare deployment, use `npm run cf:build` before `npm run cf:deploy`.
+- Cron cleanup endpoint needs scheduler setup outside `vercel.json` when running on Cloudflare.
 
 ## 10) New Chat Bootstrap Prompt
 Use this at the start of a new chat:

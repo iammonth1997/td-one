@@ -7,6 +7,9 @@
     "dev:turbo": "next dev",
     "build": "next build",
     "start": "next start",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:preview": "opennextjs-cloudflare preview",
+    "cf:deploy": "opennextjs-cloudflare deploy",
     "lint": "eslint",
     "seed:rbac": "node scripts/seed-rbac.mjs",
     "seed:rbac:apply": "node scripts/seed-rbac.mjs --apply",
@@ -35,6 +38,8 @@
     "jsdom": "^26.0.0",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "wrangler": "^4.40.0",
+    "@opennextjs/cloudflare": "^1.8.0"
   }
 }

@@ -5,7 +5,7 @@
 
 ## Latest Known Good Direction
 - Main branch has ongoing auth hardening and HR reset controls.
-- Deployment workflow is GitHub -> Vercel Production.
+- Deployment workflow supports either GitHub -> Vercel Production or Cloudflare Workers (OpenNext).
 
 ## Recent Feature Work (Summary)
 - Improved login performance and timing instrumentation.
@@ -17,12 +17,13 @@
 - Added admin audit UI page for PIN reset records.
 
 ## Critical Production Checklist
-1. Ensure Vercel deployment for latest commit is `Ready`.
+1. Ensure deployment for latest commit is `Ready` (Vercel or Cloudflare).
 2. Apply migrations in Supabase production:
    - `004_add_login_performance_indexes.sql`
    - `005_create_pin_reset_audit.sql`
    - `006_add_temp_pin_controls.sql`
-3. Smoke test:
+3. If using Cloudflare, ensure scheduler is configured for `/api/cron/cleanup-cancelled-leave-files` with `CRON_SECRET`.
+4. Smoke test:
    - Login success
    - Dashboard loads
    - Daywork route works
