@@ -4,6 +4,7 @@
   "compatibility_date": "2025-04-04",
   "compatibility_flags": ["nodejs_compat"],
   "main": "./workers/app.ts",
+  "workers_dev": true,
   "vars": {
     "NEXT_PUBLIC_APP_BASE_URL": "https://tdone-erp.com",
     "NEXT_PUBLIC_LIFF_ID": "2009413188-4647l7eA",
