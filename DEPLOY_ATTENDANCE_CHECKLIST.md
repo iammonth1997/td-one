@@ -44,7 +44,7 @@ git commit -m "feat(attendance): add scan in/out module with GPS, device binding
 git push origin main
 ```
 
-#### Option B: Cloudflare Workers (OpenNext)
+#### Option B: Cloudflare Workers (Remix runtime)
 
 ```bash
 npm install

@@ -1,6 +1,6 @@
 # TDOne Remix App (Cloudflare)
 
-Employee portal migration from Next.js to React Router/Remix runtime, deployed on Cloudflare Workers.
+Employee portal built on React Router/Remix runtime, deployed on Cloudflare Workers.
 
 ## Local Development
 

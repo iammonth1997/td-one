@@ -5,7 +5,7 @@
 
 ## Latest Known Good Direction
 - Main branch has ongoing auth hardening and HR reset controls.
-- Deployment workflow supports either GitHub -> Vercel Production or Cloudflare Workers (OpenNext).
+- Deployment workflow uses Remix app runtime (`remix-app`) on Cloudflare Workers.
 
 ## Recent Feature Work (Summary)
 - Improved login performance and timing instrumentation.

@@ -1,6 +1,6 @@
 # TD One ERP
 
-Human Resource System for ThaiDrill Lao — built with Next.js 16 + Supabase.
+Human Resource System for ThaiDrill Lao — built with Remix (React Router 7) + Supabase.
 
 ## Features
 
@@ -14,7 +14,7 @@ Human Resource System for ThaiDrill Lao — built with Next.js 16 + Supabase.
 
 | Layer | Technology |
 |-------|-----------|
-| Framework | Next.js 16 (App Router) |
+| Framework | Remix / React Router 7 |
 | Database | Supabase (PostgreSQL) |
 | Auth | Custom PIN + bcryptjs |
 | Styling | Tailwind CSS v4 |
@@ -92,14 +92,14 @@ npm run build      # Build for production
 npm run test       # Run unit tests (vitest)
 npm run test:smoke # Smoke test against running server (requires npm run dev)
 npm run lint       # Run ESLint
-npm run cf:build   # Build OpenNext output for Cloudflare
+npm run cf:build   # Build Remix app for Cloudflare
 npm run cf:preview # Preview Cloudflare worker locally
 npm run cf:deploy  # Deploy to Cloudflare Workers
 ```
 
 ## Deploy on Cloudflare
 
-This project can be deployed to Cloudflare Workers using OpenNext.
+This project deploys to Cloudflare Workers via the Remix app in `remix-app`.
 
 1. Install dependencies:
   ```bash
@@ -120,25 +120,21 @@ This project can be deployed to Cloudflare Workers using OpenNext.
   ```
 
 Notes:
-- Worker config is in `wrangler.jsonc`.
+- Worker config is in `remix-app/wrangler.jsonc`.
 - Production secrets must be set in Cloudflare (`Workers & Pages -> Variables and Secrets`).
 - The cleanup cron route (`/api/cron/cleanup-cancelled-leave-files`) still requires a scheduler setup outside `vercel.json` when running on Cloudflare.
 
 ## Project Structure
 
 ```
-app/
-  api/login/          # POST /api/login — PIN authentication
-  api/login/set-pin/  # POST /api/login/set-pin — first-time PIN setup
-  components/         # Header, Sidebar (shared UI)
-  dashboard/          # Protected dashboard page
-  login/              # Login page
-  set-pin/            # PIN setup page
+remix-app/
+  app/                # Remix routes, UI, and app runtime
+  workers/            # Cloudflare worker entry
+server/
+  api/                # Legacy API handlers bridged by Remix routes
 lib/
-  supabaseClient.js   # Browser Supabase client
-  supabaseServer.js   # Server Supabase client (service role)
+  *.js                # Shared server/domain utilities
 tests/
   api/                # Unit tests for API route handlers
-  components/         # Component render tests
   smoke.js            # End-to-end smoke test
 ```

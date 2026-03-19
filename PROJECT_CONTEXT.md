@@ -2,8 +2,8 @@
 
 ## 1) Project Overview
 - Name: TD One ERP
-- Stack: Next.js App Router + Supabase
-- Deploy: Vercel (current production) or Cloudflare Workers via OpenNext
+- Stack: Remix (React Router 7) + Supabase
+- Deploy: Cloudflare Workers via `remix-app` (primary), Vercel used for cron config only when needed
 - Auth Model: Custom PIN login with server-side sessions table
 
 ## 2) Core Security Rules
@@ -59,7 +59,7 @@
 - If login/route fails on production, verify missing tracked files on `main` first.
 - Always run `npm run build` before pushing production fixes.
 - For Vercel failures, read first red build error line and fix incrementally.
-- For Cloudflare deployment, use `npm run cf:build` before `npm run cf:deploy`.
+- For Cloudflare deployment, use `npm run cf:build` and `npm run cf:deploy` from repo root (delegates to `remix-app`).
 - Cron cleanup endpoint needs scheduler setup outside `vercel.json` when running on Cloudflare.
 
 ## 10) New Chat Bootstrap Prompt
