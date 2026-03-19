@@ -16,8 +16,8 @@ export default function SetPinPage() {
     setError("");
     setSuccess("");
 
-    if (pin.length < 4) {
-      setError("PIN must be at least 4 digits.");
+    if (!/^\d{6}$/.test(pin)) {
+      setError("PIN must be exactly 6 digits.");
       return;
     }
 
@@ -39,12 +39,13 @@ export default function SetPinPage() {
       if (!res.ok) {
         if (data.error === "EMPLOYEE_NOT_FOUND") setError("Employee not found.");
         else if (data.error === "INVALID_DOB") setError("Date of birth is incorrect.");
+        else if (data.error === "INVALID_PIN_FORMAT") setError("Password must be 12-128 characters.");
         else if (data.error === "ACCOUNT_BLOCKED") setError("Account is blocked.");
-        else setError(data.error || "Unable to set PIN.");
+        else setError(data.error || "Unable to set password.");
         return;
       }
 
-      setSuccess("PIN set successfully. Redirecting to login...");
+      setSuccess("Password set successfully. Redirecting to login...");
       setTimeout(() => navigate("/login"), 1000);
     } catch {
       setError("Network error. Please try again.");
@@ -56,7 +57,7 @@ export default function SetPinPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-white px-4">
       <div className="w-full max-w-sm rounded-[1rem] border border-[#FECACA] bg-white p-8 shadow-[0_4px_24px_rgba(220,38,38,0.10)]">
-        <h1 className="mb-6 text-center text-2xl font-bold text-[#111111]">Set PIN</h1>
+        <h1 className="mb-6 text-center text-2xl font-bold text-[#111111]">Set Password</h1>
 
         <label className="text-sm font-medium text-[#555555]">Employee ID</label>
         <input
@@ -77,23 +78,24 @@ export default function SetPinPage() {
           disabled={loading}
         />
 
-        <label className="text-sm font-medium text-[#555555]">PIN</label>
+        <label className="text-sm font-medium text-[#555555]">Password</label>
         <input
           type="password"
           value={pin}
           onChange={(e) => setPin(e.target.value)}
           className="mb-4 mt-1 w-full rounded-xl border border-[#FECACA] bg-white p-2.5 text-[#111111] placeholder:text-[#777777] focus:border-[#DC2626] focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
-          placeholder="At least 4 digits"
+          placeholder="12+ characters"
           disabled={loading}
         />
+        <p className="mb-3 text-xs text-[#666666]">Min 12 characters. Use mix of letters, numbers, symbols.</p>
 
-        <label className="text-sm font-medium text-[#555555]">Confirm PIN</label>
+        <label className="text-sm font-medium text-[#555555]">Confirm Password</label>
         <input
           type="password"
           value={confirmPin}
           onChange={(e) => setConfirmPin(e.target.value)}
           className="mb-4 mt-1 w-full rounded-xl border border-[#FECACA] bg-white p-2.5 text-[#111111] placeholder:text-[#777777] focus:border-[#DC2626] focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
-          placeholder="Confirm PIN"
+          placeholder="Confirm password"
           disabled={loading}
         />
 
@@ -108,7 +110,7 @@ export default function SetPinPage() {
           disabled={loading}
           className="mt-2 w-full rounded-xl bg-[#DC2626] py-2.5 font-semibold text-white shadow-[0_10px_24px_rgba(220,38,38,0.25)] transition hover:bg-[#991B1B] disabled:opacity-50"
         >
-          {loading ? "Saving..." : "Set PIN"}
+          {loading ? "Saving..." : "Set Password"}
         </button>
 
         <p className="mt-4 text-center text-xs text-[#555555]">

@@ -1,12 +1,13 @@
 import { createCookie } from "react-router";
 
-const SESSION_COOKIE_MAX_AGE = 60 * 60 * 8;
+// 30-day session per device-trust architecture (user logs in once per device)
+const SESSION_COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
 
 export const sessionTokenCookie = createCookie("tdone_session_token", {
   httpOnly: true,
   sameSite: "lax",
   path: "/",
-  secure: false,
+  secure: true,
   maxAge: SESSION_COOKIE_MAX_AGE,
 });
 

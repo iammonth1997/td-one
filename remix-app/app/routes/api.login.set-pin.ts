@@ -1,7 +1,8 @@
-﻿import bcrypt from "bcryptjs";
-import type { ActionFunctionArgs } from "react-router";
+﻿import type { ActionFunctionArgs } from "react-router";
 import { clearFailedAttempts, checkRateLimit, recordLoginAttempt } from "~/lib/rate-limit.server";
 import { getSupabaseServerClient } from "~/lib/supabase.server";
+import { validatePasswordPolicy, hashPassword } from "~/lib/password.server";
+import { writeAuditLog, AuditEvent } from "~/lib/audit-log.server";
 
 function json(data: unknown, init?: ResponseInit) {
   return new Response(JSON.stringify(data), {
@@ -23,13 +24,25 @@ export async function action({ request, context }: ActionFunctionArgs) {
     );
   }
 
-  const body = (await request.json()) as { emp_id?: string; date_of_birth?: string; pin?: string };
-  const empId = String(body.emp_id || "").trim().toUpperCase();
-  const dob = String(body.date_of_birth || "").trim();
-  const rawPin = String(body.pin || "").trim();
+  const body = (await request.json().catch(() => null)) as {
+    emp_id?: string;
+    date_of_birth?: string;
+    pin?: string;
+    password?: string;
+  } | null;
+  const empId = String(body?.emp_id || "").trim().toUpperCase();
+  const dob = String(body?.date_of_birth || "").trim();
+  // Accept "password" (new) or "pin" (old) field
+  const rawPassword = String(body?.password || body?.pin || "").trim();
 
-  if (!empId || !dob || !rawPin) {
+  if (!empId || !dob || !rawPassword) {
     return json({ error: "INVALID_INPUT" }, { status: 400 });
+  }
+
+  // Enforce NIST password policy
+  const policyResult = validatePasswordPolicy(rawPassword, empId);
+  if (!policyResult.valid) {
+    return json({ error: policyResult.error || "INVALID_PASSWORD_FORMAT" }, { status: 400 });
   }
 
   const { locked, minutesRemaining } = await checkRateLimit(supabaseServer, empId);
@@ -64,8 +77,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
     return json({ error: "INVALID_DOB" }, { status: 400 });
   }
 
-  const salt = await bcrypt.genSalt(10);
-  const pinHash = await bcrypt.hash(rawPin, salt);
+  const pinHash = await hashPassword(rawPassword);
 
   const { error: upsertError } = await supabaseServer
     .from("login_users")
@@ -73,8 +85,11 @@ export async function action({ request, context }: ActionFunctionArgs) {
       {
         emp_id: empId,
         pin_hash: pinHash,
+        password_changed_at: new Date().toISOString(),
+        password_history: [],
         is_registered: true,
         force_pin_change: false,
+        must_change_password: false,
         temp_pin_expires_at: null,
         temp_pin_issued_at: null,
         temp_pin_issued_by: null,
@@ -89,6 +104,14 @@ export async function action({ request, context }: ActionFunctionArgs) {
   }
 
   await clearFailedAttempts(supabaseServer, empId);
+
+  void writeAuditLog(supabaseServer, {
+    event_type: AuditEvent.PASSWORD_CHANGED,
+    emp_id: empId,
+    ip_address: ip,
+    metadata: { action: "initial_password_set" },
+  });
+
   return json({ success: true }, { status: 200 });
 }
 

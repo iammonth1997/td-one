@@ -1,7 +1,14 @@
-﻿import bcrypt from "bcryptjs";
-import type { ActionFunctionArgs } from "react-router";
+﻿import type { ActionFunctionArgs } from "react-router";
 import { validateSession } from "~/lib/session-validation.server";
 import { getSupabaseServerClient } from "~/lib/supabase.server";
+import {
+  validatePasswordPolicy,
+  hashPassword,
+  verifyPassword,
+  isPasswordReused,
+  buildPasswordHistory,
+} from "~/lib/password.server";
+import { writeAuditLog, AuditEvent } from "~/lib/audit-log.server";
 
 function json(data: unknown, init?: ResponseInit) {
   return new Response(JSON.stringify(data), {
@@ -19,18 +26,28 @@ export async function action({ request, context }: ActionFunctionArgs) {
     return json({ error: authError || "UNAUTHORIZED" }, { status: authStatus || 401 });
   }
 
-  const body = (await request.json()) as { new_pin?: string };
-  const rawPin = String(body.new_pin || "").trim();
+  const body = (await request.json().catch(() => null)) as {
+    current_pin?: string;
+    current_password?: string;
+    new_pin?: string;
+    new_password?: string;
+  } | null;
+  // Accept both old (pin) and new (password) field names
+  const currentPin = String(body?.current_password || body?.current_pin || "").trim();
+  const rawPassword = String(body?.new_password || body?.new_pin || "").trim();
 
-  if (!rawPin || rawPin.length < 4) {
-    return json({ error: "PIN_TOO_SHORT" }, { status: 400 });
+  // Enforce NIST password policy on new password
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
+  const policyResult = validatePasswordPolicy(rawPassword, session.emp_id);
+  if (!policyResult.valid) {
+    return json({ error: policyResult.error || "INVALID_PASSWORD_FORMAT" }, { status: 400 });
   }
 
   const { supabaseServer } = getSupabaseServerClient(context);
 
   const { data: user, error: userError } = await supabaseServer
     .from("login_users")
-    .select("emp_id, force_pin_change, temp_pin_expires_at")
+    .select("emp_id, force_pin_change, temp_pin_expires_at, pin_hash, password_history")
     .eq("emp_id", session.emp_id)
     .maybeSingle();
 
@@ -43,20 +60,39 @@ export async function action({ request, context }: ActionFunctionArgs) {
     return json({ error: "USER_NOT_FOUND" }, { status: 400 });
   }
 
-  if (!user.force_pin_change) {
-    return json({ error: "PIN_CHANGE_NOT_REQUIRED" }, { status: 400 });
+  if (user.force_pin_change) {
+    if (user.temp_pin_expires_at && new Date(user.temp_pin_expires_at) < new Date()) {
+      return json({ error: "TEMP_PIN_EXPIRED" }, { status: 400 });
+    }
+  } else {
+    // Verify current credential (accepts old 6-digit PIN or new long password)
+    if (!currentPin) {
+      return json({ error: "INVALID_CURRENT_PIN" }, { status: 400 });
+    }
+    const currentMatches = user.pin_hash ? await verifyPassword(currentPin, user.pin_hash) : false;
+    if (!currentMatches) {
+      return json({ error: "INVALID_CURRENT_PIN" }, { status: 400 });
+    }
   }
 
-  if (user.temp_pin_expires_at && new Date(user.temp_pin_expires_at) < new Date()) {
-    return json({ error: "TEMP_PIN_EXPIRED" }, { status: 400 });
+  // Check password history (last 3)
+  const existingHistory: string[] = Array.isArray(user.password_history) ? user.password_history : [];
+  const reused = await isPasswordReused(rawPassword, existingHistory);
+  if (reused) {
+    return json({ error: "PASSWORD_RECENTLY_USED" }, { status: 400 });
   }
 
-  const pinHash = await bcrypt.hash(rawPin, 10);
+  const newHash = await hashPassword(rawPassword);
+  const newHistory = buildPasswordHistory(user.pin_hash ?? "", existingHistory);
+
   const { error: updateError } = await supabaseServer
     .from("login_users")
     .update({
-      pin_hash: pinHash,
+      pin_hash: newHash,
+      password_history: newHistory,
+      password_changed_at: new Date().toISOString(),
       force_pin_change: false,
+      must_change_password: false,
       temp_pin_expires_at: null,
       temp_pin_issued_at: null,
       temp_pin_issued_by: null,
@@ -68,6 +104,20 @@ export async function action({ request, context }: ActionFunctionArgs) {
     console.error("change-pin update failed:", updateError.message);
     return json({ error: "UPDATE_FAILED" }, { status: 500 });
   }
+
+  // Revoke all OTHER sessions (force re-login on all other devices after password change)
+  void supabaseServer
+    .from("sessions")
+    .update({ is_active: false })
+    .eq("emp_id", session.emp_id)
+    .neq("id", session.id);
+
+  void writeAuditLog(supabaseServer, {
+    event_type: AuditEvent.PASSWORD_CHANGED,
+    emp_id: session.emp_id,
+    ip_address: ip,
+    metadata: { changed_by: "self" },
+  });
 
   return json({ success: true }, { status: 200 });
 }

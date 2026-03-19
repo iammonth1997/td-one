@@ -1,5 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+function createRateLimitChain() {
+  const chain = {
+    select: vi.fn(() => chain),
+    eq: vi.fn(() => chain),
+    gte: vi.fn(() => chain),
+    order: vi.fn(() => chain),
+    limit: vi.fn(async () => ({ data: [], error: null })),
+    insert: vi.fn(async () => ({ error: null })),
+    delete: vi.fn(() => chain),
+  };
+  return chain;
+}
+
 describe('login API handler', () => {
   let POST;
 
@@ -13,12 +26,23 @@ describe('login API handler', () => {
         select: vi.fn(function () { return mockChain; }),
       };
 
+      const rateLimitChain = createRateLimitChain();
+      const sessionsChain = {
+        insert: vi.fn(async () => ({ error: null })),
+      };
+
       vi.doMock('@/lib/supabaseServer', () => ({
         isServiceRoleEnabled: true,
-        supabaseServer: { from: vi.fn(() => mockChain) },
+        supabaseServer: {
+          from: vi.fn((table) => {
+            if (table === 'login_attempts') return rateLimitChain;
+            if (table === 'sessions') return sessionsChain;
+            return mockChain;
+          }),
+        },
       }));
 
-      const route = await import('../../app/api/login/route.js');
+      const route = await import('../../server/api/login/route.js');
       POST = route.POST;
     });
 
@@ -72,14 +96,25 @@ describe('login API handler', () => {
         select: vi.fn(function () { return empChain; }),
       };
 
+      const rateLimitChain = createRateLimitChain();
+      const sessionsChain = {
+        insert: vi.fn(async () => ({ error: null })),
+      };
+
       vi.doMock('@/lib/supabaseServer', () => ({
         isServiceRoleEnabled: true,
         supabaseServer: {
-          from: vi.fn((table) => table === 'login_users' ? loginChain : empChain),
+          from: vi.fn((table) => {
+            if (table === 'login_users') return loginChain;
+            if (table === 'employees') return empChain;
+            if (table === 'login_attempts') return rateLimitChain;
+            if (table === 'sessions') return sessionsChain;
+            return empChain;
+          }),
         },
       }));
 
-      const route = await import('../../app/api/login/route.js');
+      const route = await import('../../server/api/login/route.js');
       POST = route.POST;
     });
 
@@ -98,3 +133,4 @@ describe('login API handler', () => {
     });
   });
 });
+

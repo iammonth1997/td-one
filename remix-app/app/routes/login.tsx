@@ -29,14 +29,9 @@ export default function LoginPage() {
       };
 
       if (!res.ok) {
-        if (data.error === "USER_NOT_FOUND") setError("Employee ID not found in login users.");
-        else if (data.error === "EMPLOYEE_NOT_FOUND") setError("Employee not found in employees table.");
-        else if (data.error === "INVALID_PIN") {
+        if (data.error === "INVALID_CREDENTIALS") {
           setPinSet(true);
-          setError("Invalid PIN.");
-        } else if (data.error === "PIN_NOT_SET") {
-          setPinSet(false);
-          setError("PIN not set. Please create PIN first.");
+          setError("Invalid Employee ID or PIN.");
         } else if (data.error === "TEMP_PIN_EXPIRED") setError("Temporary PIN expired. Please contact HR.");
         else if (data.error === "ACCOUNT_BLOCKED") setError(`Account blocked (${data.reason || "unknown"}).`);
         else if (data.error === "ACCOUNT_LOCKED") {
@@ -96,14 +91,14 @@ export default function LoginPage() {
           disabled={loading}
         />
 
-        <label className="text-sm font-medium text-[#555555]">PIN</label>
+        <label className="text-sm font-medium text-[#555555]">Password</label>
         <input
           type="password"
           value={pin}
           onChange={(e) => setPin(e.target.value)}
           onKeyDown={handleKeyDown}
           className="mb-4 mt-1 w-full rounded-xl border border-[#FECACA] bg-[#FEF2F2] p-2.5 text-[#111111] placeholder:text-[#777777] focus:border-[#DC2626] focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
-          placeholder="••••"
+          placeholder="••••••••••••"
           disabled={loading}
         />
 
@@ -122,17 +117,17 @@ export default function LoginPage() {
 
         {pinSet !== true && (
           <p className="mt-4 text-center text-xs text-[#555555]">
-            Don&apos;t have PIN?{" "}
+            Don&apos;t have a password?{" "}
             <Link to="/set-pin" className="font-medium text-[#DC2626] hover:text-[#991B1B]">
-              Set PIN
+              Set Password
             </Link>
           </p>
         )}
 
         <p className={`text-center text-xs text-[#555555] ${pinSet !== true ? "mt-2" : "mt-4"}`}>
-          Need HR to reset employee PIN?{" "}
+          Need HR to reset your password?{" "}
           <Link to="/forgot-pin" className="font-medium text-[#DC2626] hover:text-[#991B1B]">
-            Forgot PIN
+            Reset Password
           </Link>
         </p>
       </div>

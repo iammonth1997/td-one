@@ -37,19 +37,29 @@ export async function action({ request, context }: ActionFunctionArgs) {
     return json({ error: "FORBIDDEN" }, { status: 403 });
   }
 
-  const body = (await request.json()) as { token?: string; new_pin?: string };
-  const rawToken = String(body.token || "").trim();
-  const rawPin = String(body.new_pin || "").trim();
+  const body = (await request.json().catch(() => null)) as { token?: string; new_pin?: string } | null;
+  const rawToken = String(body?.token || "").trim();
+  const rawPin = String(body?.new_pin || "").trim();
 
   if (!rawToken || !rawPin) {
     return json({ error: "INVALID_INPUT" }, { status: 400 });
   }
 
-  if (rawPin.length < 4) {
-    return json({ error: "PIN_TOO_SHORT" }, { status: 400 });
+  if (!/^\d{6}$/.test(rawPin)) {
+    return json({ error: "INVALID_PIN_FORMAT" }, { status: 400 });
   }
 
-  const payload = await verifyResetToken(context, rawToken);
+  let payload: Awaited<ReturnType<typeof verifyResetToken>>;
+  try {
+    payload = await verifyResetToken(context, rawToken);
+  } catch (error) {
+    console.error("reset-pin token verification failed:", error);
+    return json(
+      { error: "SERVER_CONFIG_MISSING", message: "RESET_PIN_SECRET is required" },
+      { status: 500 }
+    );
+  }
+
   if (!payload) {
     return json({ error: "INVALID_OR_EXPIRED_TOKEN" }, { status: 400 });
   }

@@ -318,12 +318,6 @@ export default function DashboardPage({ loaderData }: Route.ComponentProps) {
               {T.forgotPinHr}
             </Link>
           )}
-          <Link
-            to="/change-pin"
-            className="rounded-lg border border-[#FECACA] bg-[#FEF2F2] px-4 py-2 text-sm font-medium text-[#991B1B] hover:bg-[#FEE2E2]"
-          >
-            {T.changePin}
-          </Link>
           <form method="post">
             <button type="submit" className="rounded-lg bg-[#DC2626] px-4 py-2 text-sm font-semibold text-white hover:bg-[#991B1B]">
               {T.logout}

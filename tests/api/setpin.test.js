@@ -2,6 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 let POST;
 
+function createRateLimitChain() {
+  const chain = {
+    select: vi.fn(() => chain),
+    eq: vi.fn(() => chain),
+    gte: vi.fn(() => chain),
+    order: vi.fn(() => chain),
+    limit: vi.fn(async () => ({ data: [], error: null })),
+    insert: vi.fn(async () => ({ error: null })),
+    delete: vi.fn(() => chain),
+  };
+  return chain;
+}
+
 describe('set-pin API handler', () => {
   describe('early validation', () => {
     beforeEach(async () => {
@@ -13,12 +26,16 @@ describe('set-pin API handler', () => {
         select: vi.fn(function () { return empChain; }),
       };
 
+      const rateLimitChain = createRateLimitChain();
+
       vi.doMock('@/lib/supabaseServer', () => ({
         isServiceRoleEnabled: true,
-        supabaseServer: { from: vi.fn(() => empChain) },
+        supabaseServer: {
+          from: vi.fn((table) => (table === 'login_attempts' ? rateLimitChain : empChain)),
+        },
       }));
 
-      const route = await import('../../app/api/login/set-pin/route.js');
+      const route = await import('../../server/api/login/set-pin/route.js');
       POST = route.POST;
     });
 
@@ -60,7 +77,7 @@ describe('set-pin API handler', () => {
 
       const empChain = {
         maybeSingle: vi.fn(async () => ({
-          data: { date_of_birth: '2000-01-01' },
+          data: { date_of_birth: '2000-01-01', status: 'active' },
           error: null,
         })),
         eq: vi.fn(function () { return empChain; }),
@@ -71,18 +88,22 @@ describe('set-pin API handler', () => {
         select: vi.fn(async () => ({ error: null })),
       };
 
+      const rateLimitChain = createRateLimitChain();
+
       vi.doMock('@/lib/supabaseServer', () => ({
         isServiceRoleEnabled: true,
         supabaseServer: {
           from: vi.fn((table) =>
             table === 'login_users'
               ? { upsert: vi.fn(() => upsertResultChain) }
+              : table === 'login_attempts'
+              ? rateLimitChain
               : empChain
           ),
         },
       }));
 
-      const route = await import('../../app/api/login/set-pin/route.js');
+      const route = await import('../../server/api/login/set-pin/route.js');
       POST = route.POST;
     });
 
@@ -111,3 +132,4 @@ describe('set-pin API handler', () => {
     });
   });
 });
+

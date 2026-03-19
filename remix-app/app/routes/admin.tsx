@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link, redirect } from "react-router";
 import type { Route } from "./+types/admin";
 import { requireSession } from "~/lib/require-session.server";
 import { canManagePinReset } from "~/lib/role-access.server";
@@ -6,7 +6,10 @@ import { canManagePinReset } from "~/lib/role-access.server";
 export async function loader({ request, context }: Route.LoaderArgs) {
   const session = await requireSession(request, context);
   const isAdmin = canManagePinReset(session.role) || session.login_context === "admin_portal";
-  return { isAdmin, role: session.role };
+  if (isAdmin) {
+    throw redirect("/admin/dashboard");
+  }
+  return { isAdmin: false, role: session.role };
 }
 
 export default function AdminPage({ loaderData }: Route.ComponentProps) {

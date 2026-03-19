@@ -36,8 +36,8 @@ export default function ResetPinPage() {
     setError("");
     setSuccess("");
 
-    if (pin.length < 4) {
-      setError("PIN must be at least 4 digits.");
+    if (!/^\d{6}$/.test(pin)) {
+      setError("PIN must be exactly 6 digits.");
       return;
     }
 
@@ -62,6 +62,7 @@ export default function ResetPinPage() {
       const data = (await res.json()) as { error?: string };
       if (!res.ok) {
         if (data.error === "INVALID_OR_EXPIRED_TOKEN") setError("Token is invalid or expired.");
+        else if (data.error === "INVALID_PIN_FORMAT") setError("PIN must be exactly 6 digits.");
         else if (data.error === "FORBIDDEN") setError("You don't have permission to reset PIN.");
         else setError("Unable to reset PIN. Please try again.");
         return;

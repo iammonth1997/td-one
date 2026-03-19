@@ -30,7 +30,11 @@ async function hmacSha256Base64Url(secret: string, payloadStr: string) {
 }
 
 function getSecret(context: unknown) {
-  return getEnvValue(context, "RESET_PIN_SECRET") || "td-one-reset-pin-secret-2026";
+  const secret = getEnvValue(context, "RESET_PIN_SECRET");
+  if (!secret) {
+    throw new Error("RESET_PIN_SECRET is required");
+  }
+  return secret;
 }
 
 export async function generateResetToken(context: unknown, empId: string, issuedByEmpId: string) {

@@ -3,13 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --webpack",
-    "dev:turbo": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "cf:build": "opennextjs-cloudflare build",
-    "cf:preview": "opennextjs-cloudflare preview",
-    "cf:deploy": "opennextjs-cloudflare deploy",
+    "dev": "npm --prefix remix-app run dev",
+    "dev:turbo": "npm --prefix remix-app run dev",
+    "build": "npm --prefix remix-app run build",
+    "start": "npm --prefix remix-app run preview",
+    "typecheck": "npm --prefix remix-app run typecheck",
+    "cf:build": "npm --prefix remix-app run build",
+    "cf:preview": "npm --prefix remix-app run preview",
+    "cf:deploy": "npm --prefix remix-app run deploy",
     "lint": "eslint",
     "seed:rbac": "node scripts/seed-rbac.mjs",
     "seed:rbac:apply": "node scripts/seed-rbac.mjs --apply",
@@ -21,7 +22,7 @@
     "@supabase/supabase-js": "^2.98.0",
     "bcryptjs": "^3.0.3",
     "leaflet": "^1.9.4",
-    "next": "16.1.6",
+    "lucide-react": "^0.577.0",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },
@@ -34,12 +35,10 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.1.6",
     "jsdom": "^26.0.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.0.18",
-    "wrangler": "^4.40.0",
-    "@opennextjs/cloudflare": "^1.8.0"
+    "wrangler": "^4.40.0"
   }
 }

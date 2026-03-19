@@ -33,17 +33,17 @@ export async function action({ request, context }: ActionFunctionArgs) {
     return json({ error: "FORBIDDEN" }, { status: 403 });
   }
 
-  const body = (await request.json()) as {
+  const body = (await request.json().catch(() => null)) as {
     emp_id?: string;
     start_month?: number;
     start_year?: number;
     date_of_birth?: string;
-  };
+  } | null;
 
-  const empId = String(body.emp_id || "").trim().toUpperCase();
-  const startMonth = Number(body.start_month);
-  const startYear = Number(body.start_year);
-  const dob = String(body.date_of_birth || "").trim();
+  const empId = String(body?.emp_id || "").trim().toUpperCase();
+  const startMonth = Number(body?.start_month);
+  const startYear = Number(body?.start_year);
+  const dob = String(body?.date_of_birth || "").trim();
 
   if (!empId || !startMonth || !startYear || !dob) {
     return json({ error: "INVALID_INPUT" }, { status: 400 });
@@ -108,7 +108,17 @@ export async function action({ request, context }: ActionFunctionArgs) {
     return json({ error: "USER_NOT_REGISTERED" }, { status: 400 });
   }
 
-  const token = await generateResetToken(context, empId, session.emp_id);
+  let token: string;
+  try {
+    token = await generateResetToken(context, empId, session.emp_id);
+  } catch (error) {
+    console.error("forgot-pin reset token generation failed:", error);
+    return json(
+      { error: "SERVER_CONFIG_MISSING", message: "RESET_PIN_SECRET is required" },
+      { status: 500 }
+    );
+  }
+
   await clearFailedAttempts(supabaseServer, empId);
   return json({ success: true, token }, { status: 200 });
 }
