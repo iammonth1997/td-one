@@ -47,13 +47,19 @@ wrangler secret put LINE_CHANNEL_ACCESS_TOKEN
 wrangler secret put LINE_ADMIN_API_KEY
 ```
 
-### One-shot setup (Windows PowerShell)
+### One-shot setup (ค่าเริ่มต้น: Linux/macOS)
 
 ```bash
 npm run cf:setup
 ```
 
-### One-shot setup (Linux/macOS)
+### One-shot setup (Windows PowerShell)
+
+```bash
+npm run cf:setup:ps
+```
+
+### One-shot setup (Linux/macOS แบบระบุชัดเจน)
 
 ```bash
 npm run cf:setup:sh

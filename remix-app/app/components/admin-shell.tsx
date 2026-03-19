@@ -21,6 +21,8 @@ const NAV_GROUPS = [
       { label: "Employees", href: "/admin/employees" },
       { label: "Attendance", href: "/admin/attendance" },
       { label: "Requests", href: "/admin/requests" },
+      { label: "Recruitment", href: "/admin/recruitment" },
+      { label: "HR-ER", href: "/admin/hr-er" },
     ],
   },
   {

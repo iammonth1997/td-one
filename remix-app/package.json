@@ -5,7 +5,7 @@
   "scripts": {
     "build": "react-router build",
     "cf-typegen": "wrangler types",
-    "cf:setup": "powershell -ExecutionPolicy Bypass -File ./scripts/setup-cloudflare.ps1",
+    "cf:setup": "npm run cf:setup:sh",
     "cf:setup:ps": "powershell -ExecutionPolicy Bypass -File ./scripts/setup-cloudflare.ps1",
     "cf:setup:sh": "bash ./scripts/setup-cloudflare.sh",
     "deploy": "npm run build && wrangler deploy",
