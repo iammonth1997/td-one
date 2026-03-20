@@ -14,7 +14,7 @@ import { validateSession } from "@/lib/validateSession";
 import { processSecurityAlerts, checkAlertConfig } from "@/lib/alert.server";
 
 // Simple cron secret validation
-function validateCronSecret(req: Request): boolean {
+function validateCronSecret(req) {
   const cronSecret = req.headers.get("x-cron-secret");
   const envSecret = process.env.CRON_SECRET;
 
@@ -26,7 +26,7 @@ function validateCronSecret(req: Request): boolean {
   return cronSecret === envSecret;
 }
 
-export async function POST(req: Request) {
+export async function POST(req) {
   // Check if this is a cron job or authenticated admin request
   const isCronRequest = validateCronSecret(req);
 
@@ -94,7 +94,7 @@ export async function POST(req: Request) {
  * Check alert system status and configuration.
  * Admin only.
  */
-export async function GET(req: Request) {
+export async function GET(req) {
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) {
     return Response.json({ error: authError }, { status: authStatus });
