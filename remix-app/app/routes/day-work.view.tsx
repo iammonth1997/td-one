@@ -120,6 +120,7 @@ export default function DayWorkViewPage({ loaderData }: Route.ComponentProps) {
             </Link>
             <Link
               to="/dashboard"
+              reloadDocument
               className="inline-block rounded-xl border border-[#DC2626] bg-white px-4 py-2 font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
             >
               Home
@@ -147,6 +148,7 @@ export default function DayWorkViewPage({ loaderData }: Route.ComponentProps) {
             </Link>
             <Link
               to="/dashboard"
+              reloadDocument
               className="inline-block rounded-xl border border-[#DC2626] bg-white px-4 py-2 font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
             >
               Home
@@ -237,6 +239,7 @@ export default function DayWorkViewPage({ loaderData }: Route.ComponentProps) {
           </Link>
           <Link
             to="/dashboard"
+            reloadDocument
             className="inline-block rounded-xl border border-[#DC2626] bg-white px-4 py-2 font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
           >
             Home
