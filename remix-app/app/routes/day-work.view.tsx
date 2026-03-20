@@ -105,6 +105,14 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 }
 
 export default function DayWorkViewPage({ loaderData }: Route.ComponentProps) {
+  const goHome = () => {
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      window.location.href = "/offline.html";
+      return;
+    }
+    window.location.href = "/dashboard";
+  };
+
   if (loaderData.error) {
     return (
       <main className="min-h-screen bg-white px-4 py-6 sm:px-6 sm:py-10">
@@ -118,13 +126,13 @@ export default function DayWorkViewPage({ loaderData }: Route.ComponentProps) {
             >
               Back
             </Link>
-            <Link
-              to="/dashboard"
-              reloadDocument
+            <button
+              type="button"
+              onClick={goHome}
               className="inline-block rounded-xl border border-[#DC2626] bg-white px-4 py-2 font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
             >
               Home
-            </Link>
+            </button>
           </div>
         </section>
       </main>
@@ -146,13 +154,13 @@ export default function DayWorkViewPage({ loaderData }: Route.ComponentProps) {
             >
               Back
             </Link>
-            <Link
-              to="/dashboard"
-              reloadDocument
+            <button
+              type="button"
+              onClick={goHome}
               className="inline-block rounded-xl border border-[#DC2626] bg-white px-4 py-2 font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
             >
               Home
-            </Link>
+            </button>
           </div>
         </section>
       </main>
@@ -237,13 +245,13 @@ export default function DayWorkViewPage({ loaderData }: Route.ComponentProps) {
           >
             Back
           </Link>
-          <Link
-            to="/dashboard"
-            reloadDocument
+          <button
+            type="button"
+            onClick={goHome}
             className="inline-block rounded-xl border border-[#DC2626] bg-white px-4 py-2 font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
           >
             Home
-          </Link>
+          </button>
         </div>
       </section>
     </main>
