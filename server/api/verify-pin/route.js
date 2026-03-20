@@ -6,6 +6,16 @@ import { EMPLOYEE_PORTAL } from "@/lib/sessionContext";
 
 const SESSION_DURATION_MS = 8 * 60 * 60 * 1000;
 
+function getCookieValue(cookieHeader, name) {
+  if (!cookieHeader) return null;
+  const parts = cookieHeader.split(";").map((s) => s.trim());
+  for (const part of parts) {
+    const [k, ...rest] = part.split("=");
+    if (k === name) return decodeURIComponent(rest.join("="));
+  }
+  return null;
+}
+
 export async function POST(req) {
   try {
     const { emp_id, pin, line_user_id, id_token } = await req.json();
@@ -100,6 +110,12 @@ export async function POST(req) {
       return Response.json({ error: "TEMP_PIN_EXPIRED" }, { status: 400 });
     }
 
+    const deviceId =
+      getCookieValue(req.headers.get("cookie"), "tdone_device_id") || req.headers.get("x-device-id")?.trim();
+    if (!deviceId) {
+      return Response.json({ error: "MISSING_DEVICE_ID" }, { status: 401 });
+    }
+
     const sessionToken = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + SESSION_DURATION_MS).toISOString();
 
@@ -109,6 +125,7 @@ export async function POST(req) {
         session_token: sessionToken,
         emp_id: empId,
         role: user.role,
+        device_id: deviceId,
         expires_at: expiresAt,
         is_active: true,
         login_context: EMPLOYEE_PORTAL,

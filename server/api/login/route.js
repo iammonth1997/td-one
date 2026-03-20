@@ -6,6 +6,16 @@ import { EMPLOYEE_PORTAL } from "@/lib/sessionContext";
 
 const SESSION_DURATION_MS = 8 * 60 * 60 * 1000; // 8 hours
 
+function getCookieValue(cookieHeader, name) {
+  if (!cookieHeader) return null;
+  const parts = cookieHeader.split(";").map((s) => s.trim());
+  for (const part of parts) {
+    const [k, ...rest] = part.split("=");
+    if (k === name) return decodeURIComponent(rest.join("="));
+  }
+  return null;
+}
+
 export async function POST(req) {
   const perfStart = performance.now();
   const checkpoints = {};
@@ -136,6 +146,12 @@ export async function POST(req) {
     return Response.json({ error: "TEMP_PIN_EXPIRED" }, { status: 400 });
   }
 
+  const deviceId =
+    getCookieValue(req.headers.get("cookie"), "tdone_device_id") || req.headers.get("x-device-id")?.trim();
+  if (!deviceId) {
+    return Response.json({ error: "MISSING_DEVICE_ID" }, { status: 401 });
+  }
+
   // PIN correct — run independent writes in parallel to reduce total latency.
   const recordAttemptPromise = recordLoginAttempt(empId, true, ipAddress);
   const clearFailedPromise = clearFailedAttempts(empId);
@@ -149,6 +165,7 @@ export async function POST(req) {
       session_token: sessionToken,
       emp_id: empId,
       role: user.role,
+      device_id: deviceId,
       expires_at: expiresAt,
       is_active: true,
       login_context: EMPLOYEE_PORTAL,

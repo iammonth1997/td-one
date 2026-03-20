@@ -31,9 +31,9 @@ export default function AdminPage({ loaderData }: Route.ComponentProps) {
         <h1 className="text-2xl font-bold text-[#111111]">Admin Portal</h1>
         <p className="mt-2 text-sm text-[#555555]">Role: {loaderData.role}</p>
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <Link to="/forgot-pin" className="rounded-lg border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-sm font-semibold text-[#991B1B]">PIN reset tools</Link>
+          <Link to="/forgot-password" className="rounded-lg border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-sm font-semibold text-[#991B1B]">Password reset tools</Link>
           <a href="/api/work-locations" className="rounded-lg border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-sm font-semibold text-[#991B1B]">Work locations API</a>
-          <a href="/api/login/admin/pin-reset-audit" className="rounded-lg border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-sm font-semibold text-[#991B1B]">PIN reset audit API</a>
+          <a href="/api/login/admin/password-reset-audit" className="rounded-lg border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-sm font-semibold text-[#991B1B]">Password reset audit API</a>
           <a href="/api/attendance/admin/reset-device" className="rounded-lg border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-sm font-semibold text-[#991B1B]">Reset device API</a>
         </div>
       </section>

@@ -14,7 +14,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const session = await requireAdminSession(request, context);
 
   const url = new URL(request.url);
-  url.pathname = "/api/login/admin/pin-reset-audit";
+  url.pathname = "/api/login/admin/password-reset-audit";
 
   const res = await fetch(url.toString(), {
     headers: { cookie: request.headers.get("cookie") ?? "" },
@@ -37,7 +37,7 @@ export default function AdminAuditPage({ loaderData }: Route.ComponentProps) {
     <AdminShell title="Audit Logs" session={loaderData.session}>
       <section className="overflow-hidden rounded-xl border border-[#d8dee8] bg-white shadow-sm">
         <div className="border-b border-[#e6ebf2] px-4 py-3">
-          <h2 className="text-sm font-semibold text-[#1b2738]">Pin Reset / Admin Audit</h2>
+          <h2 className="text-sm font-semibold text-[#1b2738]">Password Reset / Admin Audit</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[680px] text-sm">

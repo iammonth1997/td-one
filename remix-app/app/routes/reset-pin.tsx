@@ -17,10 +17,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   return { role: session.role };
 }
 
-export default function ResetPinPage() {
+export default function ResetPasswordPage() {
   const navigate = useNavigate();
-  const [pin, setPin] = useState("");
-  const [confirmPin, setConfirmPin] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
@@ -36,13 +36,13 @@ export default function ResetPinPage() {
     setError("");
     setSuccess("");
 
-    if (!/^\d{6}$/.test(pin)) {
-      setError("PIN must be exactly 6 digits.");
+    if (password.length < 12) {
+      setError("Password must be at least 12 characters.");
       return;
     }
 
-    if (pin !== confirmPin) {
-      setError("PIN does not match.");
+    if (password !== confirmPassword) {
+      setError("Password does not match.");
       return;
     }
 
@@ -53,22 +53,27 @@ export default function ResetPinPage() {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/login/reset-pin", {
+      const res = await fetch("/api/login/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, new_pin: pin }),
+        body: JSON.stringify({ token, new_password: password }),
       });
 
       const data = (await res.json()) as { error?: string };
       if (!res.ok) {
         if (data.error === "INVALID_OR_EXPIRED_TOKEN") setError("Token is invalid or expired.");
-        else if (data.error === "INVALID_PIN_FORMAT") setError("PIN must be exactly 6 digits.");
-        else if (data.error === "FORBIDDEN") setError("You don't have permission to reset PIN.");
-        else setError("Unable to reset PIN. Please try again.");
+        else if (["INVALID_PIN_FORMAT", "PASSWORD_TOO_SHORT", "PASSWORD_TOO_LONG"].includes(String(data.error))) {
+          setError("Password must be 12-128 characters.");
+        } else if (data.error === "PASSWORD_TOO_SIMPLE") {
+          setError("Password is too simple. Please use a stronger password.");
+        } else if (data.error === "PASSWORD_CONTAINS_EMP_ID") {
+          setError("Password must not contain employee ID.");
+        } else if (data.error === "FORBIDDEN") setError("You don't have permission to reset password.");
+        else setError("Unable to reset password. Please try again.");
         return;
       }
 
-      setSuccess("PIN reset successfully. Redirecting to login...");
+      setSuccess("Password reset successfully. Redirecting to login...");
       setTimeout(() => navigate("/login"), 1000);
     } catch {
       setError("Network error. Please try again.");
@@ -80,24 +85,27 @@ export default function ResetPinPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-white px-4">
       <div className="w-full max-w-sm rounded-[1rem] border border-[#FECACA] bg-white p-8 shadow-[0_4px_24px_rgba(220,38,38,0.10)]">
-        <h1 className="mb-1 text-center text-2xl font-bold text-[#111111]">Reset PIN</h1>
-        <p className="mb-6 text-center text-sm text-[#777777]">Set a new PIN for the employee account.</p>
+        <h1 className="mb-1 text-center text-2xl font-bold text-[#111111]">Reset Password</h1>
+        <p className="mb-6 text-center text-sm text-[#777777]">Set a new password for the employee account.</p>
 
-        <label className="text-sm font-medium text-[#555555]">New PIN</label>
+        <label className="text-sm font-medium text-[#555555]">New Password</label>
         <input
           type="password"
-          value={pin}
-          onChange={(event) => setPin(event.target.value)}
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
           className="mb-4 mt-1 w-full rounded-xl border border-[#FECACA] bg-white p-2.5 text-[#111111] focus:border-[#DC2626] focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
+          placeholder="12+ characters"
           disabled={loading}
         />
+        <p className="mb-3 text-xs text-[#666666]">Min 12 characters. Use mix of letters, numbers, symbols.</p>
 
-        <label className="text-sm font-medium text-[#555555]">Confirm PIN</label>
+        <label className="text-sm font-medium text-[#555555]">Confirm Password</label>
         <input
           type="password"
-          value={confirmPin}
-          onChange={(event) => setConfirmPin(event.target.value)}
+          value={confirmPassword}
+          onChange={(event) => setConfirmPassword(event.target.value)}
           className="mb-4 mt-1 w-full rounded-xl border border-[#FECACA] bg-white p-2.5 text-[#111111] focus:border-[#DC2626] focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
+          placeholder="Confirm password"
           disabled={loading}
         />
 
@@ -112,7 +120,7 @@ export default function ResetPinPage() {
           disabled={loading}
           className="mt-2 w-full rounded-xl bg-[#DC2626] py-2.5 font-semibold text-white shadow-[0_10px_24px_rgba(220,38,38,0.25)] transition hover:bg-[#991B1B] disabled:opacity-50"
         >
-          {loading ? "Saving..." : "Reset PIN"}
+          {loading ? "Saving..." : "Reset Password"}
         </button>
 
         <p className="mt-4 text-center text-xs text-[#555555]">

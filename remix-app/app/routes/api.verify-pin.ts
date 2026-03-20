@@ -1,9 +1,10 @@
-﻿import bcrypt from "bcryptjs";
+import bcrypt from "bcryptjs";
 import type { ActionFunctionArgs } from "react-router";
 import { verifyLineIdToken } from "~/lib/line-verify.server";
 import { sessionTokenCookie } from "~/lib/session-cookie.server";
 import { EMPLOYEE_PORTAL } from "~/lib/session-context";
 import { getSupabaseServerClient } from "~/lib/supabase.server";
+import { getDeviceIdFromRequest } from "~/lib/device-cookie.server";
 
 const SESSION_DURATION_MS = 8 * 60 * 60 * 1000;
 
@@ -28,16 +29,17 @@ export async function action({ request, context }: ActionFunctionArgs) {
     const body = (await request.json()) as {
       emp_id?: string;
       pin?: string;
+      password?: string;
       line_user_id?: string;
       id_token?: string;
     };
 
     const empId = String(body.emp_id || "").trim().toUpperCase();
-    const rawPin = String(body.pin || "").trim();
+    const rawPassword = String(body.password || body.pin || "").trim();
     const lineUserId = String(body.line_user_id || "").trim();
     const idToken = String(body.id_token || "").trim();
 
-    if (!empId || !rawPin || !lineUserId || !idToken) {
+    if (!empId || !rawPassword || !lineUserId || !idToken) {
       return json({ error: "INVALID_INPUT" }, { status: 400 });
     }
 
@@ -91,8 +93,8 @@ export async function action({ request, context }: ActionFunctionArgs) {
       return json({ error: "PIN_NOT_SET" }, { status: 400 });
     }
 
-    const validPin = await bcrypt.compare(rawPin, user.pin_hash);
-    if (!validPin) {
+    const validPassword = await bcrypt.compare(rawPassword, user.pin_hash);
+    if (!validPassword) {
       return json({ error: "INVALID_PIN" }, { status: 400 });
     }
 
@@ -122,9 +124,14 @@ export async function action({ request, context }: ActionFunctionArgs) {
       return json({ error: "LINK_LINE_FAILED" }, { status: 500 });
     }
 
-    const mustChangePin = Boolean(user.force_pin_change);
-    if (mustChangePin && user.temp_pin_expires_at && new Date(user.temp_pin_expires_at) < new Date()) {
+    const mustChangePassword = Boolean(user.force_pin_change);
+    if (mustChangePassword && user.temp_pin_expires_at && new Date(user.temp_pin_expires_at) < new Date()) {
       return json({ error: "TEMP_PIN_EXPIRED" }, { status: 400 });
+    }
+
+    const deviceId = await getDeviceIdFromRequest(request);
+    if (!deviceId) {
+      return json({ error: "MISSING_DEVICE_ID" }, { status: 401 });
     }
 
     const sessionToken = createSessionToken(32);
@@ -134,6 +141,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
       session_token: sessionToken,
       emp_id: empId,
       role: user.role,
+      device_id: deviceId,
       expires_at: expiresAt,
       is_active: true,
       login_context: EMPLOYEE_PORTAL,
@@ -153,12 +161,15 @@ export async function action({ request, context }: ActionFunctionArgs) {
         status: emp.status,
         session_token: sessionToken,
         login_context: EMPLOYEE_PORTAL,
-        must_change_pin: mustChangePin,
+        must_change_pin: mustChangePassword,
+        must_change_password: mustChangePassword,
       },
       {
         status: 200,
         headers: {
-          "Set-Cookie": await sessionTokenCookie.serialize(sessionToken),
+          "Set-Cookie": await sessionTokenCookie.serialize(sessionToken, {
+            secure: new URL(request.url).protocol === "https:",
+          }),
         },
       }
     );

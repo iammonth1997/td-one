@@ -111,12 +111,20 @@ export default function DayWorkViewPage({ loaderData }: Route.ComponentProps) {
         <section className="mx-auto w-full max-w-xl rounded-[1rem] border border-[#FECACA] bg-white p-6 shadow-[0_4px_24px_rgba(220,38,38,0.15)]">
           <h2 className="text-xl font-bold text-[#DC2626]">Error</h2>
           <p className="mt-2 text-[#555555]">{loaderData.error}</p>
-          <Link
-            to="/day-work"
-            className="mt-6 inline-block rounded-xl border border-[#DC2626] bg-white px-4 py-2 font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
-          >
-            Back
-          </Link>
+          <div className="mt-6 flex items-center justify-between">
+            <Link
+              to="/day-work"
+              className="inline-block rounded-xl border border-[#DC2626] bg-white px-4 py-2 font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
+            >
+              Back
+            </Link>
+            <Link
+              to="/dashboard"
+              className="inline-block rounded-xl border border-[#DC2626] bg-white px-4 py-2 font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
+            >
+              Home
+            </Link>
+          </div>
         </section>
       </main>
     );
@@ -130,12 +138,20 @@ export default function DayWorkViewPage({ loaderData }: Route.ComponentProps) {
           <p className="mt-2 text-[#555555]">
             Employee: {loaderData.employee?.employeeCode || "-"}, Year: {loaderData.year || "-"}, Month: {loaderData.month || "-"}
           </p>
-          <Link
-            to="/day-work"
-            className="mt-6 inline-block rounded-xl border border-[#DC2626] bg-white px-4 py-2 font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
-          >
-            Change month/year
-          </Link>
+          <div className="mt-6 flex items-center justify-between">
+            <Link
+              to="/day-work"
+              className="inline-block rounded-xl border border-[#DC2626] bg-white px-4 py-2 font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
+            >
+              Back
+            </Link>
+            <Link
+              to="/dashboard"
+              className="inline-block rounded-xl border border-[#DC2626] bg-white px-4 py-2 font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
+            >
+              Home
+            </Link>
+          </div>
         </section>
       </main>
     );
@@ -212,12 +228,20 @@ export default function DayWorkViewPage({ loaderData }: Route.ComponentProps) {
           </div>
         </div>
 
-        <Link
-          to="/day-work"
-          className="mt-6 inline-block rounded-xl border border-[#DC2626] bg-white px-4 py-2 font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
-        >
-          Back
-        </Link>
+        <div className="mt-6 flex items-center justify-between">
+          <Link
+            to="/day-work"
+            className="inline-block rounded-xl border border-[#DC2626] bg-white px-4 py-2 font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
+          >
+            Back
+          </Link>
+          <Link
+            to="/dashboard"
+            className="inline-block rounded-xl border border-[#DC2626] bg-white px-4 py-2 font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
+          >
+            Home
+          </Link>
+        </div>
       </section>
     </main>
   );

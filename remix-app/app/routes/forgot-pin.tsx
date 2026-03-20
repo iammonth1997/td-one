@@ -17,7 +17,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   return { role: session.role };
 }
 
-export default function ForgotPinPage() {
+export default function ForgotPasswordPage() {
   const navigate = useNavigate();
   const [empId, setEmpId] = useState("");
   const [startMonth, setStartMonth] = useState("");
@@ -43,7 +43,7 @@ export default function ForgotPinPage() {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/login/forgot-pin", {
+      const res = await fetch("/api/login/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -60,8 +60,8 @@ export default function ForgotPinPage() {
         else if (data.error === "INVALID_DOB") setError("Date of birth is incorrect.");
         else if (data.error === "INVALID_START_DATE") setError("Start date is incorrect.");
         else if (data.error === "ACCOUNT_BLOCKED") setError("Employee account is blocked.");
-        else if (data.error === "USER_NOT_REGISTERED") setError("Employee has not registered PIN yet.");
-        else if (data.error === "FORBIDDEN") setError("You don't have permission to reset PIN.");
+        else if (data.error === "USER_NOT_REGISTERED") setError("Employee has not registered password yet.");
+        else if (data.error === "FORBIDDEN") setError("You don't have permission to reset password.");
         else setError("Unable to verify information. Please try again.");
         return;
       }
@@ -71,7 +71,7 @@ export default function ForgotPinPage() {
         return;
       }
 
-      navigate(`/reset-pin?token=${encodeURIComponent(data.token)}`);
+      navigate(`/reset-password?token=${encodeURIComponent(data.token)}`);
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -82,8 +82,8 @@ export default function ForgotPinPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-white px-4">
       <div className="w-full max-w-sm rounded-[1rem] border border-[#FECACA] bg-white p-8 shadow-[0_4px_24px_rgba(220,38,38,0.10)]">
-        <h1 className="mb-1 text-center text-2xl font-bold text-[#111111]">Forgot PIN</h1>
-        <p className="mb-6 text-center text-sm text-[#777777]">Verify employee info before issuing reset PIN.</p>
+        <h1 className="mb-1 text-center text-2xl font-bold text-[#111111]">Forgot Password</h1>
+        <p className="mb-6 text-center text-sm text-[#777777]">Verify employee info before issuing password reset.</p>
 
         <label className="text-sm font-medium text-[#555555]">Employee ID</label>
         <input

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import type { Route } from "./+types/activate";
+import { ensureDeviceIdCookie, getOrCreateDeviceId } from "~/lib/device-id";
 
 export async function loader({ request }: Route.LoaderArgs) {
   // Check if already logged in, redirect to dashboard
@@ -55,6 +56,9 @@ export default function ActivatePage() {
 
     setLoading(true);
     try {
+      const deviceId = getOrCreateDeviceId();
+      ensureDeviceIdCookie();
+
       const res = await fetch("/api/login/activate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -62,6 +66,9 @@ export default function ActivatePage() {
           emp_id: empId,
           activation_code: activationCode,
           password,
+          device_id: deviceId,
+          device_name: navigator.userAgent,
+          platform: "web",
         }),
       });
 

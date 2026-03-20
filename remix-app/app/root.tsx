@@ -8,9 +8,13 @@ import {
 } from "react-router";
 
 import type { Route } from "./+types/root";
+import { PwaInstallPrompt } from "./components/pwa-install-prompt";
+import { PwaRegister } from "./components/pwa-register";
 import "./app.css";
 
 export const links: Route.LinksFunction = () => [
+  { rel: "manifest", href: "/manifest.json" },
+  { rel: "apple-touch-icon", href: "/icons/icon-192.svg" },
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
     rel: "preconnect",
@@ -29,11 +33,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#DC2626" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="TD One" />
         <Meta />
         <Links />
       </head>
       <body className="bg-white text-[#111111] antialiased">
         {children}
+        <PwaInstallPrompt />
+        <PwaRegister />
         <ScrollRestoration />
         <Scripts />
       </body>

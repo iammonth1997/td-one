@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import type { Route } from "./+types/scan";
 import { requireSession } from "~/lib/require-session.server";
+import { setDeviceIdCookie } from "~/lib/device-id";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const session = await requireSession(request, context);
@@ -272,6 +273,7 @@ function makeDeviceId() {
 
   const id = `dev_${Math.abs(hash)}_${Date.now().toString(36)}`;
   localStorage.setItem(key, id);
+  setDeviceIdCookie(id);
   return id;
 }
 

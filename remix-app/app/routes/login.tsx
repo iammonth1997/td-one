@@ -1,48 +1,106 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router";
+import { ensureDeviceIdCookie, getOrCreateDeviceId } from "~/lib/device-id";
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [empId, setEmpId] = useState("");
-  const [pin, setPin] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [pinSet, setPinSet] = useState<boolean | null>(null);
+  const [passwordSet, setPasswordSet] = useState<boolean | null>(null);
+  const authError = searchParams.get("auth_error");
+
+  useEffect(() => {
+    ensureDeviceIdCookie();
+  }, []);
+
+  useEffect(() => {
+    if (!authError) return;
+
+    if (authError === "MISSING_SESSION_TOKEN") {
+      setError("Sign-in session was not created. Please sign in again.");
+    } else if (authError === "MISSING_DEVICE_ID") {
+      setError("Device verification failed. Please refresh and try again.");
+    } else if (authError === "DEVICE_MISMATCH") {
+      setError("This session belongs to another device. Please sign in again.");
+    } else if (authError === "DEVICE_NOT_TRUSTED") {
+      setError("This device is not trusted. Please contact HR/Admin.");
+    }
+  }, [authError]);
 
   async function handleLogin() {
     if (loading) return;
     setError("");
+
+    if (!empId.trim() || !password.trim()) {
+      setError("Please enter Employee ID and password.");
+      return;
+    }
+
     setLoading(true);
 
     try {
+      const deviceId = getOrCreateDeviceId();
+      ensureDeviceIdCookie();
+
       const res = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emp_id: empId, pin }),
+        body: JSON.stringify({
+          emp_id: empId,
+          password,
+          device_id: deviceId,
+          device_name: navigator.userAgent,
+          platform: "web",
+          app_version: null,
+        }),
       });
 
-      const data = (await res.json()) as {
+      const rawBody = await res.text();
+      let data: {
         error?: string;
+        message?: string;
         reason?: string;
         minutes_remaining?: number;
         must_change_pin?: boolean;
-      };
+        must_change_password?: boolean;
+      } = {};
+
+      try {
+        data = rawBody ? (JSON.parse(rawBody) as typeof data) : {};
+      } catch {
+        data = {
+          error: `HTTP_${res.status}`,
+          message: rawBody?.slice(0, 160) || undefined,
+        };
+      }
 
       if (!res.ok) {
         if (data.error === "INVALID_CREDENTIALS") {
-          setPinSet(true);
-          setError("Invalid Employee ID or PIN.");
-        } else if (data.error === "TEMP_PIN_EXPIRED") setError("Temporary PIN expired. Please contact HR.");
+          setPasswordSet(true);
+          setError("Invalid Employee ID or password.");
+        } else if (data.error === "TEMP_PIN_EXPIRED") setError("Temporary password expired. Please contact HR.");
         else if (data.error === "ACCOUNT_BLOCKED") setError(`Account blocked (${data.reason || "unknown"}).`);
         else if (data.error === "ACCOUNT_LOCKED") {
           setError(`Too many attempts. Try again in ${data.minutes_remaining || 15} minute(s).`);
+        } else if (data.error === "DEVICE_LIMIT_REACHED") {
+          setError("Maximum 2 devices allowed. Please contact HR/Admin to deactivate an old device.");
+        } else if (data.error === "DEVICE_DEACTIVATED") {
+          setError("This device is deactivated. Please contact HR/Admin.");
+        } else if (data.error === "SERVER_CONFIG_MISSING") {
+          setError("Server configuration missing. Please contact system admin.");
+        } else if (data.error === "DB_QUERY_FAILED" || data.error === "SESSION_CREATE_FAILED") {
+          setError("System error while signing in. Please try again shortly.");
         } else {
-          setError("Login failed. Please try again.");
+          const fallback = data.message?.trim();
+          setError(fallback ? `Login failed: ${fallback}` : "Login failed. Please try again.");
         }
         return;
       }
 
-      if (data.must_change_pin) navigate("/change-pin");
+      if (data.must_change_pin || data.must_change_password) navigate("/change-password");
       else navigate("/dashboard");
     } catch {
       setError("Network error. Please try again.");
@@ -94,8 +152,8 @@ export default function LoginPage() {
         <label className="text-sm font-medium text-[#555555]">Password</label>
         <input
           type="password"
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
           onKeyDown={handleKeyDown}
           className="mb-4 mt-1 w-full rounded-xl border border-[#FECACA] bg-[#FEF2F2] p-2.5 text-[#111111] placeholder:text-[#777777] focus:border-[#DC2626] focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
           placeholder="••••••••••••"
@@ -115,18 +173,18 @@ export default function LoginPage() {
           {loading ? "Signing in..." : "Sign in"}
         </button>
 
-        {pinSet !== true && (
+        {passwordSet !== true && (
           <p className="mt-4 text-center text-xs text-[#555555]">
             Don&apos;t have a password?{" "}
-            <Link to="/set-pin" className="font-medium text-[#DC2626] hover:text-[#991B1B]">
+            <Link to="/set-password" className="font-medium text-[#DC2626] hover:text-[#991B1B]">
               Set Password
             </Link>
           </p>
         )}
 
-        <p className={`text-center text-xs text-[#555555] ${pinSet !== true ? "mt-2" : "mt-4"}`}>
+        <p className={`text-center text-xs text-[#555555] ${passwordSet !== true ? "mt-2" : "mt-4"}`}>
           Need HR to reset your password?{" "}
-          <Link to="/forgot-pin" className="font-medium text-[#DC2626] hover:text-[#991B1B]">
+          <Link to="/forgot-password" className="font-medium text-[#DC2626] hover:text-[#991B1B]">
             Reset Password
           </Link>
         </p>

@@ -20,6 +20,7 @@ import { sessionTokenCookie } from "~/lib/session-cookie.server";
 import { EMPLOYEE_PORTAL } from "~/lib/session-context";
 import { writeAuditLog, AuditEvent } from "~/lib/audit-log.server";
 import bcrypt from "bcryptjs";
+import { getDeviceIdFromRequest } from "~/lib/device-cookie.server";
 
 const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_CODE_FAILURES = 5;
@@ -59,7 +60,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
   const empId = String(body?.emp_id || "").trim().toUpperCase();
   const activationCode = String(body?.activation_code || "").trim();
   const rawPassword = String(body?.password || "").trim();
-  const deviceId = String(body?.device_id || "").trim() || null;
+  let deviceId = String(body?.device_id || "").trim() || null;
   const deviceName = String(body?.device_name || "").trim() || null;
   const platform = (["android", "ios", "web"].includes(body?.platform ?? "")) ? body!.platform! : "web";
 
@@ -68,6 +69,9 @@ export async function action({ request, context }: ActionFunctionArgs) {
   }
 
   const ipAddress = request.headers.get("x-forwarded-for") || null;
+  if (!deviceId) {
+    deviceId = (await getDeviceIdFromRequest(request)) || null;
+  }
 
   // ─── Password policy check ────────────────────────────────────────────────
   const policyResult = validatePasswordPolicy(rawPassword, empId);
@@ -234,7 +238,9 @@ export async function action({ request, context }: ActionFunctionArgs) {
     {
       status: 200,
       headers: {
-        "Set-Cookie": await sessionTokenCookie.serialize(sessionToken),
+        "Set-Cookie": await sessionTokenCookie.serialize(sessionToken, {
+          secure: new URL(request.url).protocol === "https:",
+        }),
       },
     }
   );

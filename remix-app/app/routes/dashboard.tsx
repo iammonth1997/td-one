@@ -7,6 +7,10 @@ import { sessionTokenCookie } from "~/lib/session-cookie.server";
 import { validateSession } from "~/lib/session-validation.server";
 
 type LangCode = "th" | "en" | "lo";
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+};
 
 const DASHBOARD_I18N: Record<LangCode, {
   welcome: string;
@@ -16,8 +20,8 @@ const DASHBOARD_I18N: Record<LangCode, {
   servicesTitle: string;
   dayWork: string;
   dayWorkDesc: string;
-  changePin: string;
-  changePinDesc: string;
+  changePassword: string;
+  changePasswordDesc: string;
   scanInOut: string;
   scanInOutDesc: string;
   requestMenu: string;
@@ -26,7 +30,8 @@ const DASHBOARD_I18N: Record<LangCode, {
   slipDesc: string;
   admin: string;
   adminDesc: string;
-  forgotPinHr: string;
+  forgotPasswordHr: string;
+  installApp: string;
   logout: string;
 }> = {
   th: {
@@ -37,8 +42,8 @@ const DASHBOARD_I18N: Record<LangCode, {
     servicesTitle: "บริการ",
     dayWork: "ดูข้อมูลงานประจำวัน",
     dayWorkDesc: "ดูสรุปการทำงานรายวัน",
-    changePin: "เปลี่ยน PIN",
-    changePinDesc: "อัปเดต PIN ปัจจุบัน",
+    changePassword: "เปลี่ยนรหัสผ่าน",
+    changePasswordDesc: "อัปเดตรหัสผ่านปัจจุบัน",
     scanInOut: "สแกนเข้า/ออกงาน",
     scanInOutDesc: "ลงเวลางานด้วย GPS และอุปกรณ์ที่ผูกไว้",
     requestMenu: "ศูนย์คำขอ",
@@ -47,7 +52,8 @@ const DASHBOARD_I18N: Record<LangCode, {
     slipDesc: "ดูสลิปเงินเดือนและโอที",
     admin: "ผู้ดูแลระบบ",
     adminDesc: "เครื่องมือและการตั้งค่าผู้ดูแล",
-    forgotPinHr: "ลืม PIN (HR)",
+    forgotPasswordHr: "ลืมรหัสผ่าน (HR)",
+    installApp: "ติดตั้งแอป",
     logout: "ออกจากระบบ",
   },
   en: {
@@ -58,8 +64,8 @@ const DASHBOARD_I18N: Record<LangCode, {
     servicesTitle: "Services",
     dayWork: "Check Day Work",
     dayWorkDesc: "View daily work summary",
-    changePin: "Change PIN",
-    changePinDesc: "Update your current PIN",
+    changePassword: "Change Password",
+    changePasswordDesc: "Update your current password",
     scanInOut: "Scan In/Out",
     scanInOutDesc: "Clock in/out with GPS and bound device",
     requestMenu: "Request Center",
@@ -68,7 +74,8 @@ const DASHBOARD_I18N: Record<LangCode, {
     slipDesc: "View salary and OT slip information",
     admin: "Admin",
     adminDesc: "Admin tools and settings",
-    forgotPinHr: "Forgot PIN (HR)",
+    forgotPasswordHr: "Forgot Password (HR)",
+    installApp: "Install App",
     logout: "Logout",
   },
   lo: {
@@ -79,8 +86,8 @@ const DASHBOARD_I18N: Record<LangCode, {
     servicesTitle: "ບໍລິການ",
     dayWork: "ກວດສອບວັນງານ",
     dayWorkDesc: "ເບິ່ງສະຫຼຸບການເຮັດວຽກປະຈຳວັນ",
-    changePin: "ປ່ຽນ PIN",
-    changePinDesc: "ອັບເດດ PIN ປັດຈຸບັນ",
+    changePassword: "ປ່ຽນລະຫັດຜ່ານ",
+    changePasswordDesc: "ອັບເດດລະຫັດຜ່ານປັດຈຸບັນ",
     scanInOut: "ສະແກນເຂົ້າ/ອອກ",
     scanInOutDesc: "ລົງເວລາດ້ວຍ GPS ແລະ ອຸປະກອນທີ່ຜູກໄວ້",
     requestMenu: "ສູນຄຳຂໍ",
@@ -89,7 +96,8 @@ const DASHBOARD_I18N: Record<LangCode, {
     slipDesc: "ເບິ່ງສລິບເງິນເດືອນ ແລະ OT",
     admin: "ແອດມິນ",
     adminDesc: "ເຄື່ອງມື ແລະ ການຕັ້ງຄ່າແອດມິນ",
-    forgotPinHr: "ລືມ PIN (HR)",
+    forgotPasswordHr: "ລືມລະຫັດຜ່ານ (HR)",
+    installApp: "ຕິດຕັ້ງແອັບ",
     logout: "ອອກຈາກລະບົບ",
   },
 };
@@ -97,18 +105,19 @@ const DASHBOARD_I18N: Record<LangCode, {
 export async function loader({ request, context }: Route.LoaderArgs) {
   const { session, error } = await validateSession(request, context);
   if (error || !session) {
-    throw redirect("/login");
+    const reason = encodeURIComponent(error || "INVALID_SESSION");
+    throw redirect(`/login?auth_error=${reason}`);
   }
 
   const { supabaseServer } = getSupabaseServerClient(context);
   const { data: user } = await supabaseServer
     .from("login_users")
-    .select("force_pin_change")
+    .select("force_pin_change, must_change_password")
     .eq("emp_id", session.emp_id)
     .maybeSingle();
 
-  if (user?.force_pin_change) {
-    throw redirect("/change-pin");
+  if (user?.force_pin_change || user?.must_change_password) {
+    throw redirect("/change-password");
   }
 
   const { data: emp } = await supabaseServer
@@ -123,20 +132,24 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     login_context: session.login_context,
     first_name: emp?.first_name_th || "",
     last_name: emp?.last_name_th || "",
-    can_reset_pin: canManagePinReset(session.role),
+    can_reset_password: canManagePinReset(session.role),
   };
 }
 
 export async function action() {
   return redirect("/login", {
     headers: {
-      "Set-Cookie": await sessionTokenCookie.serialize("", { maxAge: 0 }),
+      // Ensure we don't send `Secure` on plain-http local dev.
+      "Set-Cookie": await sessionTokenCookie.serialize("", { maxAge: 0, secure: false }),
     },
   });
 }
 
 export default function DashboardPage({ loaderData }: Route.ComponentProps) {
   const [lang, setLang] = useState<LangCode>("th");
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [installing, setInstalling] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
   const displayName = `${loaderData.first_name || ""} ${loaderData.last_name || ""}`.trim() || loaderData.emp_id;
   const T = DASHBOARD_I18N[lang];
 
@@ -147,9 +160,42 @@ export default function DashboardPage({ loaderData }: Route.ComponentProps) {
     }
   }, []);
 
+  useEffect(() => {
+    const onBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setDeferredInstallPrompt(event as BeforeInstallPromptEvent);
+    };
+
+    const onAppInstalled = () => {
+      setIsInstalled(true);
+      setDeferredInstallPrompt(null);
+    };
+
+    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    window.addEventListener("appinstalled", onAppInstalled);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", onAppInstalled);
+    };
+  }, []);
+
   function changeLanguage(next: LangCode) {
     setLang(next);
     localStorage.setItem("tdone_lang", next);
+  }
+
+  async function handleInstallApp() {
+    if (!deferredInstallPrompt || installing) return;
+
+    setInstalling(true);
+    await deferredInstallPrompt.prompt();
+    const result = await deferredInstallPrompt.userChoice;
+    if (result.outcome === "accepted") {
+      setIsInstalled(true);
+    }
+    setDeferredInstallPrompt(null);
+    setInstalling(false);
   }
 
   const services = [
@@ -171,9 +217,9 @@ export default function DashboardPage({ loaderData }: Route.ComponentProps) {
     },
     {
       key: "change-pin",
-      title: T.changePin,
-      description: T.changePinDesc,
-      href: "/change-pin",
+      title: T.changePassword,
+      description: T.changePasswordDesc,
+      href: "/change-password",
       icon: (
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="11" width="18" height="10" rx="2" />
@@ -310,13 +356,23 @@ export default function DashboardPage({ loaderData }: Route.ComponentProps) {
         </div>
 
         <div className="flex flex-wrap gap-3">
-          {loaderData.can_reset_pin && (
+          {loaderData.can_reset_password && (
             <Link
-              to="/forgot-pin"
+              to="/forgot-password"
               className="rounded-lg border border-[#FECACA] bg-[#FEF2F2] px-4 py-2 text-sm font-medium text-[#991B1B] hover:bg-[#FEE2E2]"
             >
-              {T.forgotPinHr}
+              {T.forgotPasswordHr}
             </Link>
+          )}
+          {!isInstalled && deferredInstallPrompt && (
+            <button
+              type="button"
+              onClick={() => void handleInstallApp()}
+              disabled={installing}
+              className="rounded-lg border border-[#FECACA] bg-[#FEF2F2] px-4 py-2 text-sm font-semibold text-[#991B1B] hover:bg-[#FEE2E2] disabled:opacity-60"
+            >
+              {installing ? `${T.installApp}...` : T.installApp}
+            </button>
           )}
           <form method="post">
             <button type="submit" className="rounded-lg bg-[#DC2626] px-4 py-2 text-sm font-semibold text-white hover:bg-[#991B1B]">

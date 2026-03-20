@@ -1,9 +1,9 @@
-﻿import bcrypt from "bcryptjs";
-import type { ActionFunctionArgs } from "react-router";
+﻿import type { ActionFunctionArgs } from "react-router";
 import { verifyResetToken } from "~/lib/reset-token.server";
 import { canManagePinReset } from "~/lib/role-access.server";
 import { validateSession } from "~/lib/session-validation.server";
 import { getSupabaseServerClient } from "~/lib/supabase.server";
+import { validatePasswordPolicy, hashPassword } from "~/lib/password.server";
 
 function json(data: unknown, init?: ResponseInit) {
   return new Response(JSON.stringify(data), {
@@ -37,16 +37,21 @@ export async function action({ request, context }: ActionFunctionArgs) {
     return json({ error: "FORBIDDEN" }, { status: 403 });
   }
 
-  const body = (await request.json().catch(() => null)) as { token?: string; new_pin?: string } | null;
+  const body = (await request.json().catch(() => null)) as {
+    token?: string;
+    new_pin?: string;
+    new_password?: string;
+  } | null;
   const rawToken = String(body?.token || "").trim();
-  const rawPin = String(body?.new_pin || "").trim();
+  const rawPassword = String(body?.new_password || body?.new_pin || "").trim();
 
-  if (!rawToken || !rawPin) {
+  if (!rawToken || !rawPassword) {
     return json({ error: "INVALID_INPUT" }, { status: 400 });
   }
 
-  if (!/^\d{6}$/.test(rawPin)) {
-    return json({ error: "INVALID_PIN_FORMAT" }, { status: 400 });
+  const policyResult = validatePasswordPolicy(rawPassword);
+  if (!policyResult.valid) {
+    return json({ error: policyResult.error || "INVALID_PASSWORD_FORMAT" }, { status: 400 });
   }
 
   let payload: Awaited<ReturnType<typeof verifyResetToken>>;
@@ -80,14 +85,15 @@ export async function action({ request, context }: ActionFunctionArgs) {
     return json({ error: "ACCOUNT_BLOCKED" }, { status: 403 });
   }
 
-  const salt = await bcrypt.genSalt(10);
-  const pinHash = await bcrypt.hash(rawPin, salt);
+  const passwordHash = await hashPassword(rawPassword);
 
   const { error: updateError } = await supabaseServer
     .from("login_users")
     .update({
-      pin_hash: pinHash,
+      pin_hash: passwordHash,
       force_pin_change: false,
+      must_change_password: false,
+      password_changed_at: new Date().toISOString(),
       temp_pin_expires_at: null,
       temp_pin_issued_at: null,
       temp_pin_issued_by: null,
@@ -111,7 +117,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
   });
 
   if (auditError) {
-    console.error("pin reset audit insert failed:", auditError.message);
+    console.error("password reset audit insert failed:", auditError.message);
   }
 
   return json({ success: true }, { status: 200 });

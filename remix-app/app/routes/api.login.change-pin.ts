@@ -33,7 +33,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
     new_password?: string;
   } | null;
   // Accept both old (pin) and new (password) field names
-  const currentPin = String(body?.current_password || body?.current_pin || "").trim();
+  const currentPassword = String(body?.current_password || body?.current_pin || "").trim();
   const rawPassword = String(body?.new_password || body?.new_pin || "").trim();
 
   // Enforce NIST password policy on new password
@@ -47,7 +47,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
 
   const { data: user, error: userError } = await supabaseServer
     .from("login_users")
-    .select("emp_id, force_pin_change, temp_pin_expires_at, pin_hash, password_history")
+    .select("emp_id, force_pin_change, must_change_password, temp_pin_expires_at, pin_hash, password_history")
     .eq("emp_id", session.emp_id)
     .maybeSingle();
 
@@ -60,16 +60,16 @@ export async function action({ request, context }: ActionFunctionArgs) {
     return json({ error: "USER_NOT_FOUND" }, { status: 400 });
   }
 
-  if (user.force_pin_change) {
+  if (user.force_pin_change || user.must_change_password) {
     if (user.temp_pin_expires_at && new Date(user.temp_pin_expires_at) < new Date()) {
       return json({ error: "TEMP_PIN_EXPIRED" }, { status: 400 });
     }
   } else {
     // Verify current credential (accepts old 6-digit PIN or new long password)
-    if (!currentPin) {
+    if (!currentPassword) {
       return json({ error: "INVALID_CURRENT_PIN" }, { status: 400 });
     }
-    const currentMatches = user.pin_hash ? await verifyPassword(currentPin, user.pin_hash) : false;
+    const currentMatches = user.pin_hash ? await verifyPassword(currentPassword, user.pin_hash) : false;
     if (!currentMatches) {
       return json({ error: "INVALID_CURRENT_PIN" }, { status: 400 });
     }

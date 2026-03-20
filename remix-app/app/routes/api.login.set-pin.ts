@@ -1,4 +1,4 @@
-﻿import type { ActionFunctionArgs } from "react-router";
+import type { ActionFunctionArgs } from "react-router";
 import { clearFailedAttempts, checkRateLimit, recordLoginAttempt } from "~/lib/rate-limit.server";
 import { getSupabaseServerClient } from "~/lib/supabase.server";
 import { validatePasswordPolicy, hashPassword } from "~/lib/password.server";
@@ -69,6 +69,25 @@ export async function action({ request, context }: ActionFunctionArgs) {
 
   if (emp.status !== "active") {
     return json({ error: "ACCOUNT_BLOCKED", reason: emp.status }, { status: 403 });
+  }
+
+  // First-time onboarding only:
+  // - If the employee already has a registered credential, block this endpoint.
+  // - Users who are forced to change due to migration should use /change-password.
+  const { data: existingLoginUser, error: loginUserQueryError } = await supabaseServer
+    .from("login_users")
+    .select("is_registered, pin_hash")
+    .eq("emp_id", empId)
+    .maybeSingle();
+
+  if (loginUserQueryError) {
+    console.error("set-pin login_users query failed:", loginUserQueryError.message);
+    return json({ error: "DB_QUERY_FAILED" }, { status: 500 });
+  }
+
+  const alreadyHasCredential = Boolean(existingLoginUser?.is_registered) || Boolean(existingLoginUser?.pin_hash);
+  if (alreadyHasCredential) {
+    return json({ error: "ACCOUNT_ALREADY_REGISTERED" }, { status: 409 });
   }
 
   const employeeDob = String(emp.date_of_birth || "").slice(0, 10);

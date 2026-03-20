@@ -112,7 +112,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
   try {
     token = await generateResetToken(context, empId, session.emp_id);
   } catch (error) {
-    console.error("forgot-pin reset token generation failed:", error);
+    console.error("forgot-password reset token generation failed:", error);
     return json(
       { error: "SERVER_CONFIG_MISSING", message: "RESET_PIN_SECRET is required" },
       { status: 500 }
