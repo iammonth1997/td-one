@@ -7,7 +7,6 @@ import {
   verifyWorkLocation,
 } from "@/lib/attendanceUtils";
 import { supabaseServer } from "@/lib/supabaseServer";
-import { verifyAttendanceLiffBySession } from "@/lib/verifyAttendanceLiff";
 import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
 import { hasAnyPermission } from "@/lib/rbac/access";
 import { EMPLOYEE_PORTAL, isPortalContextAllowed } from "@/lib/sessionContext";
@@ -18,37 +17,178 @@ function getClientIp(req) {
     || null;
 }
 
-export async function POST(req) {
-  const { session, error: authError, status: authStatus } = await validateSession(req);
-  if (authError) {
-    return Response.json({ error: authError }, { status: authStatus });
-  }
+function normalizeFlags(flags) {
+  if (!Array.isArray(flags)) return [];
+  return flags
+    .map((flag) => String(flag || "").trim())
+    .filter(Boolean)
+    .slice(0, 20);
+}
 
-  if (!isPortalContextAllowed(session, [EMPLOYEE_PORTAL])) {
-    return Response.json({ error: "FORBIDDEN_PORTAL_CONTEXT" }, { status: 403 });
-  }
+function parseScanPayload(payload = {}) {
+  const gpsPosition = payload.gpsPosition && typeof payload.gpsPosition === "object"
+    ? payload.gpsPosition
+    : null;
 
-  const accessProfile = buildSessionAccessProfile(session);
-  if (!hasAnyPermission(accessProfile, ["attendance.read.self", "attendance.read.team", "attendance.read.department", "attendance.read.all"])) {
-    return Response.json({ error: "FORBIDDEN" }, { status: 403 });
-  }
+  const latitude = Number(
+    payload.latitude
+      ?? gpsPosition?.latitude
+      ?? gpsPosition?.lat
+  );
+  const longitude = Number(
+    payload.longitude
+      ?? gpsPosition?.longitude
+      ?? gpsPosition?.lng
+      ?? gpsPosition?.lon
+  );
+  const accuracy = Number(
+    payload.accuracy
+      ?? gpsPosition?.accuracy
+      ?? 0
+  );
 
-  const liffCheck = await verifyAttendanceLiffBySession(req, session.emp_id);
-  if (!liffCheck.ok) {
-    return Response.json({ error: liffCheck.error, detail: liffCheck.detail || null }, { status: liffCheck.status });
-  }
-
-  const payload = await req.json();
-  const latitude = Number(payload.latitude);
-  const longitude = Number(payload.longitude);
-  const accuracy = Number(payload.accuracy || 0);
-  const deviceId = String(payload.device_id || "").trim();
-  const faceVerified = Boolean(payload.face_verified);
+  const deviceId = String(payload.deviceId ?? payload.device_id ?? "").trim();
+  const employeeId = String(payload.employeeId ?? payload.employee_id ?? "").trim().toUpperCase();
+  const timestamp = payload.timestamp || payload.captured_at || new Date().toISOString();
+  const faceMatchScoreRaw = payload.faceMatchScore ?? payload.face_match_score;
+  const faceMatchScore = Number.isFinite(Number(faceMatchScoreRaw)) ? Number(faceMatchScoreRaw) : null;
+  const faceVerified = Boolean(payload.face_verified) || (typeof faceMatchScore === "number" && faceMatchScore >= 0.75);
   const selfieUrl = payload.selfie_url || null;
-  const fakeFlags = Array.isArray(payload.fake_flags) ? payload.fake_flags : [];
+
+  const baseFlags = normalizeFlags(payload.suspicionFlags ?? payload.suspicion_flags);
+  const legacyFlags = normalizeFlags(payload.suspected_spoofing_flags ?? payload.fake_flags);
+  const suspicionFlags = [...new Set([...baseFlags, ...legacyFlags])];
+
+  const scoreRaw = payload.suspicionScore ?? payload.suspicion_score ?? payload.suspected_spoofing_score;
+  const suspicionScore = Number.isFinite(Number(scoreRaw)) ? Number(scoreRaw) : 0;
+
+  return {
+    latitude,
+    longitude,
+    accuracy,
+    deviceId,
+    employeeId,
+    timestamp,
+    faceMatchScore,
+    faceVerified,
+    selfieUrl,
+    suspicionFlags,
+    suspicionScore,
+    rawGpsPosition: gpsPosition,
+  };
+}
+
+function classifySuspicion(score) {
+  if (score > 70) return "blocked";
+  if (score >= 31) return "flagged";
+  return "normal";
+}
+
+async function persistSuspiciousScan({
+  employee,
+  employeeCode,
+  attendanceId,
+  timestamp,
+  latitude,
+  longitude,
+  accuracy,
+  suspicionScore,
+  suspicionFlags,
+  faceMatchScore,
+  deviceId,
+  scanStatus,
+  reviewAction,
+  reviewNote,
+}) {
+  const payload = {
+    employee_id: employee?.id || null,
+    employee_code: employeeCode || null,
+    attendance_id: attendanceId || null,
+    scan_timestamp: timestamp || new Date().toISOString(),
+    gps_position: {
+      latitude,
+      longitude,
+      accuracy,
+    },
+    suspicion_score: Math.max(0, Math.round(Number(suspicionScore || 0))),
+    suspicion_flags: normalizeFlags(suspicionFlags),
+    face_match_score: typeof faceMatchScore === "number" ? faceMatchScore : null,
+    device_id: deviceId || null,
+    scan_status: scanStatus,
+    review_action: reviewAction,
+    review_note: reviewNote || null,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = await supabaseServer
+    .from("attendance_suspicious_scans")
+    .insert(payload);
+
+  if (error) {
+    console.error("[attendance/scan] failed to save suspicious scan", error.message);
+  }
+}
+
+async function notifyHrBlockedScan({ employeeCode, suspicionScore, suspicionFlags, timestamp }) {
+  const webhookUrl = process.env.SLACK_WEBHOOK_URL;
+  if (!webhookUrl) return;
+
+  try {
+    const message = [
+      "🚨 Attendance scan blocked",
+      `Employee: ${employeeCode || "unknown"}`,
+      `Score: ${suspicionScore}`,
+      `Time: ${timestamp}`,
+      `Flags: ${normalizeFlags(suspicionFlags).join(", ") || "none"}`,
+    ].join("\n");
+
+    await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: message }),
+    });
+  } catch (error) {
+    console.error("[attendance/scan] HR notify failed", error);
+  }
+}
+
+export async function POST(req) {
+  try {
+    const { session, error: authError, status: authStatus } = await validateSession(req);
+    if (authError) {
+      return Response.json({ error: authError }, { status: authStatus });
+    }
+
+    if (!isPortalContextAllowed(session, [EMPLOYEE_PORTAL])) {
+      return Response.json({ error: "FORBIDDEN_PORTAL_CONTEXT" }, { status: 403 });
+    }
+
+    const accessProfile = buildSessionAccessProfile(session);
+    if (!hasAnyPermission(accessProfile, ["attendance.read.self", "attendance.read.team", "attendance.read.department", "attendance.read.all"])) {
+      return Response.json({ error: "FORBIDDEN" }, { status: 403 });
+    }
+
+    let payload;
+    try {
+      payload = await req.json();
+    } catch (e) {
+      return Response.json({ error: "INVALID_JSON", message: String(e.message || e) }, { status: 400 });
+    }
+  const normalized = parseScanPayload(payload);
+  const latitude = normalized.latitude;
+  const longitude = normalized.longitude;
+  const accuracy = normalized.accuracy;
+  const deviceId = normalized.deviceId;
+  const faceVerified = normalized.faceVerified;
+  const selfieUrl = normalized.selfieUrl;
+  const fakeFlags = normalized.suspicionFlags;
 
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || !deviceId) {
     return Response.json({ error: "INVALID_INPUT" }, { status: 400 });
+  }
+
+  if (normalized.employeeId && normalized.employeeId !== String(session.emp_id || "").trim().toUpperCase()) {
+    return Response.json({ error: "EMPLOYEE_MISMATCH" }, { status: 403 });
   }
 
   const { employee, error: employeeError } = await getEmployeeFromSessionEmpId(session.emp_id);
@@ -107,18 +247,26 @@ export async function POST(req) {
 
   const fakeGps = detectSuspiciousGps({
     accuracy,
-    clientCapturedAt: payload.captured_at,
+    clientCapturedAt: normalized.timestamp,
     clientFlags: fakeFlags,
   });
 
-  if (fakeGps.suspicious) {
+  const mergedFlags = [...new Set([
+    ...normalizeFlags(fakeFlags),
+    ...(fakeGps.suspicious ? fakeGps.reasons : []),
+  ])];
+  const normalizedScore = Math.max(0, Math.round(Number(normalized.suspicionScore || 0)));
+  const finalSuspicionScore = fakeGps.suspicious ? Math.max(75, normalizedScore) : normalizedScore;
+  const suspicionStatus = classifySuspicion(finalSuspicionScore);
+
+  if (suspicionStatus === "blocked") {
     await logAttendanceScanAttempt({
       employee_id: employee.id,
       emp_code: session.emp_id,
       date: today,
       action_type: "scan_unknown",
       success: false,
-      reason: `SUSPICIOUS_GPS:${fakeGps.reasons.join("|")}`,
+      reason: `SUSPICIOUS_SCAN_BLOCKED:${mergedFlags.join("|") || "score_threshold"}`,
       latitude,
       longitude,
       accuracy_meters: accuracy || null,
@@ -129,9 +277,35 @@ export async function POST(req) {
       user_agent: req.headers.get("user-agent") || null,
     });
 
+    await persistSuspiciousScan({
+      employee,
+      employeeCode: session.emp_id,
+      attendanceId: null,
+      timestamp: normalized.timestamp,
+      latitude,
+      longitude,
+      accuracy,
+      suspicionScore: finalSuspicionScore,
+      suspicionFlags: mergedFlags,
+      faceMatchScore: normalized.faceMatchScore,
+      deviceId,
+      scanStatus: "blocked",
+      reviewAction: "pending",
+      reviewNote: "Blocked by suspicious scan threshold",
+    });
+
+    await notifyHrBlockedScan({
+      employeeCode: session.emp_id,
+      suspicionScore: finalSuspicionScore,
+      suspicionFlags: mergedFlags,
+      timestamp: normalized.timestamp,
+    });
+
     return Response.json({
-      error: "SUSPICIOUS_GPS",
-      reasons: fakeGps.reasons,
+      error: "SUSPICIOUS_SCAN_BLOCKED",
+      status: "blocked",
+      suspicionScore: finalSuspicionScore,
+      suspicionFlags: mergedFlags,
     }, { status: 403 });
   }
 
@@ -203,7 +377,10 @@ export async function POST(req) {
       scan_in_photo_url: selfieUrl,
       scan_in_device_id: deviceId,
       status: "present",
-      notes: faceVerified ? "face_verified" : null,
+      notes: [
+        faceVerified ? "face_verified" : null,
+        suspicionStatus === "flagged" ? "suspicious_scan_flagged" : null,
+      ].filter(Boolean).join(",") || null,
     };
 
     const { error: insertError } = await supabaseServer
@@ -231,11 +408,38 @@ export async function POST(req) {
       user_agent: req.headers.get("user-agent") || null,
     });
 
+    const { data: insertedAttendance } = await supabaseServer
+      .from("attendance")
+      .select("id")
+      .eq("employee_id", employee.id)
+      .eq("date", today)
+      .maybeSingle();
+
+    await persistSuspiciousScan({
+      employee,
+      employeeCode: session.emp_id,
+      attendanceId: insertedAttendance?.id || null,
+      timestamp: normalized.timestamp,
+      latitude,
+      longitude,
+      accuracy,
+      suspicionScore: finalSuspicionScore,
+      suspicionFlags: mergedFlags,
+      faceMatchScore: normalized.faceMatchScore,
+      deviceId,
+      scanStatus: suspicionStatus,
+      reviewAction: suspicionStatus === "flagged" ? "pending" : "approved",
+      reviewNote: suspicionStatus === "flagged" ? "Awaiting HR review" : "Auto-normal",
+    });
+
     return Response.json({
       success: true,
       action: "scan_in",
       timestamp: nowIso,
       nearest: locationCheck.nearest,
+      suspiciousStatus: suspicionStatus,
+      suspicionScore: finalSuspicionScore,
+      suspicionFlags: mergedFlags,
     });
   }
 
@@ -292,10 +496,37 @@ export async function POST(req) {
     user_agent: req.headers.get("user-agent") || null,
   });
 
+  await persistSuspiciousScan({
+    employee,
+    employeeCode: session.emp_id,
+    attendanceId: row.id,
+    timestamp: normalized.timestamp,
+    latitude,
+    longitude,
+    accuracy,
+    suspicionScore: finalSuspicionScore,
+    suspicionFlags: mergedFlags,
+    faceMatchScore: normalized.faceMatchScore,
+    deviceId,
+    scanStatus: suspicionStatus,
+    reviewAction: suspicionStatus === "flagged" ? "pending" : "approved",
+    reviewNote: suspicionStatus === "flagged" ? "Awaiting HR review" : "Auto-normal",
+  });
+
   return Response.json({
     success: true,
     action: "scan_out",
     timestamp: nowIso,
     nearest: locationCheck.nearest,
+    suspiciousStatus: suspicionStatus,
+    suspicionScore: finalSuspicionScore,
+    suspicionFlags: mergedFlags,
   });
+  } catch (error) {
+    console.error("[attendance/scan] unhandled error:", error instanceof Error ? error.message : String(error));
+    return Response.json(
+      { error: "INTERNAL_SERVER_ERROR", message: error instanceof Error ? error.message : "Unknown error" },
+      { status: 500 }
+    );
+  }
 }

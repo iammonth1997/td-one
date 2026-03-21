@@ -16,8 +16,6 @@
 ## Security
 
 - Requires session token in `Authorization` header.
-- Requires LIFF ID token in `x-line-id-token` for scan and location verification.
-- LIFF token is verified against linked LINE user (`login_users.line_user_id`).
 - GPS validation is done server-side against `work_locations` radius.
 - Every scan attempt is logged in `attendance_scan_logs`.
 

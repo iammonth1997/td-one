@@ -1,6 +1,5 @@
 import bcrypt from "bcryptjs";
 import type { ActionFunctionArgs } from "react-router";
-import { verifyLineIdToken } from "~/lib/line-verify.server";
 import { sessionTokenCookie } from "~/lib/session-cookie.server";
 import { EMPLOYEE_PORTAL } from "~/lib/session-context";
 import { getSupabaseServerClient } from "~/lib/supabase.server";
@@ -39,18 +38,9 @@ export async function action({ request, context }: ActionFunctionArgs) {
     const lineUserId = String(body.line_user_id || "").trim();
     const idToken = String(body.id_token || "").trim();
 
-    if (!empId || !rawPassword || !lineUserId || !idToken) {
+    // PIN and emp_id required; LINE fields optional (LIFF removed)
+    if (!empId || !rawPassword) {
       return json({ error: "INVALID_INPUT" }, { status: 400 });
-    }
-
-    const tokenCheck = await verifyLineIdToken({
-      context,
-      idToken,
-      expectedUserId: lineUserId,
-    });
-
-    if (!tokenCheck.ok) {
-      return json({ error: tokenCheck.error, detail: (tokenCheck as { detail?: unknown }).detail || null }, { status: 401 });
     }
 
     const { supabaseServer } = getSupabaseServerClient(context);
@@ -98,30 +88,34 @@ export async function action({ request, context }: ActionFunctionArgs) {
       return json({ error: "INVALID_PIN" }, { status: 400 });
     }
 
-    const { data: linkedOtherUser, error: linkedOtherUserError } = await supabaseServer
-      .from("login_users")
-      .select("emp_id")
-      .eq("line_user_id", lineUserId)
-      .neq("emp_id", empId)
-      .maybeSingle();
+    // Check if LINE is being linked and validate conflict (optional, since LIFF removed)
+    if (lineUserId) {
+      const { data: linkedOtherUser, error: linkedOtherUserError } = await supabaseServer
+        .from("login_users")
+        .select("emp_id")
+        .eq("line_user_id", lineUserId)
+        .neq("emp_id", empId)
+        .maybeSingle();
 
-    if (linkedOtherUserError) {
-      console.error("verify-pin line_user_id conflict query failed:", linkedOtherUserError.message);
-      return json({ error: "DB_QUERY_FAILED" }, { status: 500 });
-    }
+      if (linkedOtherUserError) {
+        console.error("verify-pin line_user_id conflict query failed:", linkedOtherUserError.message);
+        return json({ error: "DB_QUERY_FAILED" }, { status: 500 });
+      }
 
-    if (linkedOtherUser) {
-      return json({ error: "LINE_ALREADY_LINKED" }, { status: 409 });
-    }
+      if (linkedOtherUser) {
+        return json({ error: "LINE_ALREADY_LINKED" }, { status: 409 });
+      }
 
-    const { error: linkError } = await supabaseServer
-      .from("login_users")
-      .update({ line_user_id: lineUserId })
-      .eq("emp_id", empId);
+      // Only link LINE if provided (LIFF removed, optional now)
+      const { error: linkError } = await supabaseServer
+        .from("login_users")
+        .update({ line_user_id: lineUserId })
+        .eq("emp_id", empId);
 
-    if (linkError) {
-      console.error("verify-pin line link update failed:", linkError.message);
-      return json({ error: "LINK_LINE_FAILED" }, { status: 500 });
+      if (linkError) {
+        console.error("verify-pin line link update failed:", linkError.message);
+        return json({ error: "LINK_LINE_FAILED" }, { status: 500 });
+      }
     }
 
     const mustChangePassword = Boolean(user.force_pin_change);

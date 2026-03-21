@@ -3,6 +3,8 @@ import { Link } from "react-router";
 import type { Route } from "./+types/scan";
 import { requireSession } from "~/lib/require-session.server";
 import { setDeviceIdCookie } from "~/lib/device-id";
+import { useGPSCollection } from "@/lib/useGPSCollection";
+import { checkInternalNetwork, type NetworkCheckResult } from "@/lib/gpsSpoofingDetection";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const session = await requireSession(request, context);
@@ -18,6 +20,8 @@ type GpsState = {
 
 type LangCode = "th" | "en" | "lo";
 
+type EmployeeLocationStatus = "collecting" | "verified" | "pending" | "blocked";
+
 const SCAN_I18N: Record<LangCode, {
   title: string;
   loading: string;
@@ -27,6 +31,7 @@ const SCAN_I18N: Record<LangCode, {
   workplace: string;
   selectArea: string;
   gpsStatus: string;
+  locationVerificationStatus: string;
   statusLabel: string;
   nearest: string;
   coords: string;
@@ -51,12 +56,14 @@ const SCAN_I18N: Record<LangCode, {
   cameraNotSupported: string;
   cameraStartFailed: string;
   loadFailed: string;
-  liffInitFailed: string;
-  liffTokenMissing: string;
   statusWaiting: string;
   statusInside: string;
   statusOutside: string;
   statusSuspicious: string;
+  collectingLocation: string;
+  locationVerifiedFriendly: string;
+  locationPendingFriendly: string;
+  locationBlockedFriendly: string;
   savingPrefix: string;
   timeLabel: string;
 }> = {
@@ -69,6 +76,7 @@ const SCAN_I18N: Record<LangCode, {
     workplace: "พื้นที่ทำงาน",
     selectArea: "เลือกพื้นที่",
     gpsStatus: "สถานะ GPS",
+    locationVerificationStatus: "การยืนยันตำแหน่ง",
     statusLabel: "สถานะ",
     nearest: "จุดใกล้สุด",
     coords: "พิกัด",
@@ -93,12 +101,14 @@ const SCAN_I18N: Record<LangCode, {
     cameraNotSupported: "อุปกรณ์นี้ไม่รองรับกล้อง",
     cameraStartFailed: "ไม่สามารถเปิดกล้องได้",
     loadFailed: "โหลดข้อมูลไม่สำเร็จ",
-    liffInitFailed: "ไม่สามารถเริ่ม LIFF ได้",
-    liffTokenMissing: "ไม่พบ LINE token: กรุณาเปิดผ่าน LINE LIFF",
     statusWaiting: "รอตรวจสอบตำแหน่ง",
     statusInside: "อยู่ในพื้นที่ทำงาน",
     statusOutside: "อยู่นอกพื้นที่ทำงาน",
     statusSuspicious: "พบความผิดปกติของ GPS",
+    collectingLocation: "กำลังตรวจสอบตำแหน่ง...",
+    locationVerifiedFriendly: "ยืนยันตำแหน่งแล้ว ✅",
+    locationPendingFriendly: "รอตรวจสอบตำแหน่ง ⚠️",
+    locationBlockedFriendly: "ไม่สามารถยืนยันตำแหน่งได้ ❌",
     savingPrefix: "กำลังอัปโหลดรูปถ่าย...",
     timeLabel: "เวลา",
   },
@@ -111,6 +121,7 @@ const SCAN_I18N: Record<LangCode, {
     workplace: "Work Area",
     selectArea: "Select Area",
     gpsStatus: "GPS Status",
+    locationVerificationStatus: "Location Verification",
     statusLabel: "Status",
     nearest: "Nearest",
     coords: "Coordinates",
@@ -135,12 +146,14 @@ const SCAN_I18N: Record<LangCode, {
     cameraNotSupported: "This device does not support camera",
     cameraStartFailed: "Unable to open camera",
     loadFailed: "Failed to load attendance data",
-    liffInitFailed: "Unable to initialize LIFF",
-    liffTokenMissing: "Missing LINE token: open this page from LINE LIFF",
     statusWaiting: "Waiting for location check",
     statusInside: "Inside work area",
     statusOutside: "Outside work area",
     statusSuspicious: "Suspicious GPS detected",
+    collectingLocation: "Collecting location...",
+    locationVerifiedFriendly: "Location verified ✅",
+    locationPendingFriendly: "Location check pending ⚠️",
+    locationBlockedFriendly: "Unable to verify location ❌",
     savingPrefix: "Uploading selfie...",
     timeLabel: "Time",
   },
@@ -153,6 +166,7 @@ const SCAN_I18N: Record<LangCode, {
     workplace: "ພື້ນທີ່ເຮັດວຽກ",
     selectArea: "ເລືອກພື້ນທີ່",
     gpsStatus: "ສະຖານະ GPS",
+    locationVerificationStatus: "ການຢືນຢັນຕຳແໜ່ງ",
     statusLabel: "ສະຖານະ",
     nearest: "ຈຸດໃກ້ສຸດ",
     coords: "ພິກັດ",
@@ -177,79 +191,37 @@ const SCAN_I18N: Record<LangCode, {
     cameraNotSupported: "ອຸປະກອນນີ້ບໍ່ຮອງຮັບກ້ອງ",
     cameraStartFailed: "ບໍ່ສາມາດເປີດກ້ອງໄດ້",
     loadFailed: "ໂຫຼດຂໍ້ມູນບໍ່ສຳເລັດ",
-    liffInitFailed: "ບໍ່ສາມາດເລີ່ມ LIFF ໄດ້",
-    liffTokenMissing: "ບໍ່ພົບ LINE token: ກະລຸນາເປີດຜ່ານ LINE LIFF",
     statusWaiting: "ກຳລັງລໍຖ້າການກວດສອບຕຳແໜ່ງ",
     statusInside: "ຢູ່ໃນເຂດເຮັດວຽກ",
     statusOutside: "ຢູ່ນອກເຂດເຮັດວຽກ",
     statusSuspicious: "ພົບ GPS ຜິດປົກກະຕິ",
+    collectingLocation: "ກຳລັງເກັບຂໍ້ມູນຕຳແໜ່ງ...",
+    locationVerifiedFriendly: "ຢືນຢັນຕຳແໜ່ງແລ້ວ ✅",
+    locationPendingFriendly: "ກຳລັງລໍຖ້າການກວດສອບ ⚠️",
+    locationBlockedFriendly: "ບໍ່ສາມາດຢືນຢັນຕຳແໜ່ງໄດ້ ❌",
     savingPrefix: "ກຳລັງອັບໂຫຼດຮູບ...",
     timeLabel: "ເວລາ",
   },
 };
 
-type LiffInstance = {
-  init: (args: { liffId: string }) => Promise<void>;
-  isLoggedIn: () => boolean;
-  login: (args?: { redirectUri?: string }) => void;
-  getIDToken: () => string | null;
-};
+function calculateNetworkSuspicionPoints(networkCheck: NetworkCheckResult | null): number {
+  if (!networkCheck) return 0;
+  if (!networkCheck.isOnCompanyNetwork) return 20;
+  if (networkCheck.responseTime > 2000) return 10;
+  return 0;
+}
 
 declare global {
   interface Window {
-    liff?: LiffInstance;
+    // LIFF SDK removed
   }
 }
 
-const DEFAULT_LIFF_ID = "2009413188-4647l7eA";
-
-function resolveLiffId() {
-  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
-  return env?.NEXT_PUBLIC_LIFF_ID || DEFAULT_LIFF_ID;
-}
-
-function loadLiffSdk() {
-  return new Promise<void>((resolve, reject) => {
-    if (typeof window === "undefined") {
-      reject(new Error("LIFF SDK can only run in browser"));
-      return;
-    }
-
-    if (window.liff) {
-      resolve();
-      return;
-    }
-
-    const existing = document.querySelector('script[data-sdk="line-liff"]') as HTMLScriptElement | null;
-    if (existing) {
-      existing.addEventListener("load", () => resolve(), { once: true });
-      existing.addEventListener("error", () => reject(new Error("Failed to load LIFF SDK")), { once: true });
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = "https://static.line-scdn.net/liff/edge/2/sdk.js";
-    script.async = true;
-    script.dataset.sdk = "line-liff";
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Failed to load LIFF SDK"));
-    document.head.appendChild(script);
-  });
-}
+// LIFF SDK removed after March 2026
 
 async function getLiffIdToken() {
-  if (typeof window === "undefined") return "";
-  await loadLiffSdk();
-  const liff = window.liff;
-  if (!liff) return "";
-
-  await liff.init({ liffId: resolveLiffId() });
-
-  if (!liff.isLoggedIn()) {
-    return "";
-  }
-
-  return String(liff.getIDToken() || "").trim();
+  // LIFF has been removed - return empty string
+  return "";
 }
 
 function makeDeviceId() {
@@ -337,7 +309,14 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const [selfieDataUrl, setSelfieDataUrl] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState("");
-  const [lineIdToken, setLineIdToken] = useState("");
+  const [networkCheck, setNetworkCheck] = useState<NetworkCheckResult | null>(null);
+  const [networkReady, setNetworkReady] = useState(false);
+
+  const gpsCollection = useGPSCollection({
+    readingsCount: 5,
+    readingInterval: 3000,
+    autoStart: true,
+  });
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -360,11 +339,19 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
   }
 
   function attendanceHeaders(extra?: Record<string, string>) {
-    return {
-      ...(extra || {}),
-      ...(lineIdToken ? { "x-line-id-token": lineIdToken } : {}),
-    };
+    return extra || {};
   }
+
+  const latestCollectedGps = useMemo(() => {
+    if (!gpsCollection.positions.length) return null;
+    const latest = gpsCollection.positions[gpsCollection.positions.length - 1];
+    return {
+      latitude: latest.latitude,
+      longitude: latest.longitude,
+      accuracy: Number(latest.accuracy || 0),
+      timestamp: latest.timestamp,
+    } as GpsState;
+  }, [gpsCollection.positions]);
 
   async function loadToday() {
     const [todayRes, locationRes] = await Promise.all([
@@ -508,11 +495,22 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
         method: "POST",
         headers: attendanceHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
+          employeeId: loaderData.empId,
+          timestamp: new Date(gps.timestamp).toISOString(),
+          gpsPosition: {
+            latitude: gps.latitude,
+            longitude: gps.longitude,
+            accuracy: gps.accuracy,
+          },
+          suspicionScore: finalSuspicionScore,
+          suspicionFlags: finalSuspicionFlags,
+          faceMatchScore: null,
+          deviceId: makeDeviceId(),
           latitude: gps.latitude,
           longitude: gps.longitude,
           accuracy: gps.accuracy,
           captured_at: new Date(gps.timestamp).toISOString(),
-          fake_flags: collectGpsFlags(gps),
+          fake_flags: [...new Set([...collectGpsFlags(gps), ...finalSuspicionFlags])],
           device_id: makeDeviceId(),
           device_name: navigator.userAgent,
           face_verified: false,
@@ -545,30 +543,32 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
     loadToday().catch((err: unknown) => {
       setFeedback({ type: "error", message: err instanceof Error ? err.message : SCAN_I18N[lang].loadFailed });
     });
-  }, [lineIdToken, lang]);
+  }, [lang]);
 
   useEffect(() => {
     let cancelled = false;
 
-    getLiffIdToken()
-      .then((token) => {
-        if (!cancelled) {
-          setLineIdToken(token);
-          if (!token) {
-            setFeedback((prev) => prev.message ? prev : { type: "error", message: SCAN_I18N[lang].liffTokenMissing });
-          }
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setFeedback((prev) => prev.message ? prev : { type: "error", message: SCAN_I18N[lang].liffInitFailed });
-        }
-      });
+    void (async () => {
+      const result = await checkInternalNetwork("/api/ping", 3000);
+      if (cancelled) return;
+      setNetworkCheck(result);
+      setNetworkReady(true);
+    })();
 
     return () => {
       cancelled = true;
     };
-  }, [lang]);
+  }, []);
+
+  useEffect(() => {
+    if (!gpsCollection.isReady || !latestCollectedGps) return;
+
+    setGps(latestCollectedGps);
+    const clientFlags = collectGpsFlags(latestCollectedGps);
+    void verifyLocation(latestCollectedGps, clientFlags).catch((err: unknown) => {
+      setGpsError(err instanceof Error ? err.message : "VERIFY_LOCATION_FAILED");
+    });
+  }, [gpsCollection.isReady, latestCollectedGps]);
 
   useEffect(() => {
     if (cameraEnabled) {
@@ -585,7 +585,52 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
   }, [cameraEnabled]);
 
   const suggestedAction = todayData?.suggested_action || "scan_in";
-  const canScan = Boolean(locationCheck?.inside) && !locationCheck?.suspicious_gps && suggestedAction !== "completed";
+
+  const finalSuspicion = useMemo(() => {
+    if (!gpsCollection.suspicionResult || !networkReady) return null;
+
+    const networkPoints = calculateNetworkSuspicionPoints(networkCheck);
+    const score = Math.max(0, Math.round((gpsCollection.suspicionResult.score || 0) + networkPoints));
+    const flags = [
+      ...(gpsCollection.suspicionResult.flags || []).map((f) => f.indicator),
+      ...(networkPoints > 0
+        ? [
+            !networkCheck?.isOnCompanyNetwork
+              ? "not_on_company_network"
+              : "slow_internal_network",
+          ]
+        : []),
+    ];
+
+    return {
+      score,
+      flags: [...new Set(flags)],
+    };
+  }, [gpsCollection.suspicionResult, networkReady, networkCheck]);
+
+  const finalSuspicionScore = finalSuspicion?.score ?? 0;
+  const finalSuspicionFlags = finalSuspicion?.flags ?? [];
+
+  const employeeLocationStatus: EmployeeLocationStatus = useMemo(() => {
+    if (!gpsCollection.isReady || !networkReady || !finalSuspicion) return "collecting";
+    if (finalSuspicion.score > 70) return "blocked";
+    if (finalSuspicion.score >= 31) return "pending";
+    return "verified";
+  }, [gpsCollection.isReady, networkReady, finalSuspicion]);
+
+  const employeeLocationStatusText = useMemo(() => {
+    const labels = SCAN_I18N[lang];
+    if (employeeLocationStatus === "collecting") return labels.collectingLocation;
+    if (employeeLocationStatus === "verified") return labels.locationVerifiedFriendly;
+    if (employeeLocationStatus === "pending") return labels.locationPendingFriendly;
+    return labels.locationBlockedFriendly;
+  }, [employeeLocationStatus, lang]);
+
+  const canScan = Boolean(locationCheck?.inside)
+    && !locationCheck?.suspicious_gps
+    && suggestedAction !== "completed"
+    && employeeLocationStatus !== "collecting"
+    && employeeLocationStatus !== "blocked";
 
   const statusLabel = useMemo(() => {
     if (!locationCheck) return SCAN_I18N[lang].statusWaiting;
@@ -694,6 +739,10 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
           <h3 className="mb-2 text-base font-bold text-[#111111]">{T.gpsStatus}</h3>
           <div className="rounded-xl border border-[#FECACA] bg-white p-3 text-sm text-[#444444]">
             <p><span className="font-semibold">{T.statusLabel}:</span> {statusLabel}</p>
+            <p className="mt-1"><span className="font-semibold">{T.locationVerificationStatus}:</span> {employeeLocationStatusText}</p>
+            {gpsCollection.isCollecting ? (
+              <p className="mt-1 text-xs text-[#555555]">{gpsCollection.progress}/5</p>
+            ) : null}
             <p className="mt-1"><span className="font-semibold">{T.nearest}:</span> {locationCheck?.nearest?.name || selectedWorkArea || "-"}</p>
             <p className="mt-1"><span className="font-semibold">{T.coords}:</span> {gps ? `${gps.latitude.toFixed(6)}, ${gps.longitude.toFixed(6)}` : "-"}</p>
           </div>

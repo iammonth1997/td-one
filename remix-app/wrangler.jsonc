@@ -6,10 +6,6 @@
   "main": "./workers/app.ts",
   "workers_dev": true,
   "vars": {
-    "NEXT_PUBLIC_APP_BASE_URL": "https://tdone-erp.com",
-    "NEXT_PUBLIC_LIFF_ID": "2009413188-4647l7eA",
-    "LINE_LOGIN_CHANNEL_ID": "2009413188",
-    "ATTENDANCE_ALLOW_DEV_WITHOUT_LIFF": "false",
     "ATTENDANCE_MIN_RADIUS_METERS": "100",
     "ATTENDANCE_MAX_RADIUS_METERS": "500",
     "ATTENDANCE_DEFAULT_RADIUS_METERS": "200",

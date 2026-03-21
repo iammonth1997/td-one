@@ -27,10 +27,6 @@
 
 Set these in your deployment platform:
 
-- `NEXT_PUBLIC_APP_BASE_URL=https://tdone-erp.com`
-- `NEXT_PUBLIC_LIFF_ID=2009413188-4647l7eA`
-- `LINE_LOGIN_CHANNEL_ID=2009413188`
-- `ATTENDANCE_ALLOW_DEV_WITHOUT_LIFF=false`
 - `CRON_SECRET=<strong-random-secret>`
 - Keep existing Supabase variables unchanged.
 
@@ -60,14 +56,12 @@ If you use Cloudflare, also configure a scheduler to call:
 
 ### 3) LINE Developers check
 
-- LIFF Endpoint URL should be `https://tdone-erp.com`
-- Test via LIFF URL:
-  - `https://liff.line.me/2009413188-4647l7eA`
+- Rich Menu setup (if not already configured)
+- Messaging API webhook for rich-menu updates
 
 ## C) Production smoke test (must pass)
 
-1. Open LIFF URL in LINE app.
-2. Login/link flow works.
+1. Login to the web app and verify access control works.
 3. Open `/scan` and refresh GPS.
 4. Inside work area -> `Scan In` enabled.
 5. `Scan In` success, then `Scan Out` success.

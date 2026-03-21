@@ -22,10 +22,6 @@ Use `.env.example` as the source of truth.
 
 ### Non-secret vars (`wrangler.jsonc -> vars`)
 
-- `NEXT_PUBLIC_APP_BASE_URL`
-- `NEXT_PUBLIC_LIFF_ID`
-- `LINE_LOGIN_CHANNEL_ID`
-- `ATTENDANCE_ALLOW_DEV_WITHOUT_LIFF`
 - `ATTENDANCE_MIN_RADIUS_METERS`
 - `ATTENDANCE_MAX_RADIUS_METERS`
 - `ATTENDANCE_DEFAULT_RADIUS_METERS`
@@ -92,5 +88,4 @@ npm run deploy
 	- Header `Authorization: Bearer <CRON_SECRET>`
 2. Verify cron endpoint response manually:
 	- `curl -H "Authorization: Bearer <CRON_SECRET>" https://tdone-erp.com/api/cron/cleanup-cancelled-leave-files`
-3. Verify LIFF endpoint points to production domain.
-4. Run smoke tests for login, scan in/out, request flows, and slip flows.
+3. Run smoke tests for login, scan in/out, request flows, and slip flows.

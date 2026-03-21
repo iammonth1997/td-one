@@ -1,6 +1,6 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 // @ts-ignore legacy JS module imported from server runtime
-import * as legacy from "../../../server/api/liff-login/route.js";
+import * as legacy from "../../../server/api/admin/attendance-suspicious/route.js";
 import { proxyLegacyApi } from "~/lib/legacy-api-bridge.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -10,7 +10,3 @@ export async function loader({ request }: LoaderFunctionArgs) {
 export async function action({ request }: ActionFunctionArgs) {
   return proxyLegacyApi(request, legacy);
 }
-
-
-
-
