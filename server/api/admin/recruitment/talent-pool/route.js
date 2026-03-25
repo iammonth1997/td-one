@@ -1,5 +1,5 @@
 import { validateSession } from '@/lib/validateSession';
-import { supabaseServer } from '@/lib/supabaseServer';
+import prisma from '@/lib/prisma';
 import { isAdminSession } from '@/lib/recruitmentExpandedUtils';
 
 export async function GET(req) {
@@ -13,29 +13,43 @@ export async function GET(req) {
   const minRating = Number(searchParams.get('min_rating') || 0);
   const position = String(searchParams.get('position') || '').trim();
 
-  let query = supabaseServer
-    .from('recruitment_candidates')
-    .select('id, full_name, position_applied, phone, email, in_talent_pool, talent_pool_tags, talent_pool_rating, talent_pool_notes, last_contacted_at, willing_to_reapply, talent_pool_added_at')
-    .eq('in_talent_pool', true)
-    .order('talent_pool_rating', { ascending: false })
-    .limit(limit);
+  const where = { in_talent_pool: true };
+  if (minRating > 0) where.talent_pool_rating = { gte: minRating };
+  if (position) where.position_applied = { contains: position, mode: 'insensitive' };
 
-  if (minRating > 0) query = query.gte('talent_pool_rating', minRating);
-  if (position) query = query.ilike('position_applied', `%${position}%`);
-
-  const { data, error } = await query;
-  if (error) return Response.json({ error: 'TALENT_POOL_QUERY_FAILED', detail: error.message }, { status: 500 });
-
-  let rows = data || [];
-  if (tags) {
-    const tagList = tags.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
-    rows = rows.filter((r) => {
-      const cTags = Array.isArray(r.talent_pool_tags) ? r.talent_pool_tags.map((t) => String(t).toLowerCase()) : [];
-      return tagList.some((tag) => cTags.includes(tag));
+  try {
+    let rows = await prisma.recruitmentCandidate.findMany({
+      where,
+      orderBy: { talent_pool_rating: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        full_name: true,
+        position_applied: true,
+        phone: true,
+        email: true,
+        in_talent_pool: true,
+        talent_pool_tags: true,
+        talent_pool_rating: true,
+        talent_pool_notes: true,
+        last_contacted_at: true,
+        willing_to_reapply: true,
+        talent_pool_added_at: true,
+      },
     });
-  }
 
-  return Response.json({ success: true, rows, total: rows.length });
+    if (tags) {
+      const tagList = tags.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
+      rows = rows.filter((r) => {
+        const cTags = Array.isArray(r.talent_pool_tags) ? r.talent_pool_tags.map((t) => String(t).toLowerCase()) : [];
+        return tagList.some((tag) => cTags.includes(tag));
+      });
+    }
+
+    return Response.json({ success: true, rows, total: rows.length });
+  } catch (err) {
+    return Response.json({ error: 'TALENT_POOL_QUERY_FAILED', detail: err.message }, { status: 500 });
+  }
 }
 
 export async function POST(req) {
@@ -50,31 +64,42 @@ export async function POST(req) {
     const candidateId = String(body.candidate_id || '').trim();
     if (!candidateId) return Response.json({ error: 'MISSING_CANDIDATE_ID' }, { status: 400 });
 
-    const { data: existing } = await supabaseServer.from('recruitment_candidates').select('id, in_talent_pool').eq('id', candidateId).maybeSingle();
-    if (!existing) return Response.json({ error: 'CANDIDATE_NOT_FOUND' }, { status: 404 });
-    if (existing.in_talent_pool) return Response.json({ error: 'ALREADY_IN_POOL' }, { status: 409 });
+    try {
+      const existing = await prisma.recruitmentCandidate.findUnique({
+        where: { id: candidateId },
+        select: { id: true, in_talent_pool: true },
+      });
+      if (!existing) return Response.json({ error: 'CANDIDATE_NOT_FOUND' }, { status: 404 });
+      if (existing.in_talent_pool) return Response.json({ error: 'ALREADY_IN_POOL' }, { status: 409 });
 
-    const rating = body.talent_pool_rating ? Number(body.talent_pool_rating) : null;
-    if (rating != null && (rating < 1 || rating > 5)) {
-      return Response.json({ error: 'INVALID_RATING_1_TO_5' }, { status: 400 });
+      const rating = body.talent_pool_rating ? Number(body.talent_pool_rating) : null;
+      if (rating != null && (rating < 1 || rating > 5)) {
+        return Response.json({ error: 'INVALID_RATING_1_TO_5' }, { status: 400 });
+      }
+
+      const data = await prisma.recruitmentCandidate.update({
+        where: { id: candidateId },
+        data: {
+          in_talent_pool: true,
+          talent_pool_added_at: new Date(),
+          talent_pool_tags: body.talent_pool_tags || null,
+          talent_pool_rating: rating,
+          talent_pool_notes: body.talent_pool_notes ? String(body.talent_pool_notes).trim() : null,
+          willing_to_reapply: Boolean(body.willing_to_reapply ?? null),
+        },
+        select: {
+          id: true,
+          full_name: true,
+          in_talent_pool: true,
+          talent_pool_tags: true,
+          talent_pool_rating: true,
+          talent_pool_added_at: true,
+        },
+      });
+      return Response.json({ success: true, row: data });
+    } catch (err) {
+      return Response.json({ error: 'TALENT_POOL_ADD_FAILED', detail: err.message }, { status: 500 });
     }
-
-    const { data, error } = await supabaseServer
-      .from('recruitment_candidates')
-      .update({
-        in_talent_pool: true,
-        talent_pool_added_at: new Date().toISOString(),
-        talent_pool_tags: body.talent_pool_tags || null,
-        talent_pool_rating: rating,
-        talent_pool_notes: body.talent_pool_notes ? String(body.talent_pool_notes).trim() : null,
-        willing_to_reapply: Boolean(body.willing_to_reapply ?? null),
-      })
-      .eq('id', candidateId)
-      .select('id, full_name, in_talent_pool, talent_pool_tags, talent_pool_rating, talent_pool_added_at')
-      .maybeSingle();
-
-    if (error) return Response.json({ error: 'TALENT_POOL_ADD_FAILED', detail: error.message }, { status: 500 });
-    return Response.json({ success: true, row: data });
   }
 
   if (action === 'update_pool') {
@@ -93,44 +118,63 @@ export async function POST(req) {
 
     if (!Object.keys(patch).length) return Response.json({ error: 'NO_CHANGES' }, { status: 400 });
 
-    const { data, error } = await supabaseServer.from('recruitment_candidates').update(patch).eq('id', candidateId).eq('in_talent_pool', true).select('id, full_name, in_talent_pool, talent_pool_tags, talent_pool_rating, talent_pool_notes').maybeSingle();
-    if (error) return Response.json({ error: 'TALENT_POOL_UPDATE_FAILED', detail: error.message }, { status: 500 });
-    if (!data) return Response.json({ error: 'CANDIDATE_NOT_IN_POOL' }, { status: 404 });
-    return Response.json({ success: true, row: data });
+    try {
+      // Ensure candidate is actually in the pool
+      const inPool = await prisma.recruitmentCandidate.findFirst({ where: { id: candidateId, in_talent_pool: true } });
+      if (!inPool) return Response.json({ error: 'CANDIDATE_NOT_IN_POOL' }, { status: 404 });
+
+      const data = await prisma.recruitmentCandidate.update({
+        where: { id: candidateId },
+        data: patch,
+        select: {
+          id: true,
+          full_name: true,
+          in_talent_pool: true,
+          talent_pool_tags: true,
+          talent_pool_rating: true,
+          talent_pool_notes: true,
+        },
+      });
+      return Response.json({ success: true, row: data });
+    } catch (err) {
+      return Response.json({ error: 'TALENT_POOL_UPDATE_FAILED', detail: err.message }, { status: 500 });
+    }
   }
 
   if (action === 'remove_from_pool') {
     const candidateId = String(body.candidate_id || '').trim();
     if (!candidateId) return Response.json({ error: 'MISSING_CANDIDATE_ID' }, { status: 400 });
 
-    const { data, error } = await supabaseServer
-      .from('recruitment_candidates')
-      .update({ in_talent_pool: false, talent_pool_added_at: null })
-      .eq('id', candidateId)
-      .eq('in_talent_pool', true)
-      .select('id')
-      .maybeSingle();
+    try {
+      const inPool = await prisma.recruitmentCandidate.findFirst({ where: { id: candidateId, in_talent_pool: true } });
+      if (!inPool) return Response.json({ error: 'CANDIDATE_NOT_IN_POOL' }, { status: 404 });
 
-    if (error) return Response.json({ error: 'TALENT_POOL_REMOVE_FAILED', detail: error.message }, { status: 500 });
-    if (!data) return Response.json({ error: 'CANDIDATE_NOT_IN_POOL' }, { status: 404 });
-    return Response.json({ success: true });
+      await prisma.recruitmentCandidate.update({
+        where: { id: candidateId },
+        data: { in_talent_pool: false, talent_pool_added_at: null },
+      });
+      return Response.json({ success: true });
+    } catch (err) {
+      return Response.json({ error: 'TALENT_POOL_REMOVE_FAILED', detail: err.message }, { status: 500 });
+    }
   }
 
   if (action === 'contact_log') {
     const candidateId = String(body.candidate_id || '').trim();
     if (!candidateId) return Response.json({ error: 'MISSING_CANDIDATE_ID' }, { status: 400 });
 
-    const { data, error } = await supabaseServer
-      .from('recruitment_candidates')
-      .update({ last_contacted_at: new Date().toISOString() })
-      .eq('id', candidateId)
-      .eq('in_talent_pool', true)
-      .select('id')
-      .maybeSingle();
+    try {
+      const inPool = await prisma.recruitmentCandidate.findFirst({ where: { id: candidateId, in_talent_pool: true } });
+      if (!inPool) return Response.json({ error: 'CANDIDATE_NOT_IN_POOL' }, { status: 404 });
 
-    if (error) return Response.json({ error: 'CONTACT_LOG_FAILED', detail: error.message }, { status: 500 });
-    if (!data) return Response.json({ error: 'CANDIDATE_NOT_IN_POOL' }, { status: 404 });
-    return Response.json({ success: true });
+      await prisma.recruitmentCandidate.update({
+        where: { id: candidateId },
+        data: { last_contacted_at: new Date() },
+      });
+      return Response.json({ success: true });
+    } catch (err) {
+      return Response.json({ error: 'CONTACT_LOG_FAILED', detail: err.message }, { status: 500 });
+    }
   }
 
   return Response.json({ error: 'UNKNOWN_ACTION' }, { status: 400 });

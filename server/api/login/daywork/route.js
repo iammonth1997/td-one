@@ -1,4 +1,4 @@
-import { supabaseServer } from "@/lib/supabaseServer";
+import prisma from "@/lib/prisma";
 import { validateSession } from "@/lib/validateSession";
 import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
 import { hasAnyPermission } from "@/lib/rbac/access";
@@ -35,62 +35,63 @@ export async function GET(req) {
       return Response.json({ error: "FORBIDDEN" }, { status: 403 });
     }
 
-    const { data: work, error: workError } = await supabaseServer
-      .from("attendance_monthly")
-      .select("*")
-      .eq("emp_id", emp_id)
-      .eq("month", Number(month))
-      .eq("year", Number(year))
-      .single();
-
-    if (workError) {
+    // attendance_monthly is not in the Prisma schema; use raw SQL
+    const monthNum = Number(month);
+    const yearNum = Number(year);
+    let workRows;
+    try {
+      workRows = await prisma.$queryRaw`
+        SELECT *
+        FROM attendance_monthly
+        WHERE emp_id = ${emp_id}
+          AND month = ${monthNum}
+          AND year  = ${yearNum}
+        LIMIT 1
+      `;
+    } catch (err) {
       return Response.json(
-        { error: "DAYWORK_NOT_FOUND", detail: workError.message },
+        { error: "DAYWORK_NOT_FOUND", detail: err.message },
         { status: 404 }
       );
     }
 
-    // Query employee basic fields — no JOIN syntax to avoid FK dependency
-    const { data: emp, error: empError } = await supabaseServer
-      .from("employees")
-      .select("employee_code, first_name_th, last_name_th, position_id, department_id, work_site_id")
-      .eq("employee_code", emp_id)
-      .maybeSingle();
-
-    if (empError) {
-      console.error("employees query failed:", empError.message);
+    const work = workRows[0] || null;
+    if (!work) {
+      return Response.json(
+        { error: "DAYWORK_NOT_FOUND", detail: "No record found" },
+        { status: 404 }
+      );
     }
 
-    let positionName = null;
-    let departmentName = null;
-    let workSiteName = null;
-
-    if (emp) {
-      const [posRes, deptRes, siteRes] = await Promise.all([
-        emp.position_id
-          ? supabaseServer.from("positions").select("title_th").eq("id", emp.position_id).maybeSingle()
-          : Promise.resolve({ data: null }),
-        emp.department_id
-          ? supabaseServer.from("departments").select("name_th").eq("id", emp.department_id).maybeSingle()
-          : Promise.resolve({ data: null }),
-        emp.work_site_id
-          ? supabaseServer.from("work_sites").select("name_th").eq("id", emp.work_site_id).maybeSingle()
-          : Promise.resolve({ data: null }),
-      ]);
-
-      positionName = posRes.data?.title_th || null;
-      departmentName = deptRes.data?.name_th || null;
-      workSiteName = siteRes.data?.name_th || null;
+    // Query employee with position, department, and work-site relations in a
+    // single Prisma query. The Prisma schema uses first_name / last_name;
+    // these are mapped to first_name_th / last_name_th in the response to
+    // preserve the existing API shape.
+    let emp = null;
+    try {
+      emp = await prisma.employee.findFirst({
+        where: { employee_code: emp_id },
+        select: {
+          employee_code: true,
+          first_name: true,
+          last_name: true,
+          position: { select: { name: true } },
+          department: { select: { name: true } },
+          workSite: { select: { name: true } },
+        },
+      });
+    } catch (empErr) {
+      console.error("employees query failed:", empErr.message);
     }
 
     const employee = emp
       ? {
           employee_code: emp.employee_code,
-          first_name_th: emp.first_name_th,
-          last_name_th: emp.last_name_th,
-          position: positionName ? { name: positionName } : null,
-          department: departmentName ? { name: departmentName } : null,
-          work_site: workSiteName ? { name: workSiteName } : null,
+          first_name_th: emp.first_name,
+          last_name_th: emp.last_name,
+          position: emp.position ? { name: emp.position.name } : null,
+          department: emp.department ? { name: emp.department.name } : null,
+          work_site: emp.workSite ? { name: emp.workSite.name } : null,
         }
       : null;
 

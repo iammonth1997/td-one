@@ -1,5 +1,5 @@
 import { validateSession } from "@/lib/validateSession";
-import { supabaseServer } from "@/lib/supabaseServer";
+import prisma from "@/lib/prisma";
 import { buildSessionAccessProfile, canManageAdminActions } from "@/lib/rbac/sessionAccess";
 
 export async function PUT(req) {
@@ -22,22 +22,21 @@ export async function PUT(req) {
   const action = String(body.action || "").trim().toLowerCase();
   const reviewNote = String(body.note || body.reason || "").trim() || null;
 
-  if (![
-    "approve",
-    "reject",
-  ].includes(action)) {
+  if (!["approve", "reject"].includes(action)) {
     return Response.json({ error: "UNSUPPORTED_ACTION" }, { status: 400 });
   }
 
-  const { data: existing, error: existingError } = await supabaseServer
-    .from("attendance_suspicious_scans")
-    .select("id, attendance_id, scan_status, review_action")
-    .eq("id", id)
-    .maybeSingle();
-
-  if (existingError) {
-    return Response.json({ error: "SUSPICIOUS_SCAN_QUERY_FAILED", detail: existingError.message }, { status: 500 });
+  // Look up the existing suspicious scan record
+  let existing = null;
+  try {
+    existing = await prisma.attendanceSuspiciousScan.findUnique({
+      where: { id },
+      select: { id: true, attendance_id: true, scan_status: true, review_action: true },
+    });
+  } catch (err) {
+    return Response.json({ error: "SUSPICIOUS_SCAN_QUERY_FAILED", detail: err.message }, { status: 500 });
   }
+
   if (!existing) {
     return Response.json({ error: "SUSPICIOUS_SCAN_NOT_FOUND" }, { status: 404 });
   }
@@ -50,39 +49,37 @@ export async function PUT(req) {
     return Response.json({ error: "SCAN_ALREADY_REVIEWED" }, { status: 400 });
   }
 
-  const nowIso = new Date().toISOString();
   const nextAction = action === "approve" ? "approved" : "rejected";
 
-  const { data: row, error: updateError } = await supabaseServer
-    .from("attendance_suspicious_scans")
-    .update({
-      review_action: nextAction,
-      review_note: reviewNote,
-      reviewed_by_emp_id: session.emp_id,
-      reviewed_at: nowIso,
-      updated_at: nowIso,
-    })
-    .eq("id", id)
-    .select("*")
-    .maybeSingle();
-
-  if (updateError) {
-    return Response.json({ error: "SUSPICIOUS_SCAN_UPDATE_FAILED", detail: updateError.message }, { status: 500 });
+  // Update the suspicious scan record
+  let row = null;
+  try {
+    row = await prisma.attendanceSuspiciousScan.update({
+      where: { id },
+      data: {
+        review_action: nextAction,
+        review_note: reviewNote,
+        reviewed_by_emp_id: session.emp_id,
+        reviewed_at: new Date(),
+      },
+    });
+  } catch (err) {
+    return Response.json({ error: "SUSPICIOUS_SCAN_UPDATE_FAILED", detail: err.message }, { status: 500 });
   }
 
+  // Patch the linked attendance row if present
   if (existing.attendance_id) {
-    const attendancePatch =
-      action === "reject"
-        ? { status: "absent", updated_at: nowIso, notes: "flagged_scan_rejected" }
-        : { status: "present", updated_at: nowIso, notes: "flagged_scan_approved" };
+    const attendancePatch = action === "reject"
+      ? { status: "absent", notes: "flagged_scan_rejected" }
+      : { status: "present", notes: "flagged_scan_approved" };
 
-    const { error: attendanceError } = await supabaseServer
-      .from("attendance")
-      .update(attendancePatch)
-      .eq("id", existing.attendance_id);
-
-    if (attendanceError) {
-      return Response.json({ error: "ATTENDANCE_UPDATE_FAILED", detail: attendanceError.message }, { status: 500 });
+    try {
+      await prisma.attendance.update({
+        where: { id: existing.attendance_id },
+        data: attendancePatch,
+      });
+    } catch (err) {
+      return Response.json({ error: "ATTENDANCE_UPDATE_FAILED", detail: err.message }, { status: 500 });
     }
   }
 

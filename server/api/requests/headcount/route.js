@@ -1,5 +1,5 @@
 import { validateSession } from '@/lib/validateSession';
-import { supabaseServer } from '@/lib/supabaseServer';
+import prisma from '@/lib/prisma';
 import {
   canSubmitHeadcountRequest,
   resolveEmployeeId,
@@ -31,36 +31,33 @@ export async function POST(req) {
   const { requestNumber, error: numError } = await generateHeadcountRequestNumber();
   if (numError) return Response.json({ error: 'REQUEST_NUMBER_GENERATION_FAILED', detail: numError.message }, { status: 500 });
 
-  const { data, error } = await supabaseServer
-    .from('headcount_requests')
-    .insert({
-      request_number: requestNumber,
-      requested_by: employee.id,
-      requested_by_emp_code: session.emp_id,
-      department: body.department ? String(body.department).trim() : null,
-      work_site_id: body.work_site_id || null,
-      position_title: positionTitle,
-      number_of_positions: numberOfPositions,
-      employment_type: String(body.employment_type || 'full_time').trim().toLowerCase(),
-      urgency: String(body.urgency || 'normal').trim().toLowerCase(),
-      reason_type: reasonType,
-      replacing_employee_id: body.replacing_employee_id || null,
-      justification,
-      expected_start_date: body.expected_start_date ? String(body.expected_start_date).trim() : null,
-      budget_salary_min: body.budget_salary_min != null ? Number(body.budget_salary_min) : null,
-      budget_salary_max: body.budget_salary_max != null ? Number(body.budget_salary_max) : null,
-      job_requirements: body.job_requirements ? String(body.job_requirements).trim() : null,
-      manpower_plan_item_id: body.manpower_plan_item_id || null,
-    })
-    .select('*')
-    .maybeSingle();
-
-  if (error) {
-    if (error.code === '23505') return Response.json({ error: 'DUPLICATE_REQUEST_NUMBER' }, { status: 409 });
-    return Response.json({ error: 'HEADCOUNT_REQUEST_CREATE_FAILED', detail: error.message }, { status: 500 });
+  try {
+    const data = await prisma.headcountRequest.create({
+      data: {
+        request_number: requestNumber,
+        requested_by: employee.id,
+        requested_by_emp_code: session.emp_id,
+        department: body.department ? String(body.department).trim() : null,
+        work_site_id: body.work_site_id || null,
+        position_title: positionTitle,
+        number_of_positions: numberOfPositions,
+        employment_type: String(body.employment_type || 'full_time').trim().toLowerCase(),
+        urgency: String(body.urgency || 'normal').trim().toLowerCase(),
+        reason_type: reasonType,
+        replacing_employee_id: body.replacing_employee_id || null,
+        justification,
+        expected_start_date: body.expected_start_date ? String(body.expected_start_date).trim() : null,
+        budget_salary_min: body.budget_salary_min != null ? Number(body.budget_salary_min) : null,
+        budget_salary_max: body.budget_salary_max != null ? Number(body.budget_salary_max) : null,
+        job_requirements: body.job_requirements ? String(body.job_requirements).trim() : null,
+        manpower_plan_item_id: body.manpower_plan_item_id || null,
+      },
+    });
+    return Response.json({ success: true, row: data }, { status: 201 });
+  } catch (err) {
+    if (err.code === 'P2002') return Response.json({ error: 'DUPLICATE_REQUEST_NUMBER' }, { status: 409 });
+    return Response.json({ error: 'HEADCOUNT_REQUEST_CREATE_FAILED', detail: err.message }, { status: 500 });
   }
-
-  return Response.json({ success: true, row: data }, { status: 201 });
 }
 
 export async function GET(req) {
@@ -76,16 +73,22 @@ export async function GET(req) {
   const status = String(searchParams.get('status') || '').trim().toLowerCase();
   const limit = Math.min(Number(searchParams.get('limit') || 20), 100);
 
-  let query = supabaseServer
-    .from('headcount_requests')
-    .select('id, request_number, position_title, number_of_positions, urgency, status, current_approval_step, expected_start_date, created_at, updated_at')
-    .eq('requested_by', employee.id)
-    .order('created_at', { ascending: false })
-    .limit(limit);
+  const where = { requested_by: employee.id };
+  if (status) where.status = status;
 
-  if (status) query = query.eq('status', status);
-
-  const { data, error } = await query;
-  if (error) return Response.json({ error: 'HEADCOUNT_REQUESTS_QUERY_FAILED', detail: error.message }, { status: 500 });
-  return Response.json({ success: true, rows: data || [] });
+  try {
+    const rows = await prisma.headcountRequest.findMany({
+      where,
+      select: {
+        id: true, request_number: true, position_title: true, number_of_positions: true,
+        urgency: true, status: true, current_approval_step: true, expected_start_date: true,
+        created_at: true, updated_at: true,
+      },
+      orderBy: { created_at: 'desc' },
+      take: limit,
+    });
+    return Response.json({ success: true, rows });
+  } catch (err) {
+    return Response.json({ error: 'HEADCOUNT_REQUESTS_QUERY_FAILED', detail: err.message }, { status: 500 });
+  }
 }

@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
-import { supabaseServer } from "@/lib/supabaseServer";
+import prisma from "@/lib/prisma";
 import { validateSession } from "@/lib/validateSession";
 import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
 import { hasAnyPermission } from "@/lib/rbac/access";
@@ -37,14 +37,14 @@ export async function POST(req) {
     return Response.json({ error: "INVALID_INPUT" }, { status: 400 });
   }
 
-  const { data: targetUser, error: targetUserError } = await supabaseServer
-    .from("login_users")
-    .select("emp_id")
-    .eq("emp_id", targetEmpId)
-    .maybeSingle();
-
-  if (targetUserError) {
-    console.error("issue temp pin login_users query failed:", targetUserError.message);
+  let targetUser;
+  try {
+    targetUser = await prisma.loginUser.findFirst({
+      where: { emp_id: targetEmpId },
+      select: { emp_id: true },
+    });
+  } catch (err) {
+    console.error("issue temp pin login_users query failed:", err.message);
     return Response.json({ error: "DB_QUERY_FAILED" }, { status: 500 });
   }
 
@@ -54,45 +54,46 @@ export async function POST(req) {
 
   const tempPin = generateTempPin();
   const pinHash = await bcrypt.hash(tempPin, 10);
-  const expiresAt = new Date(Date.now() + TEMP_PIN_TTL_MINUTES * 60 * 1000).toISOString();
+  const expiresAt = new Date(Date.now() + TEMP_PIN_TTL_MINUTES * 60 * 1000);
+  const issuedAt = new Date();
 
-  const { error: updateError } = await supabaseServer
-    .from("login_users")
-    .update({
-      pin_hash: pinHash,
-      is_registered: true,
-      force_pin_change: true,
-      temp_pin_expires_at: expiresAt,
-      temp_pin_issued_at: new Date().toISOString(),
-      temp_pin_issued_by: session.emp_id,
-    })
-    .eq("emp_id", targetEmpId);
-
-  if (updateError) {
-    console.error("issue temp pin update failed:", updateError.message);
+  // Update login_users — includes fields not yet in the Prisma schema
+  // (is_registered, temp_pin_issued_at, temp_pin_issued_by). Raw SQL is used
+  // so that all columns are written atomically.
+  try {
+    await prisma.$executeRaw`
+      UPDATE login_users SET
+        pin_hash            = ${pinHash},
+        is_registered       = true,
+        force_pin_change    = true,
+        temp_pin_expires_at = ${expiresAt},
+        temp_pin_issued_at  = ${issuedAt},
+        temp_pin_issued_by  = ${session.emp_id},
+        updated_at          = NOW()
+      WHERE emp_id = ${targetEmpId}
+    `;
+  } catch (err) {
+    console.error("issue temp pin update failed:", err.message);
     return Response.json({ error: "UPDATE_FAILED" }, { status: 500 });
   }
 
   const ipAddress = getClientIp(req);
   const userAgent = req.headers.get("user-agent") || null;
-  const { error: auditError } = await supabaseServer
-    .from("pin_reset_audit")
-    .insert({
-      target_emp_id: targetEmpId,
-      reset_by_emp_id: session.emp_id,
-      reset_by_role: session.role,
-      ip_address: ipAddress,
-      user_agent: userAgent,
-    });
 
-  if (auditError) {
-    console.error("issue temp pin audit insert failed:", auditError.message);
+  // pin_reset_audit table is not yet in the Prisma schema; use raw SQL
+  try {
+    await prisma.$executeRaw`
+      INSERT INTO pin_reset_audit (target_emp_id, reset_by_emp_id, reset_by_role, ip_address, user_agent)
+      VALUES (${targetEmpId}, ${session.emp_id}, ${session.role}, ${ipAddress}, ${userAgent})
+    `;
+  } catch (err) {
+    console.error("issue temp pin audit insert failed:", err.message);
   }
 
   return Response.json({
     success: true,
     emp_id: targetEmpId,
     temp_pin: tempPin,
-    expires_at: expiresAt,
+    expires_at: expiresAt.toISOString(),
   });
 }

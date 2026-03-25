@@ -1,5 +1,5 @@
 import { validateSession } from '@/lib/validateSession';
-import { supabaseServer } from '@/lib/supabaseServer';
+import prisma from '@/lib/prisma';
 import { isAdminSession } from '@/lib/recruitmentExpandedUtils';
 
 const COST_CATEGORIES = ['advertising', 'candidate_travel', 'agency_fee', 'medical_check', 'training', 'uniform_ppe', 'relocation', 'other'];
@@ -15,31 +15,47 @@ export async function GET(req) {
   const requisitionId = String(searchParams.get('requisition_id') || '').trim();
   const limit = Math.min(Number(searchParams.get('limit') || 100), 500);
 
-  let query = supabaseServer
-    .from('recruitment_costs')
-    .select('id, requisition_id, candidate_id, cost_category, description, amount, currency, vendor_name, cost_date, budget_year, department, work_site_id, created_by, created_at')
-    .eq('budget_year', budgetYear)
-    .order('cost_date', { ascending: false })
-    .limit(limit);
+  const where = { budget_year: budgetYear };
+  if (category) where.cost_category = category;
+  if (requisitionId) where.requisition_id = requisitionId;
 
-  if (category) query = query.eq('cost_category', category);
-  if (requisitionId) query = query.eq('requisition_id', requisitionId);
+  try {
+    const rows = await prisma.recruitmentCost.findMany({
+      where,
+      orderBy: { cost_date: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        requisition_id: true,
+        candidate_id: true,
+        cost_category: true,
+        description: true,
+        amount: true,
+        currency: true,
+        vendor_name: true,
+        cost_date: true,
+        budget_year: true,
+        department: true,
+        work_site_id: true,
+        created_by: true,
+        created_at: true,
+      },
+    });
 
-  const { data, error } = await query;
-  if (error) return Response.json({ error: 'RECRUITMENT_COSTS_QUERY_FAILED', detail: error.message }, { status: 500 });
+    const totalAmount = rows.reduce((s, r) => s + Number(r.amount), 0);
+    const byCategoryMap = {};
+    for (const row of rows) {
+      byCategoryMap[row.cost_category] = (byCategoryMap[row.cost_category] || 0) + Number(row.amount);
+    }
 
-  const rows = data || [];
-  const totalAmount = rows.reduce((s, r) => s + Number(r.amount), 0);
-  const byCategoryMap = {};
-  for (const row of rows) {
-    byCategoryMap[row.cost_category] = (byCategoryMap[row.cost_category] || 0) + Number(row.amount);
+    return Response.json({
+      success: true,
+      rows,
+      summary: { total_amount: totalAmount, budget_year: budgetYear, by_category: byCategoryMap },
+    });
+  } catch (err) {
+    return Response.json({ error: 'RECRUITMENT_COSTS_QUERY_FAILED', detail: err.message }, { status: 500 });
   }
-
-  return Response.json({
-    success: true,
-    rows,
-    summary: { total_amount: totalAmount, budget_year: budgetYear, by_category: byCategoryMap },
-  });
 }
 
 export async function POST(req) {
@@ -67,26 +83,26 @@ export async function POST(req) {
     return Response.json({ error: 'INVALID_BUDGET_YEAR' }, { status: 400 });
   }
 
-  const { data, error } = await supabaseServer
-    .from('recruitment_costs')
-    .insert({
-      requisition_id: body.requisition_id || null,
-      candidate_id: body.candidate_id || null,
-      cost_category: costCategory,
-      description,
-      amount,
-      currency: String(body.currency || 'LAK').trim().toUpperCase(),
-      vendor_name: body.vendor_name ? String(body.vendor_name).trim() : null,
-      receipt_url: body.receipt_url ? String(body.receipt_url).trim() : null,
-      cost_date: costDate,
-      budget_year: budgetYear,
-      department: body.department ? String(body.department).trim() : null,
-      work_site_id: body.work_site_id || null,
-      created_by: session.emp_id,
-    })
-    .select('*')
-    .maybeSingle();
-
-  if (error) return Response.json({ error: 'RECRUITMENT_COST_CREATE_FAILED', detail: error.message }, { status: 500 });
-  return Response.json({ success: true, row: data }, { status: 201 });
+  try {
+    const data = await prisma.recruitmentCost.create({
+      data: {
+        requisition_id: body.requisition_id || null,
+        candidate_id: body.candidate_id || null,
+        cost_category: costCategory,
+        description,
+        amount,
+        currency: String(body.currency || 'LAK').trim().toUpperCase(),
+        vendor_name: body.vendor_name ? String(body.vendor_name).trim() : null,
+        receipt_url: body.receipt_url ? String(body.receipt_url).trim() : null,
+        cost_date: costDate,
+        budget_year: budgetYear,
+        department: body.department ? String(body.department).trim() : null,
+        work_site_id: body.work_site_id || null,
+        created_by: session.emp_id,
+      },
+    });
+    return Response.json({ success: true, row: data }, { status: 201 });
+  } catch (err) {
+    return Response.json({ error: 'RECRUITMENT_COST_CREATE_FAILED', detail: err.message }, { status: 500 });
+  }
 }

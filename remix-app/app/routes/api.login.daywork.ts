@@ -1,6 +1,6 @@
-﻿import type { LoaderFunctionArgs } from "react-router";
+import type { LoaderFunctionArgs } from "react-router";
 import { validateSession } from "~/lib/session-validation.server";
-import { getSupabaseServerClient } from "~/lib/supabase.server";
+import prisma from "~/lib/prisma.server";
 
 const READ_ALL_ROLES = new Set(["admin", "super_admin", "hr_payroll", "hr-payroll", "hr payroll", "hrpayroll"]);
 
@@ -18,6 +18,35 @@ function canReadAll(role: string | null | undefined) {
   const normalized = String(role || "").trim().toLowerCase();
   return READ_ALL_ROLES.has(normalized);
 }
+
+// Raw type for attendance_monthly rows (not in Prisma schema)
+type AttendanceMonthlyRow = {
+  id: string;
+  emp_id: string;
+  month: number;
+  year: number;
+  work_days: number | null;
+  sl_days: number | null;
+  sl_date: string | null;
+  pl_days: number | null;
+  pl_date: string | null;
+  vl_days: number | null;
+  vl_date: string | null;
+  opl_days: number | null;
+  opl_date: string | null;
+  no_scan: number | null;
+  noscan_date: string | null;
+  rt_days: number | null;
+  rt_date: string | null;
+  off_days: number | null;
+  off_date: string | null;
+  night_shift_count: number | null;
+  night_shift_dates: string | null;
+  attendance_rate: number | null;
+  total_leave: number | null;
+  total_unpaid: number | null;
+  total_paid_days: number | null;
+};
 
 export async function loader({ request, context }: LoaderFunctionArgs) {
   const { session, error: authError, status: authStatus } = await validateSession(request, context);
@@ -39,60 +68,53 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
       return json({ error: "FORBIDDEN" }, { status: 403 });
     }
 
-    const { supabaseServer } = getSupabaseServerClient(context);
-
-    const { data: work, error: workError } = await supabaseServer
-      .from("attendance_monthly")
-      .select("*")
-      .eq("emp_id", empId)
-      .eq("month", month)
-      .eq("year", year)
-      .single();
-
-    if (workError) {
-      return json({ error: "DAYWORK_NOT_FOUND", detail: workError.message }, { status: 404 });
+    // attendance_monthly is not in the Prisma schema — use raw SQL
+    let workRows: AttendanceMonthlyRow[];
+    try {
+      workRows = await prisma.$queryRaw<AttendanceMonthlyRow[]>`
+        SELECT *
+        FROM attendance_monthly
+        WHERE emp_id = ${empId}
+          AND month  = ${month}::int
+          AND year   = ${year}::int
+        LIMIT 1
+      `;
+    } catch (workError) {
+      console.error("attendance_monthly query failed:", workError);
+      return json({ error: "DAYWORK_NOT_FOUND", detail: String((workError as Error)?.message || workError) }, { status: 404 });
     }
 
-    const { data: emp, error: empError } = await supabaseServer
-      .from("employees")
-      .select("employee_code, first_name_th, last_name_th, position_id, department_id, work_site_id")
-      .eq("employee_code", empId)
-      .maybeSingle();
-
-    if (empError) {
-      console.error("employees query failed:", empError.message);
+    const work = workRows[0] ?? null;
+    if (!work) {
+      return json({ error: "DAYWORK_NOT_FOUND" }, { status: 404 });
     }
 
-    let positionName: string | null = null;
-    let departmentName: string | null = null;
-    let workSiteName: string | null = null;
-
-    if (emp) {
-      const [posRes, deptRes, siteRes] = await Promise.all([
-        emp.position_id
-          ? supabaseServer.from("positions").select("title_th").eq("id", emp.position_id).maybeSingle()
-          : Promise.resolve({ data: null, error: null }),
-        emp.department_id
-          ? supabaseServer.from("departments").select("name_th").eq("id", emp.department_id).maybeSingle()
-          : Promise.resolve({ data: null, error: null }),
-        emp.work_site_id
-          ? supabaseServer.from("work_sites").select("name_th").eq("id", emp.work_site_id).maybeSingle()
-          : Promise.resolve({ data: null, error: null }),
-      ]);
-
-      positionName = posRes.data?.title_th || null;
-      departmentName = deptRes.data?.name_th || null;
-      workSiteName = siteRes.data?.name_th || null;
+    // Fetch employee with related position, department and work_site via Prisma relations
+    let emp;
+    try {
+      emp = await prisma.employee.findFirst({
+        where: { employee_code: empId },
+        select: {
+          employee_code: true,
+          first_name: true,
+          last_name: true,
+          position: { select: { name: true } },
+          department: { select: { name: true } },
+          workSite: { select: { name: true } },
+        },
+      });
+    } catch (empError) {
+      console.error("employees query failed:", empError);
     }
 
     const employee = emp
       ? {
           employee_code: emp.employee_code,
-          first_name_th: emp.first_name_th,
-          last_name_th: emp.last_name_th,
-          position: positionName ? { name: positionName } : null,
-          department: departmentName ? { name: departmentName } : null,
-          work_site: workSiteName ? { name: workSiteName } : null,
+          first_name_th: emp.first_name,
+          last_name_th: emp.last_name,
+          position: emp.position ? { name: emp.position.name } : null,
+          department: emp.department ? { name: emp.department.name } : null,
+          work_site: emp.workSite ? { name: emp.workSite.name } : null,
         }
       : null;
 
@@ -102,5 +124,3 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
     return json({ error: "SERVER_ERROR", detail: String((error as Error)?.message || error) }, { status: 500 });
   }
 }
-
-

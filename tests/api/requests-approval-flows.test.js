@@ -4,34 +4,6 @@ function makeApproveSession() {
   return { is_admin: true, emp_id: "ADMIN01", role: "admin" };
 }
 
-function makeSelectChain(row) {
-  return {
-    eq: vi.fn(() => ({
-      maybeSingle: vi.fn(async () => ({ data: row, error: null })),
-    })),
-  };
-}
-
-function makeUpdateChain(updatedRow, capture) {
-  return {
-    eq: vi.fn(() => ({
-      select: vi.fn(() => ({
-        maybeSingle: vi.fn(async () => ({ data: updatedRow, error: null })),
-      })),
-    })),
-    withPatch: (patch) => {
-      capture.patch = patch;
-      return {
-        eq: vi.fn(() => ({
-          select: vi.fn(() => ({
-            maybeSingle: vi.fn(async () => ({ data: updatedRow, error: null })),
-          })),
-        })),
-      };
-    },
-  };
-}
-
 describe("request approval flows", () => {
   beforeEach(() => {
     vi.resetModules();
@@ -55,14 +27,12 @@ describe("request approval flows", () => {
     vi.doMock("@/lib/rbac/access", () => ({
       hasAnyPermission: vi.fn(() => true),
     }));
-
-    const updateChain = makeUpdateChain(updated, capture);
-    vi.doMock("@/lib/supabaseServer", () => ({
-      supabaseServer: {
-        from: vi.fn(() => ({
-          select: vi.fn(() => makeSelectChain(existing)),
-          update: vi.fn((patch) => updateChain.withPatch(patch)),
-        })),
+    vi.doMock("@/lib/prisma", () => ({
+      default: {
+        leaveRequest: {
+          findUnique: vi.fn(async () => existing),
+          update: vi.fn(async ({ data }) => { capture.patch = data; return updated; }),
+        },
       },
     }));
 
@@ -96,14 +66,12 @@ describe("request approval flows", () => {
     vi.doMock("@/lib/rbac/access", () => ({
       hasAnyPermission: vi.fn(() => true),
     }));
-
-    const updateChain = makeUpdateChain(updated, capture);
-    vi.doMock("@/lib/supabaseServer", () => ({
-      supabaseServer: {
-        from: vi.fn(() => ({
-          select: vi.fn(() => makeSelectChain(existing)),
-          update: vi.fn((patch) => updateChain.withPatch(patch)),
-        })),
+    vi.doMock("@/lib/prisma", () => ({
+      default: {
+        otRequest: {
+          findUnique: vi.fn(async () => existing),
+          update: vi.fn(async ({ data }) => { capture.patch = data; return updated; }),
+        },
       },
     }));
 
@@ -135,14 +103,12 @@ describe("request approval flows", () => {
       buildSessionAccessProfile: vi.fn(() => ({ role: "admin" })),
       canManageAdminActions: vi.fn(() => true),
     }));
-
-    const updateChain = makeUpdateChain(updated, capture);
-    vi.doMock("@/lib/supabaseServer", () => ({
-      supabaseServer: {
-        from: vi.fn(() => ({
-          select: vi.fn(() => makeSelectChain(existing)),
-          update: vi.fn((patch) => updateChain.withPatch(patch)),
-        })),
+    vi.doMock("@/lib/prisma", () => ({
+      default: {
+        timeCorrectionRequest: {
+          findUnique: vi.fn(async () => existing),
+          update: vi.fn(async ({ data }) => { capture.patch = data; return updated; }),
+        },
       },
     }));
 

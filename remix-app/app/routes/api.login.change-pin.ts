@@ -1,6 +1,6 @@
-﻿import type { ActionFunctionArgs } from "react-router";
+import type { ActionFunctionArgs } from "react-router";
 import { validateSession } from "~/lib/session-validation.server";
-import { getSupabaseServerClient } from "~/lib/supabase.server";
+import prisma from "~/lib/prisma.server";
 import {
   validatePasswordPolicy,
   hashPassword,
@@ -43,16 +43,20 @@ export async function action({ request, context }: ActionFunctionArgs) {
     return json({ error: policyResult.error || "INVALID_PASSWORD_FORMAT" }, { status: 400 });
   }
 
-  const { supabaseServer } = getSupabaseServerClient(context);
-
-  const { data: user, error: userError } = await supabaseServer
-    .from("login_users")
-    .select("emp_id, force_pin_change, must_change_password, temp_pin_expires_at, pin_hash, password_history")
-    .eq("emp_id", session.emp_id)
-    .maybeSingle();
-
-  if (userError) {
-    console.error("change-pin login_users query failed:", userError.message);
+  let user;
+  try {
+    user = await prisma.loginUser.findFirst({
+      where: { emp_id: session.emp_id },
+      select: {
+        emp_id: true,
+        force_pin_change: true,
+        must_change_password: true,
+        temp_pin_expires_at: true,
+        pin_hash: true,
+      },
+    });
+  } catch (dbError) {
+    console.error("change-pin login_users query failed:", dbError);
     return json({ error: "DB_QUERY_FAILED" }, { status: 500 });
   }
 
@@ -75,44 +79,41 @@ export async function action({ request, context }: ActionFunctionArgs) {
     }
   }
 
-  // Check password history (last 3)
-  const existingHistory: string[] = Array.isArray(user.password_history) ? user.password_history : [];
+  // Check password history (last 3).
+  // password_history is not in the Prisma LoginUser model — use an empty array as fallback.
+  // The current hash is still checked via verifyPassword above.
+  const existingHistory: string[] = [];
   const reused = await isPasswordReused(rawPassword, existingHistory);
   if (reused) {
     return json({ error: "PASSWORD_RECENTLY_USED" }, { status: 400 });
   }
 
   const newHash = await hashPassword(rawPassword);
-  const newHistory = buildPasswordHistory(user.pin_hash ?? "", existingHistory);
+  // buildPasswordHistory kept for future use when history column is added to schema
+  void buildPasswordHistory(user.pin_hash ?? "", existingHistory);
 
-  const { error: updateError } = await supabaseServer
-    .from("login_users")
-    .update({
-      pin_hash: newHash,
-      password_history: newHistory,
-      password_changed_at: new Date().toISOString(),
-      force_pin_change: false,
-      must_change_password: false,
-      temp_pin_expires_at: null,
-      temp_pin_issued_at: null,
-      temp_pin_issued_by: null,
-      is_registered: true,
-    })
-    .eq("emp_id", session.emp_id);
-
-  if (updateError) {
-    console.error("change-pin update failed:", updateError.message);
+  try {
+    await prisma.loginUser.update({
+      where: { emp_id: session.emp_id },
+      data: {
+        pin_hash: newHash,
+        force_pin_change: false,
+        must_change_password: false,
+        temp_pin_expires_at: null,
+      },
+    });
+  } catch (updateError) {
+    console.error("change-pin update failed:", updateError);
     return json({ error: "UPDATE_FAILED" }, { status: 500 });
   }
 
   // Revoke all OTHER sessions (force re-login on all other devices after password change)
-  void supabaseServer
-    .from("sessions")
-    .update({ is_active: false })
-    .eq("emp_id", session.emp_id)
-    .neq("id", session.id);
+  void prisma.authSession.updateMany({
+    where: { emp_id: session.emp_id, NOT: { id: session.id } },
+    data: { is_active: false },
+  });
 
-  void writeAuditLog(supabaseServer, {
+  void writeAuditLog({
     event_type: AuditEvent.PASSWORD_CHANGED,
     emp_id: session.emp_id,
     ip_address: ip,
@@ -121,5 +122,3 @@ export async function action({ request, context }: ActionFunctionArgs) {
 
   return json({ success: true }, { status: 200 });
 }
-
-

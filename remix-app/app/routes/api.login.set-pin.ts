@@ -1,6 +1,6 @@
 import type { ActionFunctionArgs } from "react-router";
 import { clearFailedAttempts, checkRateLimit, recordLoginAttempt } from "~/lib/rate-limit.server";
-import { getSupabaseServerClient } from "~/lib/supabase.server";
+import prisma from "~/lib/prisma.server";
 import { validatePasswordPolicy, hashPassword } from "~/lib/password.server";
 import { writeAuditLog, AuditEvent } from "~/lib/audit-log.server";
 
@@ -14,16 +14,7 @@ function json(data: unknown, init?: ResponseInit) {
   });
 }
 
-export async function action({ request, context }: ActionFunctionArgs) {
-  const { isServiceRoleEnabled, supabaseServer } = getSupabaseServerClient(context);
-
-  if (!isServiceRoleEnabled) {
-    return json(
-      { error: "SERVER_CONFIG_MISSING", message: "SUPABASE_SERVICE_ROLE_KEY is required" },
-      { status: 500 }
-    );
-  }
-
+export async function action({ request }: ActionFunctionArgs) {
   const body = (await request.json().catch(() => null)) as {
     emp_id?: string;
     date_of_birth?: string;
@@ -45,21 +36,21 @@ export async function action({ request, context }: ActionFunctionArgs) {
     return json({ error: policyResult.error || "INVALID_PASSWORD_FORMAT" }, { status: 400 });
   }
 
-  const { locked, minutesRemaining } = await checkRateLimit(supabaseServer, empId);
+  const { locked, minutesRemaining } = await checkRateLimit(empId);
   if (locked) {
     return json({ error: "ACCOUNT_LOCKED", minutesRemaining }, { status: 429 });
   }
 
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
 
-  const { data: emp, error: empQueryError } = await supabaseServer
-    .from("employees")
-    .select("date_of_birth, status")
-    .eq("employee_code", empId)
-    .maybeSingle();
-
-  if (empQueryError) {
-    console.error("set-pin employees query failed:", empQueryError.message);
+  let emp;
+  try {
+    emp = await prisma.employee.findFirst({
+      where: { employee_code: empId },
+      select: { date_of_birth: true, status: true },
+    });
+  } catch (dbError) {
+    console.error("set-pin employees query failed:", dbError);
     return json({ error: "DB_QUERY_FAILED" }, { status: 500 });
   }
 
@@ -74,57 +65,58 @@ export async function action({ request, context }: ActionFunctionArgs) {
   // First-time onboarding only:
   // - If the employee already has a registered credential, block this endpoint.
   // - Users who are forced to change due to migration should use /change-password.
-  const { data: existingLoginUser, error: loginUserQueryError } = await supabaseServer
-    .from("login_users")
-    .select("is_registered, pin_hash")
-    .eq("emp_id", empId)
-    .maybeSingle();
-
-  if (loginUserQueryError) {
-    console.error("set-pin login_users query failed:", loginUserQueryError.message);
+  let existingLoginUser;
+  try {
+    existingLoginUser = await prisma.loginUser.findFirst({
+      where: { emp_id: empId },
+      select: { pin_hash: true },
+    });
+  } catch (dbError) {
+    console.error("set-pin login_users query failed:", dbError);
     return json({ error: "DB_QUERY_FAILED" }, { status: 500 });
   }
 
-  const alreadyHasCredential = Boolean(existingLoginUser?.is_registered) || Boolean(existingLoginUser?.pin_hash);
+  const alreadyHasCredential = Boolean(existingLoginUser?.pin_hash);
   if (alreadyHasCredential) {
     return json({ error: "ACCOUNT_ALREADY_REGISTERED" }, { status: 409 });
   }
 
-  const employeeDob = String(emp.date_of_birth || "").slice(0, 10);
+  // Compare date_of_birth: Prisma returns a Date object, normalise to YYYY-MM-DD
+  const employeeDob = emp.date_of_birth
+    ? emp.date_of_birth.toISOString().slice(0, 10)
+    : "";
   if (employeeDob !== dob) {
-    await recordLoginAttempt(supabaseServer, empId, false, ip);
+    await recordLoginAttempt(empId, false, ip);
     return json({ error: "INVALID_DOB" }, { status: 400 });
   }
 
   const pinHash = await hashPassword(rawPassword);
 
-  const { error: upsertError } = await supabaseServer
-    .from("login_users")
-    .upsert(
-      {
-        emp_id: empId,
+  try {
+    await prisma.loginUser.upsert({
+      where: { emp_id: empId },
+      update: {
         pin_hash: pinHash,
-        password_changed_at: new Date().toISOString(),
-        password_history: [],
-        is_registered: true,
         force_pin_change: false,
         must_change_password: false,
         temp_pin_expires_at: null,
-        temp_pin_issued_at: null,
-        temp_pin_issued_by: null,
       },
-      { onConflict: "emp_id" }
-    )
-    .select("emp_id");
-
-  if (upsertError) {
-    console.error("set-pin login_users upsert failed:", upsertError.message);
+      create: {
+        emp_id: empId,
+        pin_hash: pinHash,
+        force_pin_change: false,
+        must_change_password: false,
+        temp_pin_expires_at: null,
+      },
+    });
+  } catch (dbError) {
+    console.error("set-pin login_users upsert failed:", dbError);
     return json({ error: "UPDATE_FAILED" }, { status: 500 });
   }
 
-  await clearFailedAttempts(supabaseServer, empId);
+  await clearFailedAttempts(empId);
 
-  void writeAuditLog(supabaseServer, {
+  void writeAuditLog({
     event_type: AuditEvent.PASSWORD_CHANGED,
     emp_id: empId,
     ip_address: ip,
@@ -133,5 +125,3 @@ export async function action({ request, context }: ActionFunctionArgs) {
 
   return json({ success: true }, { status: 200 });
 }
-
-

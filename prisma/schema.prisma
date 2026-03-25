@@ -1,0 +1,1148 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── HR / Employee ─────────────────────────────────────────────────────────
+
+model Company {
+  id        String     @id @default(uuid()) @db.Uuid
+  name      String     @unique
+  createdAt DateTime   @default(now()) @map("created_at")
+  employees Employee[]
+
+  @@map("companies")
+}
+
+model WorkSite {
+  id        String     @id @default(uuid()) @db.Uuid
+  name      String     @unique
+  createdAt DateTime   @default(now()) @map("created_at")
+  employees Employee[]
+
+  @@map("work_sites")
+}
+
+model Department {
+  id        String     @id @default(uuid()) @db.Uuid
+  name      String     @unique
+  createdAt DateTime   @default(now()) @map("created_at")
+  employees Employee[]
+
+  @@map("departments")
+}
+
+model Position {
+  id        String     @id @default(uuid()) @db.Uuid
+  name      String     @unique
+  createdAt DateTime   @default(now()) @map("created_at")
+  employees Employee[]
+
+  @@map("positions")
+}
+
+model WorkingHours {
+  id        String     @id @default(uuid()) @db.Uuid
+  code      String     @unique @db.VarChar(20)
+  name      String     @db.VarChar(50)
+  hours     Decimal    @db.Decimal(4, 2)
+  createdAt DateTime   @default(now()) @map("created_at")
+  employees Employee[]
+
+  @@map("working_hours")
+}
+
+model EmployeeLevel {
+  id        String     @id @default(uuid()) @db.Uuid
+  code      String     @unique @db.VarChar(10)
+  createdAt DateTime   @default(now()) @map("created_at")
+  employees Employee[]
+
+  @@map("employee_levels")
+}
+
+model JobGroup {
+  id        String     @id @default(uuid()) @db.Uuid
+  name      String     @unique
+  createdAt DateTime   @default(now()) @map("created_at")
+  employees Employee[]
+
+  @@map("job_groups")
+}
+
+model MineLocation {
+  id        String     @id @default(uuid()) @db.Uuid
+  name      String     @unique
+  createdAt DateTime   @default(now()) @map("created_at")
+  employees Employee[]
+
+  @@map("mine_locations")
+}
+
+model Employee {
+  id              String               @id @default(uuid()) @db.Uuid
+  employee_code   String               @unique
+  prefix          String?
+  first_name      String?
+  last_name       String?
+  full_name_en    String?
+  full_name_lao   String?
+  gender          String?              @db.VarChar(10)
+  date_of_birth   DateTime?            @db.Date
+  nationality     String?              @db.VarChar(50)
+  phone           String?              @db.VarChar(50)
+  email           String?
+  national_id     String?              @db.VarChar(50)
+  social_security_id String?           @db.VarChar(50)
+  status          String               @default("active") @db.VarChar(20)
+
+  // Foreign keys
+  company_id       String?             @db.Uuid
+  company          Company?            @relation(fields: [company_id], references: [id])
+  department_id    String?             @db.Uuid
+  department       Department?         @relation(fields: [department_id], references: [id])
+  position_id      String?             @db.Uuid
+  position         Position?           @relation(fields: [position_id], references: [id])
+  work_site_id     String?             @db.Uuid
+  workSite         WorkSite?           @relation(fields: [work_site_id], references: [id])
+  working_hours_id String?             @db.Uuid
+  workingHours     WorkingHours?       @relation(fields: [working_hours_id], references: [id])
+  level_id         String?             @db.Uuid
+  level            EmployeeLevel?      @relation(fields: [level_id], references: [id])
+  job_group_id     String?             @db.Uuid
+  jobGroup         JobGroup?           @relation(fields: [job_group_id], references: [id])
+  mine_location_id String?             @db.Uuid
+  mineLocation     MineLocation?       @relation(fields: [mine_location_id], references: [id])
+  supervisor_id    String?             @db.Uuid
+  supervisor       Employee?           @relation("EmployeeSupervisor", fields: [supervisor_id], references: [id])
+  subordinates     Employee[]          @relation("EmployeeSupervisor")
+
+  // Contract
+  contract_type     String?            @db.VarChar(20)
+  cost_center       String?            @db.VarChar(30)
+  hire_date         DateTime?          @db.Date
+  contract_end_date DateTime?          @db.Date
+  last_work_date    DateTime?          @db.Date
+  transfer_date     DateTime?          @db.Date
+
+  // Probation
+  probation_30  DateTime?              @db.Date
+  probation_60  DateTime?              @db.Date
+  probation_119 DateTime?              @db.Date
+
+  // Salary
+  salary_base         BigInt?
+  skill_allowance     BigInt?
+  phone_allowance     BigInt?
+  upcountry_allowance BigInt?
+  other_allowance     BigInt?
+  total_salary        BigInt?
+
+  // Audit
+  created_at DateTime               @default(now())
+  updated_at DateTime               @default(now()) @updatedAt
+  created_by String?                @db.Uuid
+  updated_by String?                @db.Uuid
+
+  // Relations
+  education              EmployeeEducation[]
+  experience             EmployeeExperience[]
+  addresses              EmployeeAddress[]
+  bankAccounts           EmployeeBankAccount[]
+  leaveRequests          LeaveRequest[]
+  otRequests             OtRequest[]
+  timeCorrectionRequests TimeCorrectionRequest[]
+
+  @@map("employees")
+}
+
+model EmployeeBankAccount {
+  id             String   @id @default(uuid()) @db.Uuid
+  employee_id    String   @db.Uuid
+  employee       Employee @relation(fields: [employee_id], references: [id], onDelete: Cascade)
+  account_name   String?
+  account_number String?
+  bank_name      String?
+  is_primary     Boolean  @default(true)
+  created_at     DateTime @default(now())
+
+  @@unique([employee_id, account_number])
+  @@map("employee_bank_accounts")
+}
+
+model EmployeeEducation {
+  id              String   @id @default(uuid())
+  employee_id     String   @unique @db.Uuid
+  education_level String?
+  education_field String?
+  gpa             Float?
+  institution     String?
+  created_at      DateTime @default(now())
+  employee        Employee @relation(fields: [employee_id], references: [id])
+
+  @@map("employee_education")
+}
+
+model EmployeeExperience {
+  id                String   @id @default(uuid())
+  employee_id       String   @unique @db.Uuid
+  experience_text   String?
+  multi_skill       String?
+  previous_position String?
+  previous_unit     String?
+  created_at        DateTime @default(now())
+  employee          Employee @relation(fields: [employee_id], references: [id])
+
+  @@map("employee_experience")
+}
+
+model EmployeeAddress {
+  id          String   @id @default(uuid())
+  employee_id String   @unique @db.Uuid
+  address     String?
+  village     String?
+  district    String?
+  province    String?
+  employee    Employee @relation(fields: [employee_id], references: [id])
+
+  @@map("employee_addresses")
+}
+
+// ─── Auth ──────────────────────────────────────────────────────────────────
+
+model LoginUser {
+  id                   String    @id @default(uuid()) @db.Uuid
+  emp_id               String    @unique
+  pin_hash             String?
+  role                 String    @default("employee")
+  admin                Boolean   @default(false)
+  line_user_id         String?
+  force_pin_change     Boolean   @default(false)
+  must_change_password Boolean   @default(false)
+  temp_pin_expires_at  DateTime?
+  admin_email          String?   @unique
+  admin_password_hash  String?
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @default(now()) @updatedAt
+
+  @@map("login_users")
+}
+
+model AuthSession {
+  id            String   @id @default(uuid()) @db.Uuid
+  session_token String   @unique
+  emp_id        String
+  role          String   @default("employee")
+  device_id     String?
+  expires_at    DateTime
+  is_active     Boolean  @default(true)
+  login_context String?
+  ip_address    String?
+  user_agent    String?
+  created_at    DateTime @default(now())
+
+  @@map("auth_sessions")
+}
+
+model AuthEmployeeDevice {
+  id             String    @id @default(uuid()) @db.Uuid
+  employee_id    String    @db.Uuid
+  device_id      String
+  device_name    String?
+  platform       String?
+  app_version    String?
+  registered_at  DateTime  @default(now())
+  last_active_at DateTime?
+  is_active      Boolean   @default(true)
+
+  @@unique([employee_id, device_id])
+  @@map("auth_employee_devices")
+}
+
+model AuthLoginAttempt {
+  id           String   @id @default(uuid()) @db.Uuid
+  emp_id       String
+  success      Boolean  @default(false)
+  ip_address   String?
+  attempted_at DateTime @default(now())
+
+  @@map("auth_login_attempts")
+}
+
+// ─── Salary Sessions ────────────────────────────────────────────────────────
+
+model SalarySession {
+  id         String   @id @default(uuid()) @db.Uuid
+  emp_id     String
+  token_hash String   @unique
+  expires_at DateTime
+  created_at DateTime @default(now())
+
+  @@map("salary_sessions")
+}
+
+// ─── Payroll ────────────────────────────────────────────────────────────────
+
+model PayrollSettings {
+  id                      String   @id @default(uuid()) @db.Uuid
+  employee_id             String   @unique @db.Uuid
+  pay_type                String
+  base_salary             Float?
+  daily_rate              Float?
+  work_site_id            String?  @db.Uuid
+  social_security_enrolled Boolean @default(true)
+  is_active               Boolean  @default(true)
+  emp_code                String?
+  created_at              DateTime @default(now())
+  updated_at              DateTime @default(now()) @updatedAt
+
+  @@map("payroll_settings")
+}
+
+model EmployeePayrollSettings {
+  id                       String        @id @default(uuid()) @db.Uuid
+  employee_id              String        @unique @db.Uuid
+  emp_code                 String?
+  pay_type                 String
+  base_salary              Float?
+  daily_rate               Float?
+  bank_account_no          String?
+  bank_name                String?
+  social_security_no       String?
+  social_security_enrolled Boolean       @default(true)
+  work_site_id             String?       @db.Uuid
+  workSite                 WorkLocation? @relation(fields: [work_site_id], references: [id])
+  is_active                Boolean       @default(true)
+  updated_at               DateTime      @default(now()) @updatedAt
+
+  @@map("employee_payroll_settings")
+}
+
+model TaxBracket {
+  id             String  @id @default(uuid()) @db.Uuid
+  country_code   String
+  min_amount     Float
+  max_amount     Float?
+  rate_percent   Float
+  is_active      Boolean @default(true)
+  effective_from String
+  effective_to   String?
+
+  @@map("tax_brackets")
+}
+
+model PayrollRun {
+  id                  String        @id @default(uuid()) @db.Uuid
+  run_type            String
+  period_month        String
+  pay_date            String?
+  work_site_id        String?       @db.Uuid
+  workSite            WorkLocation? @relation(fields: [work_site_id], references: [id])
+  notes               String?
+  status              String        @default("draft")
+  employee_count      Int?
+  total_gross         Float?
+  total_deductions    Float?
+  total_net           Float?
+  total_employer_cost Float?
+  approved_by         String?
+  approved_at         DateTime?
+  paid_at             DateTime?
+  created_by          String?
+  created_at          DateTime      @default(now())
+  updated_at          DateTime      @default(now()) @updatedAt
+
+  @@map("payroll_runs")
+}
+
+model PayrollItem {
+  id                      String   @id @default(uuid()) @db.Uuid
+  payroll_run_id          String   @db.Uuid
+  employee_id             String   @db.Uuid
+  emp_code                String?
+  pay_type                String?
+  base_amount             Float?
+  work_days               Int?
+  work_hours              Float?
+  absent_days             Int?
+  absent_deduction        Float?
+  gross_pay               Float    @default(0)
+  social_security_employee Float?
+  social_security_employer Float?
+  income_tax              Float?
+  deductions              Json?
+  extra_pay_summary       Json?
+  incentive_total         Float?
+  total_deductions        Float    @default(0)
+  net_pay                 Float    @default(0)
+  warnings                Json?
+  status                  String   @default("calculated")
+  updated_at              DateTime @default(now()) @updatedAt
+
+  @@unique([payroll_run_id, employee_id])
+  @@map("payroll_items")
+}
+
+model EmployeeDeduction {
+  id                   String             @id @default(uuid()) @db.Uuid
+  employee_id          String             @db.Uuid
+  custom_name          String?
+  amount               Float?
+  remaining_amount     Float?
+  is_active            Boolean            @default(true)
+  start_month          String
+  end_month            String?
+  notes                String?
+  created_by           String?
+  deduction_template_id String?           @db.Uuid
+  deduction_template   DeductionTemplate? @relation(fields: [deduction_template_id], references: [id])
+  created_at           DateTime           @default(now())
+
+  @@map("employee_deductions")
+}
+
+model DeductionTemplate {
+  id                   String              @id @default(uuid()) @db.Uuid
+  name                 String
+  name_th              String?
+  deduction_type       String
+  default_amount       Float?
+  default_percentage   Float?
+  applies_to_run_type  String              @default("salary")
+  auto_apply           Boolean             @default(false)
+  is_active            Boolean             @default(true)
+  deductions           EmployeeDeduction[]
+
+  @@map("deduction_templates")
+}
+
+model IncentiveRecord {
+  id             String   @id @default(uuid()) @db.Uuid
+  employee_id    String   @db.Uuid
+  period_month   String
+  incentive_type String
+  amount         Float    @default(0)
+  created_at     DateTime @default(now())
+
+  @@map("incentive_records")
+}
+
+// ─── Shift ──────────────────────────────────────────────────────────────────
+
+model ShiftPattern {
+  id                 String            @id @default(uuid()) @db.Uuid
+  pattern_name       String
+  work_days          Int
+  rest_days          Int
+  cycle_total_days   Int
+  work_hours_per_day Float
+  is_active          Boolean           @default(true)
+  assignments        ShiftAssignment[]
+
+  @@map("shift_patterns")
+}
+
+model ShiftType {
+  id               String            @id @default(uuid()) @db.Uuid
+  type_name        String
+  start_time       String
+  end_time         String
+  crosses_midnight Boolean           @default(false)
+  break_minutes    Int               @default(0)
+  is_night_shift   Boolean           @default(false)
+  grace_minutes    Int               @default(0)
+  is_active        Boolean           @default(true)
+  assignments      ShiftAssignment[]
+
+  @@map("shift_types")
+}
+
+model ShiftAssignment {
+  id               String       @id @default(uuid()) @db.Uuid
+  employee_id      String       @db.Uuid
+  cycle_start_date String
+  effective_from   String
+  effective_to     String?
+  assigned_by      String?
+  shift_pattern_id String       @db.Uuid
+  shift_pattern    ShiftPattern @relation(fields: [shift_pattern_id], references: [id])
+  shift_type_id    String       @db.Uuid
+  shift_type       ShiftType    @relation(fields: [shift_type_id], references: [id])
+
+  @@map("employee_shift_assignments")
+}
+
+// ─── Attendance ─────────────────────────────────────────────────────────────
+
+model Attendance {
+  id                   String    @id @default(uuid()) @db.Uuid
+  employee_id          String    @db.Uuid
+  work_date            String
+  status               String    @default("present")
+  total_hours          Float?
+  scan_in_time         DateTime?
+  scan_in_latitude     Float?
+  scan_in_longitude    Float?
+  scan_in_location_id  String?   @db.Uuid
+  scan_in_photo_url    String?
+  scan_in_device_id    String?
+  scan_out_time        DateTime?
+  scan_out_latitude    Float?
+  scan_out_longitude   Float?
+  scan_out_location_id String?   @db.Uuid
+  scan_out_photo_url   String?
+  scan_out_device_id   String?
+  notes                String?
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @default(now()) @updatedAt
+
+  @@map("attendance")
+}
+
+model MonthlyDayworkSummary {
+  id          String @id @default(uuid()) @db.Uuid
+  employee_id String @db.Uuid
+  month       String
+  work_days   Int    @default(0)
+  absent_days Int    @default(0)
+  total_hours Float  @default(0)
+
+  @@unique([employee_id, month], name: "employee_id_month")
+  @@map("monthly_daywork_summary")
+}
+
+model AttendanceWorkLocation {
+  id            String   @id @default(uuid()) @db.Uuid
+  name          String
+  latitude      Float?
+  longitude     Float?
+  radius_meters Float?
+  boundary_type String?
+  boundary_json Json?
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now())
+
+  @@map("attendance_work_locations")
+}
+
+model AttendanceLog {
+  id              String   @id @default(uuid()) @db.Uuid
+  employee_id     String?  @db.Uuid
+  emp_code        String?
+  date            String?
+  action_type     String?
+  success         Boolean  @default(false)
+  reason          String?
+  latitude        Float?
+  longitude       Float?
+  accuracy_meters Float?
+  location_id     String?  @db.Uuid
+  distance_meters Float?
+  device_id       String?
+  ip_address      String?
+  user_agent      String?
+  created_at      DateTime @default(now())
+
+  @@map("attendance_logs")
+}
+
+model AttendanceSuspiciousScan {
+  id                 String    @id @default(uuid()) @db.Uuid
+  employee_id        String?   @db.Uuid
+  employee_code      String?
+  attendance_id      String?   @db.Uuid
+  scan_timestamp     DateTime?
+  gps_position       Json?
+  suspicion_score    Int       @default(0)
+  suspicion_flags    Json?
+  face_match_score   Float?
+  device_id          String?
+  scan_status        String    @default("normal")
+  review_action      String    @default("pending")
+  review_note        String?
+  reviewed_by_emp_id String?
+  reviewed_at        DateTime?
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @default(now()) @updatedAt
+
+  @@map("attendance_suspicious_scans")
+}
+
+// ─── Extra Pay ───────────────────────────────────────────────────────────────
+
+model SitePayPolicy {
+  id             String        @id @default(uuid()) @db.Uuid
+  work_site_id   String        @db.Uuid
+  workSite       WorkLocation? @relation(fields: [work_site_id], references: [id])
+  effective_from String
+  effective_to   String?
+  notes          String?
+  rates          SitePayRate[]
+
+  @@map("site_pay_policies")
+}
+
+model SitePayRate {
+  id                 String        @id @default(uuid()) @db.Uuid
+  site_pay_policy_id String        @db.Uuid                     @map("policy_id")
+  pay_type           String
+  multiplier         Float?
+  fixed_amount       Float?
+  calculation_method String        @default("multiplier")
+  policy             SitePayPolicy @relation(fields: [site_pay_policy_id], references: [id])
+
+  @@unique([site_pay_policy_id, pay_type])
+  @@map("site_pay_rates")
+}
+
+model PublicHoliday {
+  id           String @id @default(uuid()) @db.Uuid
+  holiday_date String
+  holiday_name String
+  country_code String
+
+  @@unique([holiday_date, country_code])
+  @@map("public_holidays")
+}
+
+model ExtraPayRequest {
+  id                String    @id @default(uuid()) @db.Uuid
+  employee_id       String    @db.Uuid
+  work_date         String
+  planned_clock_in  String?
+  planned_clock_out String?
+  actual_clock_in   String?
+  actual_clock_out  String?
+  request_type      String
+  total_hours       Float?
+  reason            String?
+  preview_amount    Float?
+  status            String    @default("pending_supervisor")
+  final_approved_at DateTime?
+  rejected_at       DateTime?
+  rejected_by       String?
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @default(now()) @updatedAt
+
+  @@map("extra_pay_requests")
+}
+
+model ExtraPayRecord {
+  id                    String   @id @default(uuid()) @db.Uuid
+  employee_id           String   @db.Uuid
+  extra_pay_request_id  String?  @db.Uuid
+  work_date             String
+  pay_type              String
+  hours                 Float?
+  hourly_rate           Float?
+  multiplier            Float?
+  amount                Float    @default(0)
+  source                String?
+  period_month          String
+  created_at            DateTime @default(now())
+
+  @@map("extra_pay_records")
+}
+
+model ApprovalAction {
+  id                String   @id @default(uuid()) @db.Uuid
+  request_id        String   @db.Uuid
+  request_type      String
+  approver_emp_code String
+  step_order        Int
+  action            String
+  notes             String?
+  created_at        DateTime @default(now())
+
+  @@map("approval_actions")
+}
+
+// ─── Employee Activations ────────────────────────────────────────────────────
+
+model EmployeeActivation {
+  id         String    @id @default(uuid()) @db.Uuid
+  emp_id     String
+  code       String    @unique
+  used_at    DateTime?
+  expires_at DateTime?
+  is_active  Boolean   @default(true)
+  created_at DateTime  @default(now())
+
+  @@map("employee_activations")
+}
+
+// ─── Security / Audit ────────────────────────────────────────────────────────
+
+model SecurityAuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  event_type String
+  severity   String   @default("info")
+  emp_id     String?
+  device_id  String?
+  ip_address String?
+  latitude   Float?
+  longitude  Float?
+  metadata   Json?
+  is_alert   Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  @@map("security_audit_logs")
+}
+
+model SecurityAlertSent {
+  id        String   @id @default(uuid()) @db.Uuid
+  rule_name String
+  emp_id    String?
+  severity  String   @default("info")
+  sent_at   DateTime @default(now())
+
+  @@map("security_alerts_sent")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  action     String
+  resource   String?
+  actor_id   String?
+  metadata   Json?
+  created_at DateTime @default(now())
+
+  @@map("audit_logs")
+}
+
+// ─── OT Requests ────────────────────────────────────────────────────────────
+
+model OtType {
+  id              String   @id @default(uuid()) @db.Uuid
+  code            String   @unique
+  name_lo         String?
+  name_th         String?
+  name_en         String?
+  rate_multiplier Float    @default(1.0)
+  is_active       Boolean  @default(true)
+  created_at      DateTime @default(now())
+
+  @@map("ot_types")
+}
+
+model OtRequest {
+  id              String    @id @default(uuid()) @db.Uuid
+  employee_id     String    @db.Uuid
+  employee        Employee  @relation(fields: [employee_id], references: [id])
+  ot_type_code    String
+  date            String
+  start_time      String
+  end_time        String
+  total_hours     Float
+  rate_multiplier Float
+  reason          String
+  project_ref     String?
+  status          String    @default("pending")
+  cross_midnight  Boolean   @default(false)
+  approved_by     String?
+  approved_at     DateTime?
+  rejected_reason String?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @default(now()) @updatedAt
+
+  @@map("ot_requests")
+}
+
+// ─── Leave ──────────────────────────────────────────────────────────────────
+
+model LeaveType {
+  id                String  @id @default(uuid()) @db.Uuid
+  code              String  @unique
+  name_lo           String?
+  name_th           String?
+  name_en           String?
+  max_days_per_year Float?
+  is_paid           Boolean @default(true)
+  is_active         Boolean @default(true)
+
+  @@map("leave_types")
+}
+
+model LeaveBalance {
+  id              String @id @default(uuid()) @db.Uuid
+  employee_id     String @db.Uuid
+  leave_type_code String
+  year            Int
+  total_days      Float  @default(0)
+  used_days       Float  @default(0)
+
+  @@unique([employee_id, leave_type_code, year])
+  @@map("leave_balances")
+}
+
+model LeaveRequest {
+  id                        String    @id @default(uuid()) @db.Uuid
+  employee_id               String    @db.Uuid
+  employee                  Employee  @relation(fields: [employee_id], references: [id])
+  leave_type_code           String
+  start_date                String
+  end_date                  String
+  total_days                Float
+  reason                    String
+  attachment_url            String?
+  attachment_public_id      String?
+  attachment_resource_type  String?
+  attachment_active         Boolean   @default(true)
+  attachment_inactivated_at DateTime?
+  attachment_delete_after   DateTime?
+  attachment_deleted_at     DateTime?
+  status                    String    @default("pending")
+  approved_by               String?
+  approved_at               DateTime?
+  rejected_reason           String?
+  cancelled_at              DateTime?
+  created_at                DateTime  @default(now())
+  updated_at                DateTime  @default(now()) @updatedAt
+
+  @@map("leave_requests")
+}
+
+// ─── Time Correction ─────────────────────────────────────────────────────────
+
+model TimeCorrectionRequest {
+  id                 String    @id @default(uuid()) @db.Uuid
+  employee_id        String    @db.Uuid
+  employee           Employee  @relation(fields: [employee_id], references: [id])
+  date               String
+  correction_type    String
+  requested_scan_in  String?
+  requested_scan_out String?
+  reason             String
+  status             String    @default("pending")
+  approved_by        String?
+  approved_at        DateTime?
+  rejected_reason    String?
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @default(now()) @updatedAt
+
+  @@map("time_correction_requests")
+}
+
+// ─── Blacklist ───────────────────────────────────────────────────────────────
+
+model Blacklist {
+  id                    String    @id @default(uuid()) @db.Uuid
+  full_name             String
+  id_card_number        String?
+  phone                 String?
+  previous_employee_id  String?
+  previous_candidate_id String?
+  reason_category       String
+  reason_detail         String
+  blacklisted_date      String
+  blacklisted_by        String?
+  severity              String    @default("permanent")
+  expiry_date           String?
+  can_reapply           Boolean   @default(false)
+  evidence_files        Json?
+  status                String    @default("active")
+  removed_by            String?
+  removed_reason        String?
+  removed_at            DateTime?
+  created_at            DateTime  @default(now())
+
+  @@map("blacklist")
+}
+
+// ─── Headcount Requests ──────────────────────────────────────────────────────
+
+model HeadcountRequest {
+  id                    String    @id @default(uuid()) @db.Uuid
+  request_number        String    @unique
+  requested_by          String?   @db.Uuid
+  requested_by_emp_code String?
+  department            String?
+  work_site_id          String?   @db.Uuid
+  position_title        String
+  number_of_positions   Int       @default(1)
+  employment_type       String    @default("full_time")
+  urgency               String    @default("normal")
+  reason_type           String
+  replacing_employee_id String?
+  justification         String
+  expected_start_date   String?
+  budget_salary_min     Float?
+  budget_salary_max     Float?
+  job_requirements      String?
+  manpower_plan_item_id String?
+  status                String    @default("pending_manager")
+  current_approval_step Int       @default(1)
+  requisition_id        String?
+  approved_at           DateTime?
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @default(now()) @updatedAt
+
+  @@map("headcount_requests")
+}
+
+model HeadcountApprovalAction {
+  id              String   @id @default(uuid()) @db.Uuid
+  request_id      String   @db.Uuid
+  step_order      Int
+  approver_role   String
+  approver_emp_id String
+  action          String
+  comment         String?
+  created_at      DateTime @default(now())
+
+  @@map("headcount_approval_actions")
+}
+
+// ─── Recruitment ─────────────────────────────────────────────────────────────
+
+model RecruitmentRequisition {
+  id                String    @id @default(uuid()) @db.Uuid
+  job_code          String    @unique
+  title             String
+  department        String?
+  headcount         Int       @default(1)
+  employment_type   String    @default("full_time")
+  status            String    @default("draft")
+  target_start_date String?
+  description       String?
+  opened_at         DateTime?
+  closed_at         DateTime?
+  created_by        String?
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @default(now()) @updatedAt
+
+  @@map("recruitment_requisitions")
+}
+
+model RecruitmentCandidate {
+  id                   String    @id @default(uuid()) @db.Uuid
+  requisition_id       String?   @db.Uuid
+  full_name            String
+  email                String?
+  phone                String?
+  source               String?
+  current_stage        String    @default("applied")
+  expected_salary      Float?
+  position_applied     String?
+  applied_at           DateTime  @default(now())
+  hired_at             DateTime?
+  rejected_reason      String?
+  notes                String?
+  in_talent_pool       Boolean   @default(false)
+  talent_pool_added_at DateTime?
+  talent_pool_tags     Json?
+  talent_pool_rating   Int?
+  talent_pool_notes    String?
+  willing_to_reapply   Boolean?
+  last_contacted_at    DateTime?
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @default(now()) @updatedAt
+
+  @@map("recruitment_candidates")
+}
+
+model RecruitmentStageLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  candidate_id String   @db.Uuid
+  from_stage   String?
+  to_stage     String
+  score        Float?
+  interviewer  String?
+  note         String?
+  scheduled_at String?
+  created_by   String?
+  created_at   DateTime @default(now())
+
+  @@map("recruitment_stage_logs")
+}
+
+model RecruitmentCost {
+  id             String   @id @default(uuid()) @db.Uuid
+  requisition_id String?  @db.Uuid
+  candidate_id   String?  @db.Uuid
+  cost_category  String
+  description    String
+  amount         Float
+  currency       String   @default("LAK")
+  vendor_name    String?
+  receipt_url    String?
+  cost_date      String
+  budget_year    Int
+  department     String?
+  work_site_id   String?  @db.Uuid
+  created_by     String?
+  created_at     DateTime @default(now())
+
+  @@map("recruitment_costs")
+}
+
+// ─── Manpower Planning ───────────────────────────────────────────────────────
+
+model ManpowerPlan {
+  id          String             @id @default(uuid()) @db.Uuid
+  plan_year   Int
+  plan_name   String
+  status      String             @default("draft")
+  approved_by String?
+  approved_at DateTime?
+  notes       String?
+  created_by  String
+  created_at  DateTime           @default(now())
+  updated_at  DateTime           @default(now()) @updatedAt
+  items       ManpowerPlanItem[]
+
+  @@unique([plan_year, plan_name])
+  @@map("manpower_plans")
+}
+
+model ManpowerPlanItem {
+  id                   String       @id @default(uuid()) @db.Uuid
+  plan_id              String       @db.Uuid
+  plan                 ManpowerPlan @relation(fields: [plan_id], references: [id])
+  department           String?
+  work_site_id         String?      @db.Uuid
+  position_title       String
+  position_level       String?
+  planned_headcount    Int
+  current_headcount    Int          @default(0)
+  priority             String       @default("medium")
+  status               String?
+  expected_hire_quarter String?
+  estimated_salary_min Float?
+  estimated_salary_max Float?
+  justification        String?
+  created_at           DateTime     @default(now())
+
+  @@map("manpower_plan_items")
+}
+
+// ─── Medical Checks ──────────────────────────────────────────────────────────
+
+model MedicalCheckType {
+  id                          String   @id @default(uuid()) @db.Uuid
+  check_name                  String   @unique
+  is_mandatory_pre_employment Boolean  @default(true)
+  is_mandatory_periodic       Boolean  @default(false)
+  recurrence_months           Int?
+  created_at                  DateTime @default(now())
+
+  @@map("medical_check_types")
+}
+
+model MedicalCheck {
+  id              String   @id @default(uuid()) @db.Uuid
+  person_type     String
+  candidate_id    String?  @db.Uuid
+  employee_id     String?  @db.Uuid
+  check_type_id   String?  @db.Uuid
+  check_date      String
+  hospital_name   String
+  doctor_name     String?
+  result          String
+  conditions      String?
+  findings        String?
+  restrictions    String?
+  next_check_date String?
+  certificate_url String?
+  cost            Float?
+  paid_by         String   @default("company")
+  created_by      String?
+  created_at      DateTime @default(now())
+
+  @@map("medical_checks")
+}
+
+// ─── HR / ER Cases ───────────────────────────────────────────────────────────
+
+model HrErCase {
+  id              String    @id @default(uuid()) @db.Uuid
+  employee_id     String    @db.Uuid
+  case_type       String
+  title           String
+  detail          String?
+  severity        String    @default("medium")
+  status          String    @default("open")
+  occurred_on     String?
+  assigned_to     String?
+  opened_by       String?
+  resolution_note String?
+  resolved_at     DateTime?
+  closed_at       DateTime?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @default(now()) @updatedAt
+
+  @@map("hr_er_cases")
+}
+
+model HrErCaseNote {
+  id         String   @id @default(uuid()) @db.Uuid
+  case_id    String   @db.Uuid
+  visibility String   @default("internal")
+  note       String
+  created_by String?
+  created_at DateTime @default(now())
+
+  @@map("hr_er_case_notes")
+}
+
+// ─── Work Locations ──────────────────────────────────────────────────────────
+
+model WorkLocation {
+  id               String                    @id @default(uuid()) @db.Uuid
+  name             String
+  site_code        String?
+  site_type        String?
+  created_at       DateTime                  @default(now())
+  payrollSettings  EmployeePayrollSettings[]
+  payPolicies      SitePayPolicy[]
+  payrollRuns      PayrollRun[]
+
+  @@map("work_locations")
+}
+
+// ─── OT Slips / Salary Slips ─────────────────────────────────────────────────
+
+model OtSlip {
+  id          String   @id @default(uuid()) @db.Uuid
+  employee_id String   @db.Uuid
+  year        Int
+  month       Int
+  data        Json?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now()) @updatedAt
+
+  @@unique([employee_id, year, month])
+  @@map("ot_slips")
+}
+
+model SalarySlip {
+  id          String   @id @default(uuid()) @db.Uuid
+  employee_id String   @db.Uuid
+  year        Int
+  month       Int
+  data        Json?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now()) @updatedAt
+
+  @@unique([employee_id, year, month])
+  @@map("salary_slips")
+}
+
+// ─── Leave File Deletion Audit ───────────────────────────────────────────────
+
+model LeaveRequestFileDeletionAudit {
+  id                   String    @id @default(uuid()) @db.Uuid
+  request_id           String    @unique @db.Uuid
+  employee_id          String    @db.Uuid
+  leave_type_code      String?
+  status               String?
+  cloudinary_public_id String?
+  deleted_at           DateTime?
+  created_at           DateTime  @default(now())
+
+  @@map("leave_request_file_deletion_audit")
+}

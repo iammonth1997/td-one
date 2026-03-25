@@ -1,5 +1,5 @@
 import { validateSession } from '@/lib/validateSession';
-import { supabaseServer } from '@/lib/supabaseServer';
+import prisma from '@/lib/prisma';
 
 const STAGES = ['applied', 'screening', 'interview', 'offer', 'hired', 'rejected', 'withdrawn'];
 
@@ -20,37 +20,71 @@ export async function GET(req) {
     const requisitionId = String(searchParams.get('requisition_id') || '').trim();
     const stage = String(searchParams.get('stage') || '').trim().toLowerCase();
 
-    let query = supabaseServer
-      .from('recruitment_candidates')
-      .select('id, requisition_id, full_name, email, phone, source, current_stage, expected_salary, applied_at, hired_at, rejected_reason, notes, created_at, updated_at')
-      .order('created_at', { ascending: false })
-      .limit(limit);
+    const where = {};
+    if (requisitionId) where.requisition_id = requisitionId;
+    if (stage) where.current_stage = stage;
 
-    if (requisitionId) query = query.eq('requisition_id', requisitionId);
-    if (stage) query = query.eq('current_stage', stage);
-
-    const { data, error } = await query;
-    if (error) return Response.json({ error: 'RECRUITMENT_CANDIDATES_QUERY_FAILED', detail: error.message }, { status: 500 });
-
-    return Response.json({ success: true, view: 'candidates', rows: data || [] });
+    try {
+      const data = await prisma.recruitmentCandidate.findMany({
+        where,
+        orderBy: { created_at: 'desc' },
+        take: limit,
+        select: {
+          id: true,
+          requisition_id: true,
+          full_name: true,
+          email: true,
+          phone: true,
+          source: true,
+          current_stage: true,
+          expected_salary: true,
+          applied_at: true,
+          hired_at: true,
+          rejected_reason: true,
+          notes: true,
+          created_at: true,
+          updated_at: true,
+        },
+      });
+      return Response.json({ success: true, view: 'candidates', rows: data || [] });
+    } catch (err) {
+      return Response.json({ error: 'RECRUITMENT_CANDIDATES_QUERY_FAILED', detail: err.message }, { status: 500 });
+    }
   }
 
   const status = String(searchParams.get('status') || '').trim().toLowerCase();
   const department = String(searchParams.get('department') || '').trim();
 
-  let query = supabaseServer
-    .from('recruitment_requisitions')
-    .select('id, job_code, title, department, headcount, employment_type, status, target_start_date, opened_at, closed_at, description, created_by, created_at, updated_at')
-    .order('created_at', { ascending: false })
-    .limit(limit);
+  const where = {};
+  if (status) where.status = status;
+  if (department) where.department = department;
 
-  if (status) query = query.eq('status', status);
-  if (department) query = query.eq('department', department);
-
-  const { data, error } = await query;
-  if (error) return Response.json({ error: 'RECRUITMENT_REQUISITIONS_QUERY_FAILED', detail: error.message }, { status: 500 });
-
-  return Response.json({ success: true, view: 'requisitions', rows: data || [] });
+  try {
+    const data = await prisma.recruitmentRequisition.findMany({
+      where,
+      orderBy: { created_at: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        job_code: true,
+        title: true,
+        department: true,
+        headcount: true,
+        employment_type: true,
+        status: true,
+        target_start_date: true,
+        opened_at: true,
+        closed_at: true,
+        description: true,
+        created_by: true,
+        created_at: true,
+        updated_at: true,
+      },
+    });
+    return Response.json({ success: true, view: 'requisitions', rows: data || [] });
+  } catch (err) {
+    return Response.json({ error: 'RECRUITMENT_REQUISITIONS_QUERY_FAILED', detail: err.message }, { status: 500 });
+  }
 }
 
 export async function POST(req) {
@@ -78,26 +112,25 @@ export async function POST(req) {
       return Response.json({ error: 'INVALID_HEADCOUNT' }, { status: 400 });
     }
 
-    const openedAt = status === 'open' ? new Date().toISOString() : null;
-    const { data, error } = await supabaseServer
-      .from('recruitment_requisitions')
-      .insert({
-        job_code: jobCode,
-        title,
-        department,
-        headcount,
-        employment_type: employmentType,
-        status,
-        target_start_date: targetStartDate,
-        description,
-        opened_at: openedAt,
-        created_by: session.emp_id,
-      })
-      .select('*')
-      .maybeSingle();
-
-    if (error) return Response.json({ error: 'RECRUITMENT_REQUISITION_CREATE_FAILED', detail: error.message }, { status: 500 });
-    return Response.json({ success: true, row: data }, { status: 201 });
+    try {
+      const data = await prisma.recruitmentRequisition.create({
+        data: {
+          job_code: jobCode,
+          title,
+          department,
+          headcount,
+          employment_type: employmentType,
+          status,
+          target_start_date: targetStartDate,
+          description,
+          opened_at: status === 'open' ? new Date() : null,
+          created_by: session.emp_id,
+        },
+      });
+      return Response.json({ success: true, row: data }, { status: 201 });
+    } catch (err) {
+      return Response.json({ error: 'RECRUITMENT_REQUISITION_CREATE_FAILED', detail: err.message }, { status: 500 });
+    }
   }
 
   if (action === 'create_candidate') {
@@ -113,22 +146,14 @@ export async function POST(req) {
       return Response.json({ error: 'MISSING_REQUIRED_FIELDS' }, { status: 400 });
     }
 
-    const { data, error } = await supabaseServer
-      .from('recruitment_candidates')
-      .insert({
-        requisition_id: requisitionId,
-        full_name: fullName,
-        email,
-        phone,
-        source,
-        expected_salary: expectedSalary,
-        notes,
-      })
-      .select('*')
-      .maybeSingle();
-
-    if (error) return Response.json({ error: 'RECRUITMENT_CANDIDATE_CREATE_FAILED', detail: error.message }, { status: 500 });
-    return Response.json({ success: true, row: data }, { status: 201 });
+    try {
+      const data = await prisma.recruitmentCandidate.create({
+        data: { requisition_id: requisitionId, full_name: fullName, email, phone, source, expected_salary: expectedSalary, notes },
+      });
+      return Response.json({ success: true, row: data }, { status: 201 });
+    } catch (err) {
+      return Response.json({ error: 'RECRUITMENT_CANDIDATE_CREATE_FAILED', detail: err.message }, { status: 500 });
+    }
   }
 
   if (action === 'advance_candidate') {
@@ -146,46 +171,43 @@ export async function POST(req) {
       return Response.json({ error: 'INVALID_STAGE' }, { status: 400 });
     }
 
-    const { data: existing, error: existingError } = await supabaseServer
-      .from('recruitment_candidates')
-      .select('id, current_stage')
-      .eq('id', candidateId)
-      .maybeSingle();
-
-    if (existingError) return Response.json({ error: 'RECRUITMENT_CANDIDATE_QUERY_FAILED', detail: existingError.message }, { status: 500 });
+    let existing;
+    try {
+      existing = await prisma.recruitmentCandidate.findUnique({
+        where: { id: candidateId },
+        select: { id: true, current_stage: true },
+      });
+    } catch (err) {
+      return Response.json({ error: 'RECRUITMENT_CANDIDATE_QUERY_FAILED', detail: err.message }, { status: 500 });
+    }
     if (!existing) return Response.json({ error: 'RECRUITMENT_CANDIDATE_NOT_FOUND' }, { status: 404 });
 
-    const patch = {
-      current_stage: toStage,
-      hired_at: toStage === 'hired' ? new Date().toISOString() : null,
-      updated_at: new Date().toISOString(),
-    };
-
-    const { data: row, error: updateError } = await supabaseServer
-      .from('recruitment_candidates')
-      .update(patch)
-      .eq('id', candidateId)
-      .select('*')
-      .maybeSingle();
-
-    if (updateError) return Response.json({ error: 'RECRUITMENT_CANDIDATE_UPDATE_FAILED', detail: updateError.message }, { status: 500 });
-
-    const { error: logError } = await supabaseServer
-      .from('recruitment_stage_logs')
-      .insert({
-        candidate_id: candidateId,
-        from_stage: existing.current_stage,
-        to_stage: toStage,
-        score,
-        interviewer,
-        note,
-        scheduled_at: scheduledAt,
-        created_by: session.emp_id,
+    try {
+      const row = await prisma.recruitmentCandidate.update({
+        where: { id: candidateId },
+        data: {
+          current_stage: toStage,
+          hired_at: toStage === 'hired' ? new Date() : null,
+        },
       });
 
-    if (logError) return Response.json({ error: 'RECRUITMENT_STAGE_LOG_CREATE_FAILED', detail: logError.message }, { status: 500 });
+      await prisma.recruitmentStageLog.create({
+        data: {
+          candidate_id: candidateId,
+          from_stage: existing.current_stage,
+          to_stage: toStage,
+          score,
+          interviewer,
+          note,
+          scheduled_at: scheduledAt,
+          created_by: session.emp_id,
+        },
+      });
 
-    return Response.json({ success: true, row });
+      return Response.json({ success: true, row });
+    } catch (err) {
+      return Response.json({ error: 'RECRUITMENT_CANDIDATE_UPDATE_FAILED', detail: err.message }, { status: 500 });
+    }
   }
 
   return Response.json({ error: 'UNKNOWN_ACTION' }, { status: 400 });

@@ -1,4 +1,4 @@
-import { isServiceRoleEnabled, supabaseServer } from "@/lib/supabaseServer";
+import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { checkRateLimit, recordLoginAttempt, clearFailedAttempts } from "@/lib/checkRateLimit";
@@ -33,15 +33,6 @@ export async function POST(req) {
     });
   };
 
-  if (!isServiceRoleEnabled) {
-    stamp("service_role_check");
-    logTiming("SERVER_CONFIG_MISSING");
-    return Response.json(
-      { error: "SERVER_CONFIG_MISSING", message: "SUPABASE_SERVICE_ROLE_KEY is required" },
-      { status: 500 }
-    );
-  }
-
   const { emp_id, pin } = await req.json();
   const empId = String(emp_id || "").trim().toUpperCase();
   const rawPin = String(pin || "").trim();
@@ -66,48 +57,27 @@ export async function POST(req) {
     );
   }
 
-  const userLookupPromise = (async () => {
-    const result = await supabaseServer
-      .from("login_users")
-      .select("*")
-      .eq("emp_id", empId)
-      .maybeSingle();
-    stamp("login_user_loaded");
-    return result;
-  })();
+  // Parallel DB lookups
+  let user, emp;
+  try {
+    const userLookupPromise = prisma.loginUser
+      .findFirst({ where: { emp_id: empId } })
+      .then((result) => { stamp("login_user_loaded"); return result; });
 
-  const employeeLookupPromise = (async () => {
-    const result = await supabaseServer
-      .from("employees")
-      .select("status")
-      .eq("employee_code", empId)
-      .maybeSingle();
-    stamp("employee_loaded");
-    return result;
-  })();
+    const employeeLookupPromise = prisma.employee
+      .findFirst({ where: { employee_code: empId }, select: { status: true } })
+      .then((result) => { stamp("employee_loaded"); return result; });
 
-  const [userResult, employeeResult] = await Promise.all([
-    userLookupPromise,
-    employeeLookupPromise,
-  ]);
-  const { data: user, error: userQueryError } = userResult;
-  const { data: emp, error: empQueryError } = employeeResult;
-
-  if (userQueryError) {
-    console.error("login login_users query failed:", userQueryError.message);
-    logTiming("DB_QUERY_FAILED_LOGIN_USERS");
+    [user, emp] = await Promise.all([userLookupPromise, employeeLookupPromise]);
+  } catch (dbErr) {
+    console.error("login db query failed:", dbErr.message);
+    logTiming("DB_QUERY_FAILED");
     return Response.json({ error: "DB_QUERY_FAILED" }, { status: 500 });
   }
 
   if (!user) {
     logTiming("USER_NOT_FOUND");
     return Response.json({ error: "USER_NOT_FOUND" }, { status: 400 });
-  }
-
-  if (empQueryError) {
-    console.error("login employees query failed:", empQueryError.message);
-    logTiming("DB_QUERY_FAILED_EMPLOYEES");
-    return Response.json({ error: "DB_QUERY_FAILED" }, { status: 500 });
   }
 
   if (!emp) {
@@ -157,21 +127,26 @@ export async function POST(req) {
   const clearFailedPromise = clearFailedAttempts(empId);
 
   const sessionToken = crypto.randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + SESSION_DURATION_MS).toISOString();
+  const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
 
-  const { error: sessionError } = await supabaseServer
-    .from("sessions")
-    .insert({
-      session_token: sessionToken,
-      emp_id: empId,
-      role: user.role,
-      device_id: deviceId,
-      expires_at: expiresAt,
-      is_active: true,
-      login_context: EMPLOYEE_PORTAL,
-      ip_address: ipAddress,
-      user_agent: req.headers.get("user-agent") || null,
+  let sessionError = null;
+  try {
+    await prisma.authSession.create({
+      data: {
+        session_token: sessionToken,
+        emp_id: empId,
+        role: user.role,
+        device_id: deviceId,
+        expires_at: expiresAt,
+        is_active: true,
+        login_context: EMPLOYEE_PORTAL,
+        ip_address: ipAddress,
+        user_agent: req.headers.get("user-agent") || null,
+      },
     });
+  } catch (err) {
+    sessionError = err;
+  }
   stamp("session_inserted");
 
   await Promise.all([recordAttemptPromise, clearFailedPromise]);

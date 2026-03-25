@@ -4,7 +4,7 @@
  * Query params: ?year=2026&month=3
  */
 import { validateSession } from '@/lib/validateSession';
-import { supabaseServer } from '@/lib/supabaseServer';
+import prisma from '@/lib/prisma';
 import { getEmployeeMonthSchedule, getActiveShiftAssignment } from '@/lib/shiftService';
 
 export async function GET(req) {
@@ -24,22 +24,18 @@ export async function GET(req) {
     return Response.json({ error: 'INVALID_MONTH' }, { status: 400 });
   }
 
-  const supabase = supabaseServer;
+  const emp = await prisma.employee.findFirst({
+    where: { employee_code: empCode },
+    select: { id: true },
+  });
 
-  // Resolve employee UUID from emp_code
-  const { data: emp, error: empErr } = await supabase
-    .from('employees')
-    .select('id')
-    .eq('employee_code', empCode)
-    .maybeSingle();
-
-  if (empErr || !emp) {
+  if (!emp) {
     return Response.json({ error: 'EMPLOYEE_NOT_FOUND' }, { status: 404 });
   }
 
   try {
     const schedule = await getEmployeeMonthSchedule(emp.id, year, month);
-    const assignment = await getActiveShiftAssignment(supabase, emp.id);
+    const assignment = await getActiveShiftAssignment(emp.id);
     return Response.json({ schedule, assignment, year, month });
   } catch (err) {
     console.error('GET /api/shift:', err);

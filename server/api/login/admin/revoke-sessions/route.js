@@ -1,4 +1,4 @@
-import { supabaseServer } from "@/lib/supabaseServer";
+import prisma from "@/lib/prisma";
 import { validateSession } from "@/lib/validateSession";
 import { buildSessionAccessProfile, mapSessionRoleToAppRole } from "@/lib/rbac/sessionAccess";
 import { hasAnyPermission } from "@/lib/rbac/access";
@@ -22,11 +22,10 @@ export async function POST(req) {
     return Response.json({ error: "INVALID_INPUT" }, { status: 400 });
   }
 
-  const { data: targetUser } = await supabaseServer
-    .from("login_users")
-    .select("emp_id, role")
-    .eq("emp_id", targetEmpId)
-    .maybeSingle();
+  const targetUser = await prisma.loginUser.findFirst({
+    where: { emp_id: targetEmpId },
+    select: { emp_id: true, role: true },
+  });
 
   if (!targetUser) {
     return Response.json({ error: "USER_NOT_FOUND" }, { status: 400 });
@@ -38,20 +37,19 @@ export async function POST(req) {
     return Response.json({ error: "CANNOT_REVOKE_SUPER_ADMIN" }, { status: 403 });
   }
 
-  const { data: revokedSessions, error: revokeError } = await supabaseServer
-    .from("sessions")
-    .update({ is_active: false })
-    .eq("emp_id", targetEmpId)
-    .eq("is_active", true)
-    .select("id");
-
-  if (revokeError) {
-    console.error("revoke sessions failed:", revokeError.message);
+  let result;
+  try {
+    result = await prisma.authSession.updateMany({
+      where: { emp_id: targetEmpId, is_active: true },
+      data: { is_active: false },
+    });
+  } catch (err) {
+    console.error("revoke sessions failed:", err.message);
     return Response.json({ error: "REVOKE_FAILED" }, { status: 500 });
   }
 
   return Response.json({
     success: true,
-    revoked_count: revokedSessions?.length || 0,
+    revoked_count: result.count,
   });
 }

@@ -1,5 +1,5 @@
 import { validateSession } from '@/lib/validateSession';
-import { supabaseServer } from '@/lib/supabaseServer';
+import prisma from '@/lib/prisma';
 import { isAdminSession, extractIdFromUrl } from '@/lib/recruitmentExpandedUtils';
 
 export async function GET(req) {
@@ -10,10 +10,13 @@ export async function GET(req) {
   const id = extractIdFromUrl(req);
   if (!id) return Response.json({ error: 'INVALID_ID' }, { status: 400 });
 
-  const { data, error } = await supabaseServer.from('medical_checks').select('*').eq('id', id).maybeSingle();
-  if (error) return Response.json({ error: 'MEDICAL_CHECK_QUERY_FAILED', detail: error.message }, { status: 500 });
-  if (!data) return Response.json({ error: 'MEDICAL_CHECK_NOT_FOUND' }, { status: 404 });
-  return Response.json({ success: true, row: data });
+  try {
+    const data = await prisma.medicalCheck.findUnique({ where: { id } });
+    if (!data) return Response.json({ error: 'MEDICAL_CHECK_NOT_FOUND' }, { status: 404 });
+    return Response.json({ success: true, row: data });
+  } catch (err) {
+    return Response.json({ error: 'MEDICAL_CHECK_QUERY_FAILED', detail: err.message }, { status: 500 });
+  }
 }
 
 export async function PUT(req) {
@@ -41,8 +44,11 @@ export async function PUT(req) {
 
   if (!Object.keys(patch).length) return Response.json({ error: 'NO_CHANGES' }, { status: 400 });
 
-  const { data, error } = await supabaseServer.from('medical_checks').update(patch).eq('id', id).select('*').maybeSingle();
-  if (error) return Response.json({ error: 'MEDICAL_CHECK_UPDATE_FAILED', detail: error.message }, { status: 500 });
-  if (!data) return Response.json({ error: 'MEDICAL_CHECK_NOT_FOUND' }, { status: 404 });
-  return Response.json({ success: true, row: data });
+  try {
+    const data = await prisma.medicalCheck.update({ where: { id }, data: patch });
+    return Response.json({ success: true, row: data });
+  } catch (err) {
+    if (err?.code === 'P2025') return Response.json({ error: 'MEDICAL_CHECK_NOT_FOUND' }, { status: 404 });
+    return Response.json({ error: 'MEDICAL_CHECK_UPDATE_FAILED', detail: err.message }, { status: 500 });
+  }
 }

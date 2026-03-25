@@ -2,36 +2,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 let POST;
 
-function createRateLimitChain() {
-  const chain = {
-    select: vi.fn(() => chain),
-    eq: vi.fn(() => chain),
-    gte: vi.fn(() => chain),
-    order: vi.fn(() => chain),
-    limit: vi.fn(async () => ({ data: [], error: null })),
-    insert: vi.fn(async () => ({ error: null })),
-    delete: vi.fn(() => chain),
-  };
-  return chain;
-}
-
 describe('set-pin API handler', () => {
   describe('early validation', () => {
     beforeEach(async () => {
       vi.resetModules();
 
-      const empChain = {
-        maybeSingle: vi.fn(async () => ({ data: null, error: null })),
-        eq: vi.fn(function () { return empChain; }),
-        select: vi.fn(function () { return empChain; }),
-      };
+      vi.doMock('@/lib/checkRateLimit', () => ({
+        checkRateLimit: vi.fn(async () => ({ locked: false, minutesRemaining: null })),
+        recordLoginAttempt: vi.fn(async () => {}),
+        clearFailedAttempts: vi.fn(async () => {}),
+      }));
 
-      const rateLimitChain = createRateLimitChain();
-
-      vi.doMock('@/lib/supabaseServer', () => ({
-        isServiceRoleEnabled: true,
-        supabaseServer: {
-          from: vi.fn((table) => (table === 'login_attempts' ? rateLimitChain : empChain)),
+      vi.doMock('@/lib/prisma', () => ({
+        default: {
+          employee: { findFirst: vi.fn(async () => null) },
+          $executeRaw: vi.fn(async () => 1),
         },
       }));
 
@@ -75,31 +60,21 @@ describe('set-pin API handler', () => {
         },
       }));
 
-      const empChain = {
-        maybeSingle: vi.fn(async () => ({
-          data: { date_of_birth: '2000-01-01', status: 'active' },
-          error: null,
-        })),
-        eq: vi.fn(function () { return empChain; }),
-        select: vi.fn(function () { return empChain; }),
-      };
+      vi.doMock('@/lib/checkRateLimit', () => ({
+        checkRateLimit: vi.fn(async () => ({ locked: false, minutesRemaining: null })),
+        recordLoginAttempt: vi.fn(async () => {}),
+        clearFailedAttempts: vi.fn(async () => {}),
+      }));
 
-      const upsertResultChain = {
-        select: vi.fn(async () => ({ error: null })),
-      };
-
-      const rateLimitChain = createRateLimitChain();
-
-      vi.doMock('@/lib/supabaseServer', () => ({
-        isServiceRoleEnabled: true,
-        supabaseServer: {
-          from: vi.fn((table) =>
-            table === 'login_users'
-              ? { upsert: vi.fn(() => upsertResultChain) }
-              : table === 'login_attempts'
-              ? rateLimitChain
-              : empChain
-          ),
+      vi.doMock('@/lib/prisma', () => ({
+        default: {
+          employee: {
+            findFirst: vi.fn(async () => ({
+              date_of_birth: new Date('2000-01-01'),
+              status: 'active',
+            })),
+          },
+          $executeRaw: vi.fn(async () => 1),
         },
       }));
 
@@ -132,4 +107,3 @@ describe('set-pin API handler', () => {
     });
   });
 });
-

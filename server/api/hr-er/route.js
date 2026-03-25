@@ -1,5 +1,5 @@
 import { validateSession } from '@/lib/validateSession';
-import { supabaseServer } from '@/lib/supabaseServer';
+import prisma from '@/lib/prisma';
 
 const CASE_TYPES = ['disciplinary', 'grievance', 'safety', 'welfare', 'investigation', 'other'];
 const CASE_STATUSES = ['open', 'in_review', 'resolved', 'closed'];
@@ -18,14 +18,15 @@ function currentMonth() {
 }
 
 async function resolveEmployeeIdByCode(employeeCode) {
-  const { data, error } = await supabaseServer
-    .from('employees')
-    .select('id, employee_code')
-    .eq('employee_code', employeeCode)
-    .maybeSingle();
-
-  if (error) return { employee: null, error };
-  return { employee: data || null, error: null };
+  try {
+    const employee = await prisma.employee.findFirst({
+      where: { employee_code: employeeCode },
+      select: { id: true, employee_code: true },
+    });
+    return { employee: employee || null, error: null };
+  } catch (err) {
+    return { employee: null, error: err };
+  }
 }
 
 export async function GET(req) {
@@ -39,25 +40,44 @@ export async function GET(req) {
   const employeeCode = String(searchParams.get('employee_code') || '').trim().toUpperCase();
   const limit = Math.min(Number(searchParams.get('limit') || 50), 200);
 
-  let query = supabaseServer
-    .from('hr_er_cases')
-    .select('id, employee_id, case_type, title, detail, severity, status, occurred_on, assigned_to, opened_by, resolution_note, resolved_at, closed_at, created_at, updated_at')
-    .order('created_at', { ascending: false })
-    .limit(limit);
-
-  if (status) query = query.eq('status', status);
-  if (caseType) query = query.eq('case_type', caseType);
+  const where = {};
+  if (status) where.status = status;
+  if (caseType) where.case_type = caseType;
 
   if (employeeCode) {
     const { employee, error } = await resolveEmployeeIdByCode(employeeCode);
     if (error) return Response.json({ error: 'EMPLOYEE_QUERY_FAILED', detail: error.message }, { status: 500 });
     if (!employee) return Response.json({ success: true, rows: [] });
-    query = query.eq('employee_id', employee.id);
+    where.employee_id = employee.id;
   }
 
-  const { data, error } = await query;
-  if (error) return Response.json({ error: 'HR_ER_CASES_QUERY_FAILED', detail: error.message }, { status: 500 });
-  return Response.json({ success: true, rows: data || [] });
+  try {
+    const data = await prisma.hrErCase.findMany({
+      where,
+      orderBy: { created_at: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        employee_id: true,
+        case_type: true,
+        title: true,
+        detail: true,
+        severity: true,
+        status: true,
+        occurred_on: true,
+        assigned_to: true,
+        opened_by: true,
+        resolution_note: true,
+        resolved_at: true,
+        closed_at: true,
+        created_at: true,
+        updated_at: true,
+      },
+    });
+    return Response.json({ success: true, rows: data || [] });
+  } catch (err) {
+    return Response.json({ error: 'HR_ER_CASES_QUERY_FAILED', detail: err.message }, { status: 500 });
+  }
 }
 
 export async function POST(req) {
@@ -88,23 +108,23 @@ export async function POST(req) {
     if (employeeError) return Response.json({ error: 'EMPLOYEE_QUERY_FAILED', detail: employeeError.message }, { status: 500 });
     if (!employee) return Response.json({ error: 'EMPLOYEE_NOT_FOUND' }, { status: 404 });
 
-    const { data, error } = await supabaseServer
-      .from('hr_er_cases')
-      .insert({
-        employee_id: employee.id,
-        case_type: caseType,
-        title,
-        detail,
-        severity,
-        occurred_on: occurredOn,
-        assigned_to: assignedTo,
-        opened_by: session.emp_id,
-      })
-      .select('*')
-      .maybeSingle();
-
-    if (error) return Response.json({ error: 'HR_ER_CASE_CREATE_FAILED', detail: error.message }, { status: 500 });
-    return Response.json({ success: true, row: data }, { status: 201 });
+    try {
+      const data = await prisma.hrErCase.create({
+        data: {
+          employee_id: employee.id,
+          case_type: caseType,
+          title,
+          detail,
+          severity,
+          occurred_on: occurredOn,
+          assigned_to: assignedTo,
+          opened_by: session.emp_id,
+        },
+      });
+      return Response.json({ success: true, row: data }, { status: 201 });
+    } catch (err) {
+      return Response.json({ error: 'HR_ER_CASE_CREATE_FAILED', detail: err.message }, { status: 500 });
+    }
   }
 
   if (action === 'add_note') {
@@ -119,19 +139,14 @@ export async function POST(req) {
       return Response.json({ error: 'INVALID_VISIBILITY' }, { status: 400 });
     }
 
-    const { data, error } = await supabaseServer
-      .from('hr_er_case_notes')
-      .insert({
-        case_id: caseId,
-        visibility,
-        note,
-        created_by: session.emp_id,
-      })
-      .select('*')
-      .maybeSingle();
-
-    if (error) return Response.json({ error: 'HR_ER_CASE_NOTE_CREATE_FAILED', detail: error.message }, { status: 500 });
-    return Response.json({ success: true, row: data }, { status: 201 });
+    try {
+      const data = await prisma.hrErCaseNote.create({
+        data: { case_id: caseId, visibility, note, created_by: session.emp_id },
+      });
+      return Response.json({ success: true, row: data }, { status: 201 });
+    } catch (err) {
+      return Response.json({ error: 'HR_ER_CASE_NOTE_CREATE_FAILED', detail: err.message }, { status: 500 });
+    }
   }
 
   if (action === 'set_status') {
@@ -149,21 +164,17 @@ export async function POST(req) {
     const patch = {
       status,
       resolution_note: resolutionNote,
-      resolved_at: status === 'resolved' ? new Date().toISOString() : null,
-      closed_at: status === 'closed' ? new Date().toISOString() : null,
-      updated_at: new Date().toISOString(),
+      resolved_at: status === 'resolved' ? new Date() : null,
+      closed_at: status === 'closed' ? new Date() : null,
     };
 
-    const { data, error } = await supabaseServer
-      .from('hr_er_cases')
-      .update(patch)
-      .eq('id', caseId)
-      .select('*')
-      .maybeSingle();
-
-    if (error) return Response.json({ error: 'HR_ER_CASE_UPDATE_FAILED', detail: error.message }, { status: 500 });
-    if (!data) return Response.json({ error: 'HR_ER_CASE_NOT_FOUND' }, { status: 404 });
-    return Response.json({ success: true, row: data });
+    try {
+      const data = await prisma.hrErCase.update({ where: { id: caseId }, data: patch });
+      return Response.json({ success: true, row: data });
+    } catch (err) {
+      if (err?.code === 'P2025') return Response.json({ error: 'HR_ER_CASE_NOT_FOUND' }, { status: 404 });
+      return Response.json({ error: 'HR_ER_CASE_UPDATE_FAILED', detail: err.message }, { status: 500 });
+    }
   }
 
   if (action === 'apply_deduction') {
@@ -195,15 +206,16 @@ export async function POST(req) {
     }
 
     if (!employeeId && caseId) {
-      const { data: erCase, error: caseError } = await supabaseServer
-        .from('hr_er_cases')
-        .select('id, employee_id')
-        .eq('id', caseId)
-        .maybeSingle();
-
-      if (caseError) return Response.json({ error: 'HR_ER_CASE_QUERY_FAILED', detail: caseError.message }, { status: 500 });
-      if (!erCase) return Response.json({ error: 'HR_ER_CASE_NOT_FOUND' }, { status: 404 });
-      employeeId = erCase.employee_id;
+      try {
+        const erCase = await prisma.hrErCase.findUnique({
+          where: { id: caseId },
+          select: { id: true, employee_id: true },
+        });
+        if (!erCase) return Response.json({ error: 'HR_ER_CASE_NOT_FOUND' }, { status: 404 });
+        employeeId = erCase.employee_id;
+      } catch (err) {
+        return Response.json({ error: 'HR_ER_CASE_QUERY_FAILED', detail: err.message }, { status: 500 });
+      }
     }
 
     if (!employeeId) {
@@ -213,28 +225,28 @@ export async function POST(req) {
     const customName = deductionKind === 'welfare' ? 'Welfare Deduction' : 'Safety Deduction';
     const notes = [caseId ? `HR-ER case: ${caseId}` : null, note].filter(Boolean).join(' | ') || null;
 
-    const { data, error } = await supabaseServer
-      .from('employee_deductions')
-      .insert({
-        employee_id: employeeId,
-        custom_name: customName,
-        amount,
-        start_month: startMonth,
-        end_month: endMonth,
-        notes,
-        created_by: session.emp_id,
-        is_active: true,
-      })
-      .select('*')
-      .maybeSingle();
+    try {
+      const data = await prisma.employeeDeduction.create({
+        data: {
+          employee_id: employeeId,
+          custom_name: customName,
+          amount,
+          start_month: startMonth,
+          end_month: endMonth,
+          notes,
+          created_by: session.emp_id,
+          is_active: true,
+        },
+      });
 
-    if (error) return Response.json({ error: 'EMPLOYEE_DEDUCTION_CREATE_FAILED', detail: error.message }, { status: 500 });
-
-    return Response.json({
-      success: true,
-      deduction_table: 'employee_deductions',
-      row: data,
-    }, { status: 201 });
+      return Response.json({
+        success: true,
+        deduction_table: 'employee_deductions',
+        row: data,
+      }, { status: 201 });
+    } catch (err) {
+      return Response.json({ error: 'EMPLOYEE_DEDUCTION_CREATE_FAILED', detail: err.message }, { status: 500 });
+    }
   }
 
   return Response.json({ error: 'UNKNOWN_ACTION' }, { status: 400 });

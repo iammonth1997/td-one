@@ -1,4 +1,4 @@
-import { isServiceRoleEnabled, supabaseServer } from "@/lib/supabaseServer";
+import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { validateSession } from "@/lib/validateSession";
@@ -34,13 +34,6 @@ function getClientIp(req) {
 }
 
 export async function POST(req) {
-  if (!isServiceRoleEnabled) {
-    return Response.json(
-      { error: "SERVER_CONFIG_MISSING", message: "SUPABASE_SERVICE_ROLE_KEY is required" },
-      { status: 500 }
-    );
-  }
-
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) {
     return Response.json({ error: authError }, { status: authStatus });
@@ -77,11 +70,10 @@ export async function POST(req) {
   const empId = payload.emp_id;
 
   // Verify employee is still active
-  const { data: emp } = await supabaseServer
-    .from("employees")
-    .select("status")
-    .eq("employee_code", empId)
-    .maybeSingle();
+  const emp = await prisma.employee.findFirst({
+    where: { employee_code: empId },
+    select: { status: true },
+  });
 
   if (!emp || emp.status !== "active") {
     return Response.json({ error: "ACCOUNT_BLOCKED" }, { status: 403 });
@@ -91,38 +83,37 @@ export async function POST(req) {
   const salt = await bcrypt.genSalt(10);
   const pin_hash = await bcrypt.hash(rawPin, salt);
 
-  // Update PIN in login_users
-  const { error: updateError } = await supabaseServer
-    .from("login_users")
-    .update({
-      pin_hash,
-      force_pin_change: false,
-      temp_pin_expires_at: null,
-      temp_pin_issued_at: null,
-      temp_pin_issued_by: null,
-      is_registered: true,
-    })
-    .eq("emp_id", empId);
-
-  if (updateError) {
-    console.error("reset-pin update failed:", updateError.message);
+  // Update login_users — includes fields not yet in the Prisma schema
+  // (is_registered, temp_pin_issued_at, temp_pin_issued_by). Raw SQL is used
+  // so that all columns are written atomically.
+  try {
+    await prisma.$executeRaw`
+      UPDATE login_users SET
+        pin_hash            = ${pin_hash},
+        force_pin_change    = false,
+        temp_pin_expires_at = NULL,
+        temp_pin_issued_at  = NULL,
+        temp_pin_issued_by  = NULL,
+        is_registered       = true,
+        updated_at          = NOW()
+      WHERE emp_id = ${empId}
+    `;
+  } catch (err) {
+    console.error("reset-pin update failed:", err.message);
     return Response.json({ error: "UPDATE_FAILED" }, { status: 500 });
   }
 
   const ipAddress = getClientIp(req);
   const userAgent = req.headers.get("user-agent") || null;
-  const { error: auditError } = await supabaseServer
-    .from("pin_reset_audit")
-    .insert({
-      target_emp_id: empId,
-      reset_by_emp_id: session.emp_id,
-      reset_by_role: session.role,
-      ip_address: ipAddress,
-      user_agent: userAgent,
-    });
 
-  if (auditError) {
-    console.error("pin reset audit insert failed:", auditError.message);
+  // pin_reset_audit table is not yet in the Prisma schema; use raw SQL
+  try {
+    await prisma.$executeRaw`
+      INSERT INTO pin_reset_audit (target_emp_id, reset_by_emp_id, reset_by_role, ip_address, user_agent)
+      VALUES (${empId}, ${session.emp_id}, ${session.role}, ${ipAddress}, ${userAgent})
+    `;
+  } catch (err) {
+    console.error("pin reset audit insert failed:", err.message);
   }
 
   return Response.json({ success: true });

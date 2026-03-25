@@ -1,18 +1,10 @@
 /**
  * POST /api/extra-pay/requests/[id]/approve
  * Body: { action: 'approve'|'reject', notes: string }
- *
- * Approval flow:
- *   pending_supervisor → (approve) → pending_manager
- *   pending_manager    → (approve) → pending_hr
- *   pending_hr         → (approve) → approved
- *   any pending state  → (reject)  → rejected
- *
- * After full approval: record computed pay in extra_pay_records
  */
 import { validateSession } from '@/lib/validateSession';
-import { supabaseServer } from '@/lib/supabaseServer';
 import { calculateExtraPay } from '@/lib/extraPayEngine';
+import prisma from '@/lib/prisma';
 
 const STATUS_FLOW = {
   pending_supervisor: 'pending_manager',
@@ -41,15 +33,9 @@ export async function POST(req, { params }) {
     return Response.json({ error: 'INVALID_ACTION' }, { status: 400 });
   }
 
-  const supabase = supabaseServer;
+  const request = await prisma.extraPayRequest.findUnique({ where: { id } });
 
-  const { data: request, error: fetchErr } = await supabase
-    .from('extra_pay_requests')
-    .select('*')
-    .eq('id', id)
-    .maybeSingle();
-
-  if (fetchErr || !request) {
+  if (!request) {
     return Response.json({ error: 'REQUEST_NOT_FOUND' }, { status: 404 });
   }
 
@@ -61,35 +47,27 @@ export async function POST(req, { params }) {
   const newStatus = action === 'approve' ? STATUS_FLOW[currentStatus] : 'rejected';
   const stepOrder = STEP_ORDER[currentStatus];
 
-  // Record approval action
-  const { error: actionErr } = await supabase.from('approval_actions').insert({
-    request_id: id,
-    request_type: 'extra_pay',
-    approver_emp_code: session.emp_id,
-    step_order: stepOrder,
-    action,
-    notes: notes ?? null,
+  await prisma.approvalAction.create({
+    data: {
+      request_id: id,
+      request_type: 'extra_pay',
+      approver_emp_code: session.emp_id,
+      step_order: stepOrder,
+      action,
+      notes: notes || null,
+    },
   });
 
-  if (actionErr) return Response.json({ error: actionErr.message }, { status: 500 });
-
-  // Update request status
-  const updatePayload = { status: newStatus, updated_at: new Date().toISOString() };
+  const updateData = { status: newStatus };
   if (action === 'approve' && newStatus === 'approved') {
-    updatePayload.final_approved_at = new Date().toISOString();
+    updateData.final_approved_at = new Date();
   } else if (action === 'reject') {
-    updatePayload.rejected_at = new Date().toISOString();
-    updatePayload.rejected_by = session.emp_id;
+    updateData.rejected_at = new Date();
+    updateData.rejected_by = session.emp_id;
   }
 
-  const { error: updateErr } = await supabase
-    .from('extra_pay_requests')
-    .update(updatePayload)
-    .eq('id', id);
+  await prisma.extraPayRequest.update({ where: { id }, data: updateData });
 
-  if (updateErr) return Response.json({ error: updateErr.message }, { status: 500 });
-
-  // If fully approved: compute and persist the extra_pay_record
   if (newStatus === 'approved') {
     try {
       const computed = await calculateExtraPay({
@@ -100,7 +78,6 @@ export async function POST(req, { params }) {
         requestType: request.request_type,
       });
 
-      // Insert day and night records separately if both exist
       const recordsToInsert = [];
 
       if ((computed.dayHours ?? 0) > 0) {
@@ -149,17 +126,13 @@ export async function POST(req, { params }) {
       }
 
       if (recordsToInsert.length > 0) {
-        await supabase.from('extra_pay_records').insert(recordsToInsert);
+        await prisma.extraPayRecord.createMany({ data: recordsToInsert });
       }
 
       return Response.json({ status: newStatus, computed });
     } catch (calcErr) {
       console.error('extra-pay calculation after approval:', calcErr);
-      return Response.json({
-        status: newStatus,
-        warning: 'CALCULATION_FAILED',
-        detail: calcErr.message,
-      });
+      return Response.json({ status: newStatus, warning: 'CALCULATION_FAILED', detail: calcErr.message });
     }
   }
 

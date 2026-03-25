@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { supabaseServer } from "@/lib/supabaseServer";
+import prisma from "@/lib/prisma";
 import { validateSession } from "@/lib/validateSession";
 import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
 import { hasAnyPermission } from "@/lib/rbac/access";
@@ -23,9 +23,9 @@ export async function POST(req) {
   }
 
   const { emp_id, admin_email, admin_password } = await req.json();
-  const targetEmpId = String(emp_id || "").trim().toUpperCase();
-  const adminEmail = String(admin_email || "").trim().toLowerCase();
-  const adminPassword = String(admin_password || "").trim();
+  const targetEmpId    = String(emp_id        || "").trim().toUpperCase();
+  const adminEmail     = String(admin_email   || "").trim().toLowerCase();
+  const adminPassword  = String(admin_password || "").trim();
 
   if (!targetEmpId || !adminEmail || adminPassword.length < 8) {
     return Response.json({ error: "INVALID_INPUT" }, { status: 400 });
@@ -36,39 +36,36 @@ export async function POST(req) {
     return Response.json({ error: "INVALID_EMAIL" }, { status: 400 });
   }
 
-  const { data: targetUser, error: targetError } = await supabaseServer
-    .from("login_users")
-    .select("emp_id")
-    .eq("emp_id", targetEmpId)
-    .maybeSingle();
-
-  if (targetError) {
-    return Response.json({ error: "DB_QUERY_FAILED" }, { status: 500 });
-  }
+  // Verify target user exists
+  const targetUser = await prisma.loginUser.findUnique({
+    where:  { emp_id: targetEmpId },
+    select: { emp_id: true },
+  });
 
   if (!targetUser) {
     return Response.json({ error: "USER_NOT_FOUND" }, { status: 404 });
   }
 
   const passwordHash = await bcrypt.hash(adminPassword, 10);
-  const { error: updateError } = await supabaseServer
-    .from("login_users")
-    .update({
-      admin_email: adminEmail,
-      admin_password_hash: passwordHash,
-    })
-    .eq("emp_id", targetEmpId);
 
-  if (updateError) {
-    if (String(updateError.message || "").toLowerCase().includes("duplicate")) {
+  try {
+    await prisma.loginUser.update({
+      where: { emp_id: targetEmpId },
+      data: {
+        admin_email:         adminEmail,
+        admin_password_hash: passwordHash,
+      },
+    });
+  } catch (err) {
+    if (err.code === "P2002") {
       return Response.json({ error: "EMAIL_ALREADY_USED" }, { status: 409 });
     }
     return Response.json({ error: "UPDATE_FAILED" }, { status: 500 });
   }
 
   return Response.json({
-    success: true,
-    emp_id: targetEmpId,
+    success:     true,
+    emp_id:      targetEmpId,
     admin_email: adminEmail,
   });
 }

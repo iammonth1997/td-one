@@ -1,18 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-function createRateLimitChain() {
-  const chain = {
-    select: vi.fn(() => chain),
-    eq: vi.fn(() => chain),
-    gte: vi.fn(() => chain),
-    order: vi.fn(() => chain),
-    limit: vi.fn(async () => ({ data: [], error: null })),
-    insert: vi.fn(async () => ({ error: null })),
-    delete: vi.fn(() => chain),
-  };
-  return chain;
-}
-
 describe('login API handler', () => {
   let POST;
 
@@ -20,25 +7,17 @@ describe('login API handler', () => {
     beforeEach(async () => {
       vi.resetModules();
 
-      const mockChain = {
-        maybeSingle: vi.fn(async () => ({ data: null, error: null })),
-        eq: vi.fn(function () { return mockChain; }),
-        select: vi.fn(function () { return mockChain; }),
-      };
+      vi.doMock('@/lib/checkRateLimit', () => ({
+        checkRateLimit: vi.fn(async () => ({ locked: false, minutesRemaining: null })),
+        recordLoginAttempt: vi.fn(async () => {}),
+        clearFailedAttempts: vi.fn(async () => {}),
+      }));
 
-      const rateLimitChain = createRateLimitChain();
-      const sessionsChain = {
-        insert: vi.fn(async () => ({ error: null })),
-      };
-
-      vi.doMock('@/lib/supabaseServer', () => ({
-        isServiceRoleEnabled: true,
-        supabaseServer: {
-          from: vi.fn((table) => {
-            if (table === 'login_attempts') return rateLimitChain;
-            if (table === 'sessions') return sessionsChain;
-            return mockChain;
-          }),
+      vi.doMock('@/lib/prisma', () => ({
+        default: {
+          loginUser: { findFirst: vi.fn(async () => null) },
+          employee: { findFirst: vi.fn(async () => null) },
+          authSession: { create: vi.fn(async () => ({})) },
         },
       }));
 
@@ -79,38 +58,29 @@ describe('login API handler', () => {
         default: { compare: vi.fn(async () => true) },
       }));
 
-      const loginChain = {
-        maybeSingle: vi.fn(async () => ({
-          data: { pin_hash: '$2b$10$hash', role: 'employee', device_id_hash: null },
-          error: null,
-        })),
-        eq: vi.fn(function () { return loginChain; }),
-        select: vi.fn(function () { return loginChain; }),
-      };
-      const empChain = {
-        maybeSingle: vi.fn(async () => ({
-          data: { status: 'active' },
-          error: null,
-        })),
-        eq: vi.fn(function () { return empChain; }),
-        select: vi.fn(function () { return empChain; }),
-      };
+      vi.doMock('@/lib/checkRateLimit', () => ({
+        checkRateLimit: vi.fn(async () => ({ locked: false, minutesRemaining: null })),
+        recordLoginAttempt: vi.fn(async () => {}),
+        clearFailedAttempts: vi.fn(async () => {}),
+      }));
 
-      const rateLimitChain = createRateLimitChain();
-      const sessionsChain = {
-        insert: vi.fn(async () => ({ error: null })),
-      };
-
-      vi.doMock('@/lib/supabaseServer', () => ({
-        isServiceRoleEnabled: true,
-        supabaseServer: {
-          from: vi.fn((table) => {
-            if (table === 'login_users') return loginChain;
-            if (table === 'employees') return empChain;
-            if (table === 'login_attempts') return rateLimitChain;
-            if (table === 'sessions') return sessionsChain;
-            return empChain;
-          }),
+      vi.doMock('@/lib/prisma', () => ({
+        default: {
+          loginUser: {
+            findFirst: vi.fn(async () => ({
+              pin_hash: '$2b$10$hash',
+              role: 'employee',
+              device_id_hash: null,
+              force_pin_change: false,
+              temp_pin_expires_at: null,
+            })),
+          },
+          employee: {
+            findFirst: vi.fn(async () => ({ status: 'active' })),
+          },
+          authSession: {
+            create: vi.fn(async () => ({})),
+          },
         },
       }));
 
@@ -121,7 +91,10 @@ describe('login API handler', () => {
     it('returns success with role and status for valid credentials', async () => {
       const req = new Request('http://localhost/api/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-device-id': 'test-device-123',
+        },
         body: JSON.stringify({ emp_id: 'EMP001', pin: '1234' }),
       });
       const res = await POST(req);
@@ -133,4 +106,3 @@ describe('login API handler', () => {
     });
   });
 });
-

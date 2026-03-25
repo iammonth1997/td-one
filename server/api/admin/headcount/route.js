@@ -1,5 +1,5 @@
 import { validateSession } from '@/lib/validateSession';
-import { supabaseServer } from '@/lib/supabaseServer';
+import prisma from '@/lib/prisma';
 import { isAdminSession, canApproveAsManager } from '@/lib/recruitmentExpandedUtils';
 
 export async function GET(req) {
@@ -11,25 +11,42 @@ export async function GET(req) {
   const view = String(searchParams.get('view') || 'pending').trim().toLowerCase();
   const limit = Math.min(Number(searchParams.get('limit') || 50), 200);
 
-  let query = supabaseServer
-    .from('headcount_requests')
-    .select('id, request_number, requested_by_emp_code, department, position_title, number_of_positions, urgency, reason_type, status, current_approval_step, expected_start_date, created_at, updated_at')
-    .order('urgency', { ascending: false })
-    .order('created_at', { ascending: true })
-    .limit(limit);
+  const where = {};
 
   if (view === 'pending') {
     if (isAdminSession(session)) {
-      query = query.in('status', ['pending_manager', 'pending_hr']);
+      where.status = { in: ['pending_manager', 'pending_hr'] };
     } else {
-      query = query.eq('status', 'pending_manager');
+      where.status = 'pending_manager';
     }
   } else {
     const status = searchParams.get('status');
-    if (status) query = query.eq('status', status);
+    if (status) where.status = status;
   }
 
-  const { data, error } = await query;
-  if (error) return Response.json({ error: 'HEADCOUNT_REQUESTS_QUERY_FAILED', detail: error.message }, { status: 500 });
-  return Response.json({ success: true, rows: data || [] });
+  try {
+    const data = await prisma.headcountRequest.findMany({
+      where,
+      orderBy: [{ urgency: 'desc' }, { created_at: 'asc' }],
+      take: limit,
+      select: {
+        id: true,
+        request_number: true,
+        requested_by_emp_code: true,
+        department: true,
+        position_title: true,
+        number_of_positions: true,
+        urgency: true,
+        reason_type: true,
+        status: true,
+        current_approval_step: true,
+        expected_start_date: true,
+        created_at: true,
+        updated_at: true,
+      },
+    });
+    return Response.json({ success: true, rows: data || [] });
+  } catch (err) {
+    return Response.json({ error: 'HEADCOUNT_REQUESTS_QUERY_FAILED', detail: err.message }, { status: 500 });
+  }
 }

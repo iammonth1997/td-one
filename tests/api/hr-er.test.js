@@ -18,7 +18,13 @@ describe('hr-er API handler', () => {
   describe('GET /api/hr-er', () => {
     it('returns FORBIDDEN when not admin', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeNonAdminMock() }));
-      vi.doMock('@/lib/supabaseServer', () => ({ supabaseServer: { from: vi.fn() } }));
+      vi.doMock('@/lib/prisma', () => ({
+        default: {
+          hrErCase: { findMany: vi.fn(), create: vi.fn() },
+          employee: { findFirst: vi.fn() },
+          employeeDeduction: { create: vi.fn() },
+        },
+      }));
 
       const route = await import('../../server/api/hr-er/route.js');
       GET = route.GET;
@@ -35,15 +41,11 @@ describe('hr-er API handler', () => {
       ];
 
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
-      vi.doMock('@/lib/supabaseServer', () => ({
-        supabaseServer: {
-          from: vi.fn(() => ({
-            select: vi.fn(() => ({
-              order: vi.fn(() => ({
-                limit: vi.fn(async () => ({ data: rows, error: null })),
-              })),
-            })),
-          })),
+      vi.doMock('@/lib/prisma', () => ({
+        default: {
+          hrErCase: { findMany: vi.fn(async () => rows), create: vi.fn() },
+          employee: { findFirst: vi.fn() },
+          employeeDeduction: { create: vi.fn() },
         },
       }));
 
@@ -61,7 +63,13 @@ describe('hr-er API handler', () => {
   describe('POST /api/hr-er', () => {
     it('returns FORBIDDEN when not admin', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeNonAdminMock() }));
-      vi.doMock('@/lib/supabaseServer', () => ({ supabaseServer: { from: vi.fn() } }));
+      vi.doMock('@/lib/prisma', () => ({
+        default: {
+          hrErCase: { findMany: vi.fn(), create: vi.fn() },
+          employee: { findFirst: vi.fn() },
+          employeeDeduction: { create: vi.fn() },
+        },
+      }));
 
       const route = await import('../../server/api/hr-er/route.js');
       POST = route.POST;
@@ -77,7 +85,13 @@ describe('hr-er API handler', () => {
 
     it('returns MISSING_REQUIRED_FIELDS when title is missing', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
-      vi.doMock('@/lib/supabaseServer', () => ({ supabaseServer: { from: vi.fn() } }));
+      vi.doMock('@/lib/prisma', () => ({
+        default: {
+          hrErCase: { findMany: vi.fn(), create: vi.fn() },
+          employee: { findFirst: vi.fn() },
+          employeeDeduction: { create: vi.fn() },
+        },
+      }));
 
       const route = await import('../../server/api/hr-er/route.js');
       POST = route.POST;
@@ -95,7 +109,13 @@ describe('hr-er API handler', () => {
 
     it('returns INVALID_CASE_TYPE for invalid case_type', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
-      vi.doMock('@/lib/supabaseServer', () => ({ supabaseServer: { from: vi.fn() } }));
+      vi.doMock('@/lib/prisma', () => ({
+        default: {
+          hrErCase: { findMany: vi.fn(), create: vi.fn() },
+          employee: { findFirst: vi.fn() },
+          employeeDeduction: { create: vi.fn() },
+        },
+      }));
 
       const route = await import('../../server/api/hr-er/route.js');
       POST = route.POST;
@@ -113,7 +133,13 @@ describe('hr-er API handler', () => {
 
     it('apply_deduction uses employee_deductions table — rejects invalid deduction_kind', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
-      vi.doMock('@/lib/supabaseServer', () => ({ supabaseServer: { from: vi.fn() } }));
+      vi.doMock('@/lib/prisma', () => ({
+        default: {
+          hrErCase: { findMany: vi.fn(), create: vi.fn() },
+          employee: { findFirst: vi.fn() },
+          employeeDeduction: { create: vi.fn() },
+        },
+      }));
 
       const route = await import('../../server/api/hr-er/route.js');
       POST = route.POST;
@@ -131,7 +157,13 @@ describe('hr-er API handler', () => {
 
     it('apply_deduction rejects zero or negative amount', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
-      vi.doMock('@/lib/supabaseServer', () => ({ supabaseServer: { from: vi.fn() } }));
+      vi.doMock('@/lib/prisma', () => ({
+        default: {
+          hrErCase: { findMany: vi.fn(), create: vi.fn() },
+          employee: { findFirst: vi.fn() },
+          employeeDeduction: { create: vi.fn() },
+        },
+      }));
 
       const route = await import('../../server/api/hr-er/route.js');
       POST = route.POST;
@@ -157,26 +189,12 @@ describe('hr-er API handler', () => {
         is_active: true,
       };
 
-      const empChain = {
-        select: vi.fn(() => empChain),
-        eq: vi.fn(() => empChain),
-        maybeSingle: vi.fn(async () => ({ data: { id: 'emp-uuid-1', employee_code: 'EMP01' }, error: null })),
-      };
-
-      const insertChain = {
-        insert: vi.fn(() => insertChain),
-        select: vi.fn(() => insertChain),
-        maybeSingle: vi.fn(async () => ({ data: insertedDeduction, error: null })),
-      };
-
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
-      vi.doMock('@/lib/supabaseServer', () => ({
-        supabaseServer: {
-          from: vi.fn((table) => {
-            if (table === 'employees') return empChain;
-            if (table === 'employee_deductions') return insertChain;
-            return {};
-          }),
+      vi.doMock('@/lib/prisma', () => ({
+        default: {
+          hrErCase: { findMany: vi.fn(), create: vi.fn() },
+          employee: { findFirst: vi.fn(async () => ({ id: 'emp-uuid-1', employee_code: 'EMP01' })) },
+          employeeDeduction: { create: vi.fn(async () => insertedDeduction) },
         },
       }));
 
@@ -204,7 +222,13 @@ describe('hr-er API handler', () => {
 
     it('returns UNKNOWN_ACTION for unrecognised action', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
-      vi.doMock('@/lib/supabaseServer', () => ({ supabaseServer: { from: vi.fn() } }));
+      vi.doMock('@/lib/prisma', () => ({
+        default: {
+          hrErCase: { findMany: vi.fn(), create: vi.fn() },
+          employee: { findFirst: vi.fn() },
+          employeeDeduction: { create: vi.fn() },
+        },
+      }));
 
       const route = await import('../../server/api/hr-er/route.js');
       POST = route.POST;

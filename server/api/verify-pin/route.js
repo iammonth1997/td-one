@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { supabaseServer } from "@/lib/supabaseServer";
+import prisma from "@/lib/prisma";
 import { EMPLOYEE_PORTAL } from "@/lib/sessionContext";
 
 const SESSION_DURATION_MS = 8 * 60 * 60 * 1000;
@@ -27,14 +27,22 @@ export async function POST(req) {
       return Response.json({ error: "INVALID_INPUT" }, { status: 400 });
     }
 
-    const { data: user, error: userError } = await supabaseServer
-      .from("login_users")
-      .select("emp_id, role, pin_hash, force_pin_change, temp_pin_expires_at, line_user_id")
-      .eq("emp_id", empId)
-      .maybeSingle();
-
-    if (userError) {
-      console.error("verify-pin user query failed:", userError.message);
+    // line_user_id is not in the Prisma schema (LIFF removed). Query all other
+    // fields via the ORM; line_user_id will be undefined on the returned object.
+    let user;
+    try {
+      user = await prisma.loginUser.findFirst({
+        where: { emp_id: empId },
+        select: {
+          emp_id: true,
+          role: true,
+          pin_hash: true,
+          force_pin_change: true,
+          temp_pin_expires_at: true,
+        },
+      });
+    } catch (err) {
+      console.error("verify-pin user query failed:", err.message);
       return Response.json({ error: "DB_QUERY_FAILED" }, { status: 500 });
     }
 
@@ -42,14 +50,14 @@ export async function POST(req) {
       return Response.json({ error: "USER_NOT_FOUND" }, { status: 400 });
     }
 
-    const { data: emp, error: empError } = await supabaseServer
-      .from("employees")
-      .select("status")
-      .eq("employee_code", empId)
-      .maybeSingle();
-
-    if (empError) {
-      console.error("verify-pin employee query failed:", empError.message);
+    let emp;
+    try {
+      emp = await prisma.employee.findFirst({
+        where: { employee_code: empId },
+        select: { status: true },
+      });
+    } catch (err) {
+      console.error("verify-pin employee query failed:", err.message);
       return Response.json({ error: "DB_QUERY_FAILED" }, { status: 500 });
     }
 
@@ -70,21 +78,24 @@ export async function POST(req) {
       return Response.json({ error: "INVALID_PIN" }, { status: 400 });
     }
 
-    // Check if LINE is being linked and validate conflict (optional, since LIFF removed)
+    // Check if LINE is being linked and validate conflict (optional, since LIFF removed).
+    // line_user_id column is not in the Prisma schema; use raw SQL if a value is present.
     if (lineUserId) {
-      const { data: linkedOtherUser, error: linkedOtherUserError } = await supabaseServer
-        .from("login_users")
-        .select("emp_id")
-        .eq("line_user_id", lineUserId)
-        .neq("emp_id", empId)
-        .maybeSingle();
-
-      if (linkedOtherUserError) {
-        console.error("verify-pin line_user_id conflict query failed:", linkedOtherUserError.message);
+      let conflictRows;
+      try {
+        conflictRows = await prisma.$queryRaw`
+          SELECT emp_id
+          FROM login_users
+          WHERE line_user_id = ${lineUserId}
+            AND emp_id != ${empId}
+          LIMIT 1
+        `;
+      } catch (err) {
+        console.error("verify-pin line_user_id conflict query failed:", err.message);
         return Response.json({ error: "DB_QUERY_FAILED" }, { status: 500 });
       }
 
-      if (linkedOtherUser) {
+      if (conflictRows.length > 0) {
         return Response.json({ error: "LINE_ALREADY_LINKED" }, { status: 409 });
       }
     }
@@ -101,23 +112,23 @@ export async function POST(req) {
     }
 
     const sessionToken = crypto.randomBytes(32).toString("hex");
-    const expiresAt = new Date(Date.now() + SESSION_DURATION_MS).toISOString();
+    const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
 
-    const { error: sessionError } = await supabaseServer
-      .from("sessions")
-      .insert({
-        session_token: sessionToken,
-        emp_id: empId,
-        role: user.role,
-        device_id: deviceId,
-        expires_at: expiresAt,
-        is_active: true,
-        login_context: EMPLOYEE_PORTAL,
-        user_agent: req.headers.get("user-agent") || null,
+    try {
+      await prisma.authSession.create({
+        data: {
+          session_token: sessionToken,
+          emp_id: empId,
+          role: user.role,
+          device_id: deviceId,
+          expires_at: expiresAt,
+          is_active: true,
+          login_context: EMPLOYEE_PORTAL,
+          user_agent: req.headers.get("user-agent") || null,
+        },
       });
-
-    if (sessionError) {
-      console.error("verify-pin session insert failed:", sessionError.message);
+    } catch (err) {
+      console.error("verify-pin session insert failed:", err.message);
       return Response.json({ error: "SESSION_CREATE_FAILED" }, { status: 500 });
     }
 

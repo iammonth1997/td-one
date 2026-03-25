@@ -1,15 +1,8 @@
-import { isServiceRoleEnabled, supabaseServer } from "@/lib/supabaseServer";
+import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { checkRateLimit, recordLoginAttempt, clearFailedAttempts } from "@/lib/checkRateLimit";
 
 export async function POST(req) {
-  if (!isServiceRoleEnabled) {
-    return Response.json(
-      { error: "SERVER_CONFIG_MISSING", message: "SUPABASE_SERVICE_ROLE_KEY is required" },
-      { status: 500 }
-    );
-  }
-
   const { emp_id, date_of_birth, pin } = await req.json();
   const empId = String(emp_id || "").trim().toUpperCase();
   const dob = String(date_of_birth || "").trim();
@@ -30,14 +23,14 @@ export async function POST(req) {
 
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
 
-  const { data: emp, error: empQueryError } = await supabaseServer
-    .from("employees")
-    .select("date_of_birth, status")
-    .eq("employee_code", empId)
-    .maybeSingle();
-
-  if (empQueryError) {
-    console.error("set-pin employees query failed:", empQueryError.message);
+  let emp;
+  try {
+    emp = await prisma.employee.findFirst({
+      where: { employee_code: empId },
+      select: { date_of_birth: true, status: true },
+    });
+  } catch (err) {
+    console.error("set-pin employees query failed:", err.message);
     return Response.json({ error: "DB_QUERY_FAILED" }, { status: 500 });
   }
 
@@ -49,7 +42,10 @@ export async function POST(req) {
     return Response.json({ error: "ACCOUNT_BLOCKED", reason: emp.status }, { status: 403 });
   }
 
-  const employeeDob = String(emp.date_of_birth || "").slice(0, 10);
+  // date_of_birth is returned as a Date object by Prisma; convert to YYYY-MM-DD for comparison
+  const employeeDob = emp.date_of_birth
+    ? emp.date_of_birth.toISOString().slice(0, 10)
+    : "";
   if (employeeDob !== dob) {
     await recordLoginAttempt(empId, false, ip);
     return Response.json({ error: "INVALID_DOB" }, { status: 400 });
@@ -58,24 +54,24 @@ export async function POST(req) {
   const salt = await bcrypt.genSalt(10);
   const pin_hash = await bcrypt.hash(rawPin, salt);
 
-  const { error: upsertError } = await supabaseServer
-    .from("login_users")
-    .upsert(
-      {
-        emp_id: empId,
-        pin_hash,
-        is_registered: true,
-        force_pin_change: false,
-        temp_pin_expires_at: null,
-        temp_pin_issued_at: null,
-        temp_pin_issued_by: null,
-      },
-      { onConflict: "emp_id" }
-    )
-    .select("emp_id");
-
-  if (upsertError) {
-    console.error("set-pin login_users upsert failed:", upsertError.message);
+  // Upsert login_users including fields not yet in the Prisma schema
+  // (is_registered, temp_pin_issued_at, temp_pin_issued_by). Raw SQL is used
+  // so that these columns are properly cleared on a repeated set-pin call.
+  try {
+    await prisma.$executeRaw`
+      INSERT INTO login_users (emp_id, pin_hash, is_registered, force_pin_change, temp_pin_expires_at, temp_pin_issued_at, temp_pin_issued_by)
+      VALUES (${empId}, ${pin_hash}, true, false, NULL, NULL, NULL)
+      ON CONFLICT (emp_id) DO UPDATE SET
+        pin_hash             = EXCLUDED.pin_hash,
+        is_registered        = true,
+        force_pin_change     = false,
+        temp_pin_expires_at  = NULL,
+        temp_pin_issued_at   = NULL,
+        temp_pin_issued_by   = NULL,
+        updated_at           = NOW()
+    `;
+  } catch (err) {
+    console.error("set-pin login_users upsert failed:", err.message);
     return Response.json({ error: "UPDATE_FAILED" }, { status: 500 });
   }
 

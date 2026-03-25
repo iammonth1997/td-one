@@ -1,5 +1,5 @@
 import { validateSession } from "@/lib/validateSession";
-import { supabaseServer } from "@/lib/supabaseServer";
+import prisma from "@/lib/prisma";
 import { getEmployeeByEmpCode } from "@/lib/otRequestUtils";
 import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
 import { hasAnyPermission } from "@/lib/rbac/access";
@@ -20,30 +20,26 @@ export async function GET(req) {
     return Response.json({ error: "INVALID_ID" }, { status: 400 });
   }
 
-  const { data: row, error } = await supabaseServer
-    .from("ot_requests")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-
-  if (error) {
-    return Response.json({ error: "OT_REQUEST_QUERY_FAILED", detail: error.message }, { status: 500 });
-  }
-  if (!row) {
-    return Response.json({ error: "OT_REQUEST_NOT_FOUND" }, { status: 404 });
-  }
-
-  if (!hasAnyPermission(accessProfile, ["ot.read.all", "rbac.manage"])) {
-    const { employee, error: employeeError } = await getEmployeeByEmpCode(session.emp_id);
-    if (employeeError) {
-      return Response.json({ error: "EMPLOYEE_QUERY_FAILED", detail: employeeError.message }, { status: 500 });
+  try {
+    const row = await prisma.otRequest.findUnique({ where: { id } });
+    if (!row) {
+      return Response.json({ error: "OT_REQUEST_NOT_FOUND" }, { status: 404 });
     }
-    if (!employee || row.employee_id !== employee.id) {
-      return Response.json({ error: "FORBIDDEN" }, { status: 403 });
-    }
-  }
 
-  return Response.json({ success: true, row });
+    if (!hasAnyPermission(accessProfile, ["ot.read.all", "rbac.manage"])) {
+      const { employee, error: employeeError } = await getEmployeeByEmpCode(session.emp_id);
+      if (employeeError) {
+        return Response.json({ error: "EMPLOYEE_QUERY_FAILED", detail: employeeError.message }, { status: 500 });
+      }
+      if (!employee || row.employee_id !== employee.id) {
+        return Response.json({ error: "FORBIDDEN" }, { status: 403 });
+      }
+    }
+
+    return Response.json({ success: true, row });
+  } catch (err) {
+    return Response.json({ error: "OT_REQUEST_QUERY_FAILED", detail: err.message }, { status: 500 });
+  }
 }
 
 export async function PUT(req) {
@@ -68,14 +64,14 @@ export async function PUT(req) {
     return Response.json({ error: "UNSUPPORTED_ACTION" }, { status: 400 });
   }
 
-  const { data: existing, error: existingError } = await supabaseServer
-    .from("ot_requests")
-    .select("id, employee_id, status")
-    .eq("id", id)
-    .maybeSingle();
-
-  if (existingError) {
-    return Response.json({ error: "OT_REQUEST_QUERY_FAILED", detail: existingError.message }, { status: 500 });
+  let existing;
+  try {
+    existing = await prisma.otRequest.findUnique({
+      where: { id },
+      select: { id: true, employee_id: true, status: true },
+    });
+  } catch (err) {
+    return Response.json({ error: "OT_REQUEST_QUERY_FAILED", detail: err.message }, { status: 500 });
   }
   if (!existing) {
     return Response.json({ error: "OT_REQUEST_NOT_FOUND" }, { status: 404 });
@@ -98,26 +94,20 @@ export async function PUT(req) {
       return Response.json({ error: "EMPLOYEE_NOT_FOUND" }, { status: 404 });
     }
 
-    const nowIso = new Date().toISOString();
     const patch =
       action === "approve"
-        ? { status: "approved", approved_by: approver.id, approved_at: nowIso, rejected_reason: null, updated_at: nowIso }
-        : { status: "rejected", rejected_reason: String(body.reason || "").trim() || null, updated_at: nowIso };
+        ? { status: "approved", approved_by: approver.id, approved_at: new Date(), rejected_reason: null }
+        : { status: "rejected", rejected_reason: String(body.reason || "").trim() || null };
 
-    const { data: row, error: updateError } = await supabaseServer
-      .from("ot_requests")
-      .update(patch)
-      .eq("id", id)
-      .select("*")
-      .maybeSingle();
-
-    if (updateError) {
-      return Response.json({ error: "OT_REQUEST_UPDATE_FAILED", detail: updateError.message }, { status: 500 });
+    try {
+      const row = await prisma.otRequest.update({ where: { id }, data: patch });
+      return Response.json({ success: true, row });
+    } catch (err) {
+      return Response.json({ error: "OT_REQUEST_UPDATE_FAILED", detail: err.message }, { status: 500 });
     }
-
-    return Response.json({ success: true, row });
   }
 
+  // cancel action
   const admin = hasAnyPermission(accessProfile, ["ot.approve.company", "ot.read.all", "rbac.manage"]);
   if (!admin) {
     const { employee, error: employeeError } = await getEmployeeByEmpCode(session.emp_id);
@@ -133,16 +123,10 @@ export async function PUT(req) {
     return Response.json({ error: "CANNOT_CANCEL_STATUS" }, { status: 400 });
   }
 
-  const { data: row, error: updateError } = await supabaseServer
-    .from("ot_requests")
-    .update({ status: "cancelled", updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .select("*")
-    .maybeSingle();
-
-  if (updateError) {
-    return Response.json({ error: "OT_REQUEST_CANCEL_FAILED", detail: updateError.message }, { status: 500 });
+  try {
+    const row = await prisma.otRequest.update({ where: { id }, data: { status: "cancelled" } });
+    return Response.json({ success: true, row });
+  } catch (err) {
+    return Response.json({ error: "OT_REQUEST_CANCEL_FAILED", detail: err.message }, { status: 500 });
   }
-
-  return Response.json({ success: true, row });
 }

@@ -33,6 +33,10 @@ yarn-error.log*
 .env*
 !.env.example
 
+# Ignore environment variable files
+.env
+.env.*
+
 # vercel
 .vercel
 

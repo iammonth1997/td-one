@@ -4,6 +4,7 @@ export default [
 	index("routes/home.tsx"),
 	route("activate", "routes/activate.tsx"),
 	route("login", "routes/login.tsx"),
+	route("admin-login", "routes/admin-login.tsx"),
 	route("set-pin", "routes/set-pin.tsx"),
 	route("set-password", "routes/set-password.tsx"),
 	route("change-pin", "routes/change-pin.tsx"),

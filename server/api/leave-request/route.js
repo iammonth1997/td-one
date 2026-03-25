@@ -1,5 +1,5 @@
 import { validateSession } from "@/lib/validateSession";
-import { supabaseServer } from "@/lib/supabaseServer";
+import prisma from "@/lib/prisma";
 import { getEmployeeByEmpCode } from "@/lib/otRequestUtils";
 import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
 import { hasAnyPermission } from "@/lib/rbac/access";
@@ -32,7 +32,6 @@ export async function POST(req) {
   if (!leaveTypeCode || !startDate || !endDate || !reason) {
     return Response.json({ error: "INVALID_INPUT" }, { status: 400 });
   }
-
   if (startDate > endDate) {
     return Response.json({ error: "INVALID_DATE_RANGE" }, { status: 400 });
   }
@@ -46,57 +45,51 @@ export async function POST(req) {
   if (employeeError) return Response.json({ error: "EMPLOYEE_QUERY_FAILED", detail: employeeError.message }, { status: 500 });
   if (!employee) return Response.json({ error: "EMPLOYEE_NOT_FOUND" }, { status: 400 });
 
-  const { data: leaveType, error: leaveTypeError } = await supabaseServer
-    .from("leave_types")
-    .select("code, max_days_per_year, is_active")
-    .eq("code", leaveTypeCode)
-    .eq("is_active", true)
-    .maybeSingle();
+  try {
+    const leaveType = await prisma.leaveType.findFirst({
+      where: { code: leaveTypeCode, is_active: true },
+      select: { code: true, max_days_per_year: true, is_active: true },
+    });
+    if (!leaveType) return Response.json({ error: "LEAVE_TYPE_NOT_FOUND" }, { status: 400 });
 
-  if (leaveTypeError) return Response.json({ error: "LEAVE_TYPE_QUERY_FAILED", detail: leaveTypeError.message }, { status: 500 });
-  if (!leaveType) return Response.json({ error: "LEAVE_TYPE_NOT_FOUND" }, { status: 400 });
+    const currentYear = Number(startDate.slice(0, 4));
+    const balance = await prisma.leaveBalance.findFirst({
+      where: { employee_id: employee.id, leave_type_code: leaveTypeCode, year: currentYear },
+      select: { id: true, total_days: true, used_days: true },
+    });
 
-  const currentYear = Number(startDate.slice(0, 4));
-  const { data: balance, error: balanceError } = await supabaseServer
-    .from("leave_balances")
-    .select("id, total_days, used_days")
-    .eq("employee_id", employee.id)
-    .eq("leave_type_code", leaveTypeCode)
-    .eq("year", currentYear)
-    .maybeSingle();
-
-  if (balanceError) return Response.json({ error: "LEAVE_BALANCE_QUERY_FAILED", detail: balanceError.message }, { status: 500 });
-
-  if (leaveType.max_days_per_year !== null) {
-    const total = balance?.total_days ?? leaveType.max_days_per_year;
-    const used = balance?.used_days ?? 0;
-    const remaining = total - used;
-    if (totalDays > remaining) {
-      return Response.json({ error: "INSUFFICIENT_LEAVE_BALANCE", remaining_days: remaining }, { status: 400 });
+    if (leaveType.max_days_per_year !== null) {
+      const total = balance?.total_days ?? leaveType.max_days_per_year;
+      const used = balance?.used_days ?? 0;
+      const remaining = total - used;
+      if (totalDays > remaining) {
+        return Response.json({ error: "INSUFFICIENT_LEAVE_BALANCE", remaining_days: remaining }, { status: 400 });
+      }
     }
+
+    const inserted = await prisma.leaveRequest.create({
+      data: {
+        employee_id: employee.id,
+        leave_type_code: leaveTypeCode,
+        start_date: startDate,
+        end_date: endDate,
+        total_days: totalDays,
+        reason,
+        attachment_url: attachmentUrl,
+        attachment_public_id: attachmentPublicId,
+        attachment_resource_type: attachmentResourceType,
+        attachment_active: attachmentUrl ? true : false,
+        status: "pending",
+      },
+    });
+
+    return Response.json({ success: true, row: inserted }, { status: 201 });
+  } catch (err) {
+    if (err.message?.includes("leave_type")) {
+      return Response.json({ error: "LEAVE_TYPE_QUERY_FAILED", detail: err.message }, { status: 500 });
+    }
+    return Response.json({ error: "LEAVE_REQUEST_CREATE_FAILED", detail: err.message }, { status: 500 });
   }
-
-  const { data: inserted, error: insertError } = await supabaseServer
-    .from("leave_requests")
-    .insert({
-      employee_id: employee.id,
-      leave_type_code: leaveTypeCode,
-      start_date: startDate,
-      end_date: endDate,
-      total_days: totalDays,
-      reason,
-      attachment_url: attachmentUrl,
-      attachment_public_id: attachmentPublicId,
-      attachment_resource_type: attachmentResourceType,
-      attachment_active: attachmentUrl ? true : false,
-      status: "pending",
-    })
-    .select("*")
-    .maybeSingle();
-
-  if (insertError) return Response.json({ error: "LEAVE_REQUEST_CREATE_FAILED", detail: insertError.message }, { status: 500 });
-
-  return Response.json({ success: true, row: inserted }, { status: 201 });
 }
 
 export async function GET(req) {
@@ -112,47 +105,39 @@ export async function GET(req) {
   if (employeeError) return Response.json({ error: "EMPLOYEE_QUERY_FAILED", detail: employeeError.message }, { status: 500 });
   if (!employee) return Response.json({ error: "EMPLOYEE_NOT_FOUND" }, { status: 400 });
 
-  const { data: requests, error } = await supabaseServer
-    .from("leave_requests")
-    .select("*")
-    .eq("employee_id", employee.id)
-    .order("created_at", { ascending: false })
-    .limit(50);
+  try {
+    const requests = await prisma.leaveRequest.findMany({
+      where: { employee_id: employee.id },
+      orderBy: { created_at: "desc" },
+      take: 50,
+    });
 
-  if (error) return Response.json({ error: "LEAVE_REQUEST_QUERY_FAILED", detail: error.message }, { status: 500 });
+    const year = new Date().getFullYear();
+    const balances = await prisma.leaveBalance.findMany({
+      where: { employee_id: employee.id, year },
+      select: { leave_type_code: true, total_days: true, used_days: true },
+    });
 
-  const year = new Date().getFullYear();
-  const { data: balances, error: balanceError } = await supabaseServer
-    .from("leave_balances")
-    .select("leave_type_code, total_days, used_days")
-    .eq("employee_id", employee.id)
-    .eq("year", year);
+    const leaveTypes = await prisma.leaveType.findMany({
+      where: { is_active: true },
+      orderBy: { code: "asc" },
+      select: { code: true, name_lo: true, name_th: true, name_en: true, max_days_per_year: true, is_paid: true, is_active: true },
+    });
 
-  if (balanceError) return Response.json({ error: "LEAVE_BALANCE_QUERY_FAILED", detail: balanceError.message }, { status: 500 });
+    const sanitizedRows = (requests || []).map((row) => {
+      const fileVisible = row.attachment_active !== false && !row.attachment_deleted_at && row.status !== "cancelled";
+      if (fileVisible) return row;
+      return { ...row, attachment_url: null, attachment_public_id: null };
+    });
 
-  const { data: leaveTypes, error: leaveTypeError } = await supabaseServer
-    .from("leave_types")
-    .select("code, name_lo, name_th, name_en, max_days_per_year, is_paid, is_active")
-    .eq("is_active", true)
-    .order("code", { ascending: true });
-
-  if (leaveTypeError) return Response.json({ error: "LEAVE_TYPE_QUERY_FAILED", detail: leaveTypeError.message }, { status: 500 });
-
-  const sanitizedRows = (requests || []).map((row) => {
-    const fileVisible = row.attachment_active !== false && !row.attachment_deleted_at && row.status !== "cancelled";
-    if (fileVisible) return row;
-    return {
-      ...row,
-      attachment_url: null,
-      attachment_public_id: null,
-    };
-  });
-
-  return Response.json({
-    success: true,
-    rows: sanitizedRows,
-    leave_types: leaveTypes || [],
-    leave_balances: balances || [],
-    year,
-  });
+    return Response.json({
+      success: true,
+      rows: sanitizedRows,
+      leave_types: leaveTypes || [],
+      leave_balances: balances || [],
+      year,
+    });
+  } catch (err) {
+    return Response.json({ error: "LEAVE_REQUEST_QUERY_FAILED", detail: err.message }, { status: 500 });
+  }
 }

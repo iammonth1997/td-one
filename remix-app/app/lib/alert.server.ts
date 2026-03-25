@@ -12,7 +12,7 @@
  * Deduplicates alerts to avoid notification spam (1 per event type per employee per hour).
  */
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import prisma from "~/lib/prisma.server";
 
 function getEnv(name: string): string | undefined {
   const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
@@ -227,20 +227,20 @@ async function sendEmailAlert(alert: AlertNotification): Promise<boolean> {
  * Returns true if we should send the alert (not sent in last hour).
  */
 async function shouldSendAlert(
-  supabase: SupabaseClient,
   ruleName: string,
   empId?: string
 ): Promise<boolean> {
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
 
-  const { data: recentAlert } = await supabase
-    .from("security_alerts_sent")
-    .select("id")
-    .eq("rule_name", ruleName)
-    .eq("emp_id", empId || null)
-    .gt("sent_at", oneHourAgo)
-    .limit(1)
-    .maybeSingle();
+  const recentAlert = await prisma.securityAlertSent.findFirst({
+    where: {
+      rule_name: ruleName,
+      emp_id: empId || null,
+      sent_at: {
+        gt: oneHourAgo,
+      },
+    },
+  });
 
   return !recentAlert;
 }
@@ -249,17 +249,18 @@ async function shouldSendAlert(
  * Record that an alert was sent (for deduplication).
  */
 async function recordAlertSent(
-  supabase: SupabaseClient,
   ruleName: string,
   empId?: string,
   severity?: AlertSeverity
 ): Promise<void> {
   try {
-    await supabase.from("security_alerts_sent").insert({
-      rule_name: ruleName,
-      emp_id: empId || null,
-      severity: severity || "info",
-      sent_at: new Date().toISOString(),
+    await prisma.securityAlertSent.create({
+      data: {
+        rule_name: ruleName,
+        emp_id: empId || null,
+        severity: severity || "info",
+        sent_at: new Date(),
+      },
     });
   } catch (error) {
     console.error("[alert] Failed to record sent alert:", error);
@@ -271,37 +272,36 @@ async function recordAlertSent(
  * Returns matching events if rule threshold is met.
  */
 async function checkAlertRule(
-  supabase: SupabaseClient,
   rule: AlertRule
 ): Promise<Array<any>> {
   const cutoffTime = new Date(
     Date.now() - rule.query.withinMinutes * 60 * 1000
-  ).toISOString();
+  );
 
-  const { data: events, error } = await supabase
-    .from("security_audit_logs")
-    .select("emp_id, event_type, created_at")
-    .in("event_type", rule.query.eventTypes)
-    .gt("created_at", cutoffTime)
-    .order("created_at", { ascending: false });
+  const events = await prisma.securityAuditLog.findMany({
+    where: {
+      event_type: {
+        in: rule.query.eventTypes,
+      },
+      created_at: {
+        gt: cutoffTime,
+      },
+    },
+    orderBy: {
+      created_at: "desc",
+    },
+  });
 
-  if (error) {
-    console.error(`[alert] Error checking rule ${rule.name}:`, error.message);
-    return [];
-  }
-
-  // Group by emp_id and check if any group exceeds threshold
-  const grouped = (events || []).reduce(
+  const grouped = events.reduce(
     (acc, event) => {
       const key = event.emp_id || "unknown";
       if (!acc[key]) acc[key] = [];
       acc[key].push(event);
       return acc;
     },
-    {} as Record<string, any[]>
+    {} as Record<string, any[]>,
   );
 
-  // Flatten and mark with emp_id for alerts
   const matchingEvents: any[] = [];
   for (const [empId, events] of Object.entries(grouped)) {
     if (events.length >= rule.query.threshold && rule.shouldNotify(events.length)) {
@@ -318,7 +318,6 @@ async function checkAlertRule(
  * Checks all alert rules and sends notifications.
  */
 export async function processSecurityAlerts(
-  supabase: SupabaseClient,
   options: {
     slackEnabled?: boolean;
     emailEnabled?: boolean;
@@ -331,17 +330,15 @@ export async function processSecurityAlerts(
 
   for (const rule of ALERT_RULES) {
     try {
-      const matches = await checkAlertRule(supabase, rule);
+      const matches = await checkAlertRule(rule);
 
       for (const match of matches) {
         processed++;
         const { empId, events, count } = match;
 
-        // Check deduplication
-        const canSend = await shouldSendAlert(supabase, rule.name, empId);
+        const canSend = await shouldSendAlert(rule.name, empId);
         if (!canSend) continue;
 
-        // Build alert
         const alert: AlertNotification = {
           severity: rule.severity,
           ruleName: rule.name,
@@ -358,15 +355,11 @@ export async function processSecurityAlerts(
           },
         };
 
-        // Send via configured channels
-        const slackSent = slackEnabled ? await sendSlackAlert(alert) : false;
-        const emailSent = emailEnabled ? await sendEmailAlert(alert) : false;
+        if (slackEnabled) await sendSlackAlert(alert);
+        if (emailEnabled) await sendEmailAlert(alert);
 
-        if (slackSent || emailSent) {
-          alertsSent++;
-          await recordAlertSent(supabase, rule.name, empId, rule.severity);
-          console.log(`[alert] Sent ${rule.name} alert for ${empId}`);
-        }
+        await recordAlertSent(rule.name, empId, rule.severity);
+        alertsSent++;
       }
     } catch (error) {
       console.error(`[alert] Error processing rule ${rule.name}:`, error);

@@ -1,5 +1,5 @@
 import { validateSession } from '@/lib/validateSession';
-import { supabaseServer } from '@/lib/supabaseServer';
+import prisma from '@/lib/prisma';
 import { isAdminSession } from '@/lib/recruitmentExpandedUtils';
 
 const VALID_STATUSES = ['draft', 'approved', 'active', 'closed'];
@@ -14,19 +14,32 @@ export async function GET(req) {
   const status = String(searchParams.get('status') || '').trim().toLowerCase() || null;
   const limit = Math.min(Number(searchParams.get('limit') || 50), 200);
 
-  let query = supabaseServer
-    .from('manpower_plans')
-    .select('id, plan_year, plan_name, status, approved_by, approved_at, notes, created_by, created_at, updated_at')
-    .order('plan_year', { ascending: false })
-    .limit(limit);
+  const where = {};
+  if (year) where.plan_year = year;
+  if (status) where.status = status;
 
-  if (year) query = query.eq('plan_year', year);
-  if (status) query = query.eq('status', status);
-
-  const { data, error } = await query;
-  if (error) return Response.json({ error: 'MANPOWER_PLANS_QUERY_FAILED', detail: error.message }, { status: 500 });
-
-  return Response.json({ success: true, rows: data || [] });
+  try {
+    const data = await prisma.manpowerPlan.findMany({
+      where,
+      orderBy: { plan_year: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        plan_year: true,
+        plan_name: true,
+        status: true,
+        approved_by: true,
+        approved_at: true,
+        notes: true,
+        created_by: true,
+        created_at: true,
+        updated_at: true,
+      },
+    });
+    return Response.json({ success: true, rows: data || [] });
+  } catch (err) {
+    return Response.json({ error: 'MANPOWER_PLANS_QUERY_FAILED', detail: err.message }, { status: 500 });
+  }
 }
 
 export async function POST(req) {
@@ -46,17 +59,15 @@ export async function POST(req) {
       return Response.json({ error: 'MISSING_REQUIRED_FIELDS' }, { status: 400 });
     }
 
-    const { data, error } = await supabaseServer
-      .from('manpower_plans')
-      .insert({ plan_year: planYear, plan_name: planName, notes, created_by: session.emp_id })
-      .select('*')
-      .maybeSingle();
-
-    if (error) {
-      if (error.code === '23505') return Response.json({ error: 'DUPLICATE_PLAN', detail: 'Year + name already exists' }, { status: 409 });
-      return Response.json({ error: 'MANPOWER_PLAN_CREATE_FAILED', detail: error.message }, { status: 500 });
+    try {
+      const data = await prisma.manpowerPlan.create({
+        data: { plan_year: planYear, plan_name: planName, notes, created_by: session.emp_id },
+      });
+      return Response.json({ success: true, row: data }, { status: 201 });
+    } catch (err) {
+      if (err?.code === 'P2002') return Response.json({ error: 'DUPLICATE_PLAN', detail: 'Year + name already exists' }, { status: 409 });
+      return Response.json({ error: 'MANPOWER_PLAN_CREATE_FAILED', detail: err.message }, { status: 500 });
     }
-    return Response.json({ success: true, row: data }, { status: 201 });
   }
 
   if (action === 'add_item') {
@@ -71,43 +82,45 @@ export async function POST(req) {
       return Response.json({ error: 'INVALID_HEADCOUNT' }, { status: 400 });
     }
 
-    const { data, error } = await supabaseServer
-      .from('manpower_plan_items')
-      .insert({
-        plan_id: planId,
-        department: body.department ? String(body.department).trim() : null,
-        work_site_id: body.work_site_id || null,
-        position_title: positionTitle,
-        position_level: body.position_level ? String(body.position_level).trim() : null,
-        planned_headcount: plannedHeadcount,
-        priority: String(body.priority || 'medium').trim().toLowerCase(),
-        expected_hire_quarter: body.expected_hire_quarter ? String(body.expected_hire_quarter).toUpperCase() : null,
-        estimated_salary_min: body.estimated_salary_min != null ? Number(body.estimated_salary_min) : null,
-        estimated_salary_max: body.estimated_salary_max != null ? Number(body.estimated_salary_max) : null,
-        justification: body.justification ? String(body.justification).trim() : null,
-      })
-      .select('*')
-      .maybeSingle();
-
-    if (error) return Response.json({ error: 'MANPOWER_PLAN_ITEM_CREATE_FAILED', detail: error.message }, { status: 500 });
-    return Response.json({ success: true, row: { ...data, gap: plannedHeadcount - 0 } }, { status: 201 });
+    try {
+      const data = await prisma.manpowerPlanItem.create({
+        data: {
+          plan_id: planId,
+          department: body.department ? String(body.department).trim() : null,
+          work_site_id: body.work_site_id || null,
+          position_title: positionTitle,
+          position_level: body.position_level ? String(body.position_level).trim() : null,
+          planned_headcount: plannedHeadcount,
+          priority: String(body.priority || 'medium').trim().toLowerCase(),
+          expected_hire_quarter: body.expected_hire_quarter ? String(body.expected_hire_quarter).toUpperCase() : null,
+          estimated_salary_min: body.estimated_salary_min != null ? Number(body.estimated_salary_min) : null,
+          estimated_salary_max: body.estimated_salary_max != null ? Number(body.estimated_salary_max) : null,
+          justification: body.justification ? String(body.justification).trim() : null,
+        },
+      });
+      return Response.json({ success: true, row: { ...data, gap: plannedHeadcount - 0 } }, { status: 201 });
+    } catch (err) {
+      return Response.json({ error: 'MANPOWER_PLAN_ITEM_CREATE_FAILED', detail: err.message }, { status: 500 });
+    }
   }
 
   if (action === 'approve') {
     const planId = String(body.plan_id || '').trim();
     if (!planId) return Response.json({ error: 'MISSING_REQUIRED_FIELDS' }, { status: 400 });
 
-    const { data, error } = await supabaseServer
-      .from('manpower_plans')
-      .update({ status: 'approved', approved_by: session.emp_id, approved_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-      .eq('id', planId)
-      .eq('status', 'draft')
-      .select('*')
-      .maybeSingle();
+    try {
+      // Ensure plan exists and is in draft state
+      const existing = await prisma.manpowerPlan.findFirst({ where: { id: planId, status: 'draft' } });
+      if (!existing) return Response.json({ error: 'MANPOWER_PLAN_NOT_FOUND_OR_NOT_DRAFT' }, { status: 404 });
 
-    if (error) return Response.json({ error: 'MANPOWER_PLAN_APPROVE_FAILED', detail: error.message }, { status: 500 });
-    if (!data) return Response.json({ error: 'MANPOWER_PLAN_NOT_FOUND_OR_NOT_DRAFT' }, { status: 404 });
-    return Response.json({ success: true, row: data });
+      const data = await prisma.manpowerPlan.update({
+        where: { id: planId },
+        data: { status: 'approved', approved_by: session.emp_id, approved_at: new Date() },
+      });
+      return Response.json({ success: true, row: data });
+    } catch (err) {
+      return Response.json({ error: 'MANPOWER_PLAN_APPROVE_FAILED', detail: err.message }, { status: 500 });
+    }
   }
 
   return Response.json({ error: 'UNKNOWN_ACTION' }, { status: 400 });

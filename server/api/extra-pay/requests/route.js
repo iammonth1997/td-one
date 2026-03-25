@@ -3,49 +3,74 @@
  * POST /api/extra-pay/requests        – create new extra pay request
  */
 import { validateSession } from '@/lib/validateSession';
-import { supabaseServer } from '@/lib/supabaseServer';
+import prisma from '@/lib/prisma';
 import { calculateExtraPay } from '@/lib/extraPayEngine';
 
 export async function GET(req) {
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) return Response.json({ error: authError }, { status: authStatus });
 
-  const supabase = supabaseServer;
   const { searchParams } = new URL(req.url);
   const statusFilter = searchParams.get('status');
   const month = searchParams.get('month');  // "YYYY-MM"
 
-  const { data: emp } = await supabase
-    .from('employees')
-    .select('id')
-    .eq('employee_code', session.emp_id)
-    .maybeSingle();
+  const emp = await prisma.employee.findFirst({
+    where: { employee_code: session.emp_id },
+    select: { id: true },
+  });
 
   if (!emp) return Response.json({ error: 'EMPLOYEE_NOT_FOUND' }, { status: 404 });
 
-  let q = supabase
-    .from('extra_pay_requests')
-    .select(`
-      id, work_date, request_type, planned_clock_in, planned_clock_out,
-      actual_clock_in, actual_clock_out,
-      total_hours, reason, status, created_at,
-      approval_actions(action, step_order, notes, created_at)
-    `)
-    .eq('employee_id', emp.id)
-    .order('work_date', { ascending: false });
-
-  if (statusFilter) q = q.eq('status', statusFilter);
+  const where = { employee_id: emp.id };
+  if (statusFilter) where.status = statusFilter;
   if (month) {
     const [y, m] = month.split('-').map(Number);
     const from = `${month}-01`;
     const to = new Date(y, m, 0).toISOString().slice(0, 10);
-    q = q.gte('work_date', from).lte('work_date', to);
+    where.work_date = { gte: from, lte: to };
   }
 
-  const { data, error } = await q;
-  if (error) return Response.json({ error: error.message }, { status: 500 });
+  try {
+    const requests = await prisma.extraPayRequest.findMany({
+      where,
+      select: {
+        id: true,
+        work_date: true,
+        request_type: true,
+        planned_clock_in: true,
+        planned_clock_out: true,
+        actual_clock_in: true,
+        actual_clock_out: true,
+        total_hours: true,
+        reason: true,
+        status: true,
+        created_at: true,
+      },
+      orderBy: { work_date: 'desc' },
+    });
 
-  return Response.json({ requests: data });
+    // Fetch approval actions separately for each request
+    const ids = requests.map(r => r.id);
+    const actions = ids.length > 0 ? await prisma.approvalAction.findMany({
+      where: { request_id: { in: ids }, request_type: 'extra_pay' },
+      select: { request_id: true, action: true, step_order: true, notes: true, created_at: true },
+    }) : [];
+
+    const actionsByRequest = {};
+    for (const a of actions) {
+      if (!actionsByRequest[a.request_id]) actionsByRequest[a.request_id] = [];
+      actionsByRequest[a.request_id].push(a);
+    }
+
+    const result = requests.map(r => ({
+      ...r,
+      approval_actions: actionsByRequest[r.id] || [],
+    }));
+
+    return Response.json({ requests: result });
+  } catch (err) {
+    return Response.json({ error: err.message }, { status: 500 });
+  }
 }
 
 export async function POST(req) {
@@ -59,7 +84,6 @@ export async function POST(req) {
   const clockOut = String(body.planned_clock_out ?? '').trim();
   const reason = String(body.reason ?? '').trim();
 
-  // Validation
   if (!/^\d{4}-\d{2}-\d{2}$/.test(workDate)) {
     return Response.json({ error: 'INVALID_DATE' }, { status: 400 });
   }
@@ -73,7 +97,6 @@ export async function POST(req) {
     return Response.json({ error: 'REASON_TOO_SHORT', min_length: 10 }, { status: 400 });
   }
 
-  // Don't allow future-date manipulation beyond 30 days
   const reqDate = new Date(workDate);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -82,17 +105,13 @@ export async function POST(req) {
     return Response.json({ error: 'DATE_TOO_OLD', max_days_back: 30 }, { status: 400 });
   }
 
-  const supabase = supabaseServer;
-
-  const { data: emp } = await supabase
-    .from('employees')
-    .select('id')
-    .eq('employee_code', session.emp_id)
-    .maybeSingle();
+  const emp = await prisma.employee.findFirst({
+    where: { employee_code: session.emp_id },
+    select: { id: true },
+  });
 
   if (!emp) return Response.json({ error: 'EMPLOYEE_NOT_FOUND' }, { status: 404 });
 
-  // Calculate preview amount
   let preview = null;
   try {
     preview = await calculateExtraPay({
@@ -103,38 +122,34 @@ export async function POST(req) {
       requestType,
     });
   } catch {
-    // Preview fails silently — no pay policy configured yet
+    // Preview fails silently
   }
 
-  // Total hours
   const [inH, inM] = clockIn.split(':').map(Number);
   const [outH, outM] = clockOut.split(':').map(Number);
   let totalMinutes = (outH * 60 + outM) - (inH * 60 + inM);
   if (totalMinutes <= 0) totalMinutes += 1440;
   const totalHours = Math.round((totalMinutes / 60) * 100) / 100;
 
-  const { data: created, error: insertErr } = await supabase
-    .from('extra_pay_requests')
-    .insert({
-      employee_id: emp.id,
-      work_date: workDate,
-      request_type: requestType,
-      planned_clock_in: clockIn,
-      planned_clock_out: clockOut,
-      total_hours: totalHours,
-      reason,
-      status: 'pending_supervisor',
-      preview_amount: preview?.totalAmount ?? null,
-    })
-    .select()
-    .single();
-
-  if (insertErr) {
-    if (insertErr.code === '23505') {
+  try {
+    const created = await prisma.extraPayRequest.create({
+      data: {
+        employee_id: emp.id,
+        work_date: workDate,
+        request_type: requestType,
+        planned_clock_in: clockIn,
+        planned_clock_out: clockOut,
+        total_hours: totalHours,
+        reason,
+        status: 'pending_supervisor',
+        preview_amount: preview?.totalAmount ?? null,
+      },
+    });
+    return Response.json({ request: created, preview }, { status: 201 });
+  } catch (err) {
+    if (err.code === 'P2002') {
       return Response.json({ error: 'DUPLICATE_REQUEST' }, { status: 409 });
     }
-    return Response.json({ error: insertErr.message }, { status: 500 });
+    return Response.json({ error: err.message }, { status: 500 });
   }
-
-  return Response.json({ request: created, preview }, { status: 201 });
 }

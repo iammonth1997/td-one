@@ -28,17 +28,9 @@ describe('blacklist API handler', () => {
       const rows = [{ id: 'bl1', full_name: 'John Doe', reason_category: 'theft', severity: 'permanent', status: 'active' }];
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
-      vi.doMock('@/lib/supabaseServer', () => ({
-        supabaseServer: {
-          from: vi.fn(() => ({
-            select: vi.fn(() => ({
-              order: vi.fn(() => ({
-                limit: vi.fn(() => ({
-                  eq: vi.fn(async () => ({ data: rows, error: null })),
-                })),
-              })),
-            })),
-          })),
+      vi.doMock('@/lib/prisma', () => ({
+        default: {
+          blacklist: { findMany: vi.fn(async () => rows), create: vi.fn() },
         },
       }));
 
@@ -53,7 +45,7 @@ describe('blacklist API handler', () => {
     it('returns FORBIDDEN for non-admin', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeNonAdminMock() }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
-      vi.doMock('@/lib/supabaseServer', () => ({ supabaseServer: { from: vi.fn() } }));
+      vi.doMock('@/lib/prisma', () => ({ default: { blacklist: { findMany: vi.fn(), create: vi.fn() } } }));
 
       const { GET } = await import('../../server/api/admin/blacklist/route.js');
       const res = await GET(new Request('http://localhost/api/admin/blacklist'));
@@ -65,7 +57,7 @@ describe('blacklist API handler', () => {
     it('returns blacklisted=true when ID card matches', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
-      vi.doMock('@/lib/supabaseServer', () => ({ supabaseServer: { from: vi.fn() } }));
+      vi.doMock('@/lib/prisma', () => ({ default: { blacklist: { findMany: vi.fn(), create: vi.fn() } } }));
 
       const { GET } = await import('../../server/api/admin/blacklist/route.js');
       const res = await GET(new Request('http://localhost/api/admin/blacklist?view=check&id_card_number=1234567890123&full_name=John+Doe'));
@@ -79,7 +71,7 @@ describe('blacklist API handler', () => {
     it('returns blacklisted=false when no match', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
-      vi.doMock('@/lib/supabaseServer', () => ({ supabaseServer: { from: vi.fn() } }));
+      vi.doMock('@/lib/prisma', () => ({ default: { blacklist: { findMany: vi.fn(), create: vi.fn() } } }));
 
       const { GET } = await import('../../server/api/admin/blacklist/route.js');
       const res = await GET(new Request('http://localhost/api/admin/blacklist?view=check&id_card_number=9999999999999&full_name=Jane+Smith'));
@@ -92,7 +84,7 @@ describe('blacklist API handler', () => {
     it('returns MISSING_SEARCH_PARAMS when no query params', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
-      vi.doMock('@/lib/supabaseServer', () => ({ supabaseServer: { from: vi.fn() } }));
+      vi.doMock('@/lib/prisma', () => ({ default: { blacklist: { findMany: vi.fn(), create: vi.fn() } } }));
 
       const { GET } = await import('../../server/api/admin/blacklist/route.js');
       const res = await GET(new Request('http://localhost/api/admin/blacklist?view=check'));
@@ -107,15 +99,9 @@ describe('blacklist API handler', () => {
       const newEntry = { id: 'bl2', full_name: 'Bad Actor', reason_category: 'fraud', severity: 'permanent', status: 'active' };
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
-      vi.doMock('@/lib/supabaseServer', () => ({
-        supabaseServer: {
-          from: vi.fn(() => ({
-            insert: vi.fn(() => ({
-              select: vi.fn(() => ({
-                maybeSingle: vi.fn(async () => ({ data: newEntry, error: null })),
-              })),
-            })),
-          })),
+      vi.doMock('@/lib/prisma', () => ({
+        default: {
+          blacklist: { findMany: vi.fn(), create: vi.fn(async () => newEntry) },
         },
       }));
 
@@ -142,7 +128,7 @@ describe('blacklist API handler', () => {
     it('returns TEMPORARY_REQUIRES_EXPIRY_DATE for temporary without expiry', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
-      vi.doMock('@/lib/supabaseServer', () => ({ supabaseServer: { from: vi.fn() } }));
+      vi.doMock('@/lib/prisma', () => ({ default: { blacklist: { findMany: vi.fn(), create: vi.fn() } } }));
 
       const { POST } = await import('../../server/api/admin/blacklist/route.js');
       const req = new Request('http://localhost/api/admin/blacklist', {

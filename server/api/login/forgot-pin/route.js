@@ -1,4 +1,4 @@
-import { isServiceRoleEnabled, supabaseServer } from "@/lib/supabaseServer";
+import prisma from "@/lib/prisma";
 import crypto from "crypto";
 import { checkRateLimit, recordLoginAttempt, clearFailedAttempts } from "@/lib/checkRateLimit";
 import { validateSession } from "@/lib/validateSession";
@@ -20,13 +20,6 @@ function generateResetToken(empId, issuedByEmpId) {
 }
 
 export async function POST(req) {
-  if (!isServiceRoleEnabled) {
-    return Response.json(
-      { error: "SERVER_CONFIG_MISSING", message: "SUPABASE_SERVICE_ROLE_KEY is required" },
-      { status: 500 }
-    );
-  }
-
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) {
     return Response.json({ error: authError }, { status: authStatus });
@@ -63,16 +56,21 @@ export async function POST(req) {
 
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
 
-  const { data: emp, error: empQueryError } = await supabaseServer
-    .from("employees")
-    .select("date_of_birth, start_date, status")
-    .eq("employee_code", empId)
-    .maybeSingle();
-
-  if (empQueryError) {
-    console.error("forgot-pin employees query failed:", empQueryError.message);
+  // Query employee — start_date is not in the Prisma schema yet, so use raw SQL
+  let empRows;
+  try {
+    empRows = await prisma.$queryRaw`
+      SELECT date_of_birth, start_date, status
+      FROM employees
+      WHERE employee_code = ${empId}
+      LIMIT 1
+    `;
+  } catch (err) {
+    console.error("forgot-pin employees query failed:", err.message);
     return Response.json({ error: "DB_QUERY_FAILED" }, { status: 500 });
   }
+
+  const emp = empRows[0] || null;
 
   if (!emp) {
     return Response.json({ error: "EMPLOYEE_NOT_FOUND" }, { status: 400 });
@@ -83,7 +81,12 @@ export async function POST(req) {
   }
 
   // Verify date of birth
-  const employeeDob = String(emp.date_of_birth || "").slice(0, 10);
+  // date_of_birth may be returned as a Date object by the pg driver
+  const employeeDob = emp.date_of_birth
+    ? (emp.date_of_birth instanceof Date
+        ? emp.date_of_birth.toISOString().slice(0, 10)
+        : String(emp.date_of_birth).slice(0, 10))
+    : "";
   if (employeeDob !== dob) {
     await recordLoginAttempt(empId, false, ip);
     return Response.json({ error: "INVALID_DOB" }, { status: 400 });
@@ -104,11 +107,10 @@ export async function POST(req) {
   }
 
   // Check if user has a login record
-  const { data: user } = await supabaseServer
-    .from("login_users")
-    .select("emp_id")
-    .eq("emp_id", empId)
-    .maybeSingle();
+  const user = await prisma.loginUser.findFirst({
+    where: { emp_id: empId },
+    select: { emp_id: true },
+  });
 
   if (!user) {
     return Response.json({ error: "USER_NOT_REGISTERED" }, { status: 400 });

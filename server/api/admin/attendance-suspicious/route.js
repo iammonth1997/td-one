@@ -1,5 +1,5 @@
 import { validateSession } from "@/lib/validateSession";
-import { supabaseServer } from "@/lib/supabaseServer";
+import prisma from "@/lib/prisma";
 import { buildSessionAccessProfile, canManageAdminActions } from "@/lib/rbac/sessionAccess";
 
 export async function GET(req) {
@@ -17,22 +17,43 @@ export async function GET(req) {
   const status = String(searchParams.get("status") || "pending").toLowerCase();
   const limit = Math.min(Math.max(Number(searchParams.get("limit") || 50), 1), 500);
 
-  let query = supabaseServer
-    .from("attendance_suspicious_scans")
-    .select("id, employee_id, employee_code, attendance_id, scan_timestamp, gps_position, suspicion_score, suspicion_flags, face_match_score, device_id, scan_status, review_action, review_note, reviewed_by_emp_id, reviewed_at, created_at, updated_at")
-    .order("created_at", { ascending: false })
-    .limit(limit);
+  const select = {
+    id: true,
+    employee_id: true,
+    employee_code: true,
+    attendance_id: true,
+    scan_timestamp: true,
+    gps_position: true,
+    suspicion_score: true,
+    suspicion_flags: true,
+    face_match_score: true,
+    device_id: true,
+    scan_status: true,
+    review_action: true,
+    review_note: true,
+    reviewed_by_emp_id: true,
+    reviewed_at: true,
+    created_at: true,
+    updated_at: true,
+  };
 
+  let where = {};
   if (status === "pending") {
-    query = query.eq("scan_status", "flagged").eq("review_action", "pending");
+    where = { scan_status: "flagged", review_action: "pending" };
   } else if (status === "flagged" || status === "blocked" || status === "normal") {
-    query = query.eq("scan_status", status);
+    where = { scan_status: status };
   }
 
-  const { data, error } = await query;
-  if (error) {
-    return Response.json({ error: "SUSPICIOUS_SCAN_QUERY_FAILED", detail: error.message }, { status: 500 });
-  }
+  try {
+    const data = await prisma.attendanceSuspiciousScan.findMany({
+      select,
+      where,
+      orderBy: { created_at: "desc" },
+      take: limit,
+    });
 
-  return Response.json({ success: true, rows: data || [] });
+    return Response.json({ success: true, rows: data });
+  } catch (err) {
+    return Response.json({ error: "SUSPICIOUS_SCAN_QUERY_FAILED", detail: err.message }, { status: 500 });
+  }
 }

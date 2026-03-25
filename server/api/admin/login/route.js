@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { supabaseServer } from "@/lib/supabaseServer";
+import prisma from "@/lib/prisma";
 import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
 import { hasAnyPermission } from "@/lib/rbac/access";
 import { ADMIN_PORTAL } from "@/lib/sessionContext";
@@ -40,15 +40,21 @@ export async function POST(req) {
       return Response.json({ error: "INVALID_INPUT" }, { status: 400 });
     }
 
-    const { data: user, error: userError } = await supabaseServer
-      .from("login_users")
-      .select("emp_id, role, admin_email, admin_password_hash")
-      .eq("admin_email", normalizedEmail)
-      .maybeSingle();
-
-    if (userError) {
+    // admin_email and admin_password_hash are not yet in the Prisma schema;
+    // use raw SQL to look up the admin login record.
+    let userRows;
+    try {
+      userRows = await prisma.$queryRaw`
+        SELECT emp_id, role, admin_email, admin_password_hash
+        FROM login_users
+        WHERE admin_email = ${normalizedEmail}
+        LIMIT 1
+      `;
+    } catch (err) {
       return Response.json({ error: "DB_QUERY_FAILED" }, { status: 500 });
     }
+
+    const user = userRows[0] || null;
 
     if (!user || !user.admin_password_hash) {
       return Response.json({ error: "INVALID_CREDENTIALS" }, { status: 401 });
@@ -64,13 +70,13 @@ export async function POST(req) {
       return Response.json({ error: "FORBIDDEN" }, { status: 403 });
     }
 
-    const { data: employee, error: employeeError } = await supabaseServer
-      .from("employees")
-      .select("status")
-      .eq("employee_code", user.emp_id)
-      .maybeSingle();
-
-    if (employeeError) {
+    let employee;
+    try {
+      employee = await prisma.employee.findFirst({
+        where: { employee_code: user.emp_id },
+        select: { status: true },
+      });
+    } catch (err) {
       return Response.json({ error: "DB_QUERY_FAILED" }, { status: 500 });
     }
 
@@ -89,22 +95,22 @@ export async function POST(req) {
     }
 
     const sessionToken = crypto.randomBytes(32).toString("hex");
-    const expiresAt = new Date(Date.now() + SESSION_DURATION_MS).toISOString();
+    const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
 
-    const { error: sessionError } = await supabaseServer
-      .from("sessions")
-      .insert({
-        session_token: sessionToken,
-        emp_id: user.emp_id,
-        role: user.role,
-        device_id: deviceId,
-        expires_at: expiresAt,
-        is_active: true,
-        login_context: ADMIN_PORTAL,
-        user_agent: req.headers.get("user-agent") || null,
+    try {
+      await prisma.authSession.create({
+        data: {
+          session_token: sessionToken,
+          emp_id: user.emp_id,
+          role: user.role,
+          device_id: deviceId,
+          expires_at: expiresAt,
+          is_active: true,
+          login_context: ADMIN_PORTAL,
+          user_agent: req.headers.get("user-agent") || null,
+        },
       });
-
-    if (sessionError) {
+    } catch (err) {
       return Response.json({ error: "SESSION_CREATE_FAILED" }, { status: 500 });
     }
 

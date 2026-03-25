@@ -1,6 +1,6 @@
 import { validateSession } from "@/lib/validateSession";
 import { getEmployeeFromSessionEmpId, getTodayDateInBangkok, pickEmployeeName } from "@/lib/attendanceUtils";
-import { supabaseServer } from "@/lib/supabaseServer";
+import prisma from "@/lib/prisma";
 import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
 import { hasAnyPermission } from "@/lib/rbac/access";
 import { EMPLOYEE_PORTAL, isPortalContextAllowed } from "@/lib/sessionContext";
@@ -57,22 +57,24 @@ export async function GET(req) {
 
   const today = getTodayDateInBangkok();
 
-  const { data: attendance, error: attendanceError } = await supabaseServer
-    .from("attendance")
-    .select("*")
-    .eq("employee_id", employee.id)
-    .eq("date", today)
-    .maybeSingle();
-
-  if (attendanceError) {
-    return Response.json({ error: "ATTENDANCE_QUERY_FAILED", detail: attendanceError.message }, { status: 500 });
+  let attendance = null;
+  try {
+    attendance = await prisma.attendance.findFirst({
+      where: { employee_id: employee.id, work_date: today },
+    });
+  } catch (err) {
+    return Response.json({ error: "ATTENDANCE_QUERY_FAILED", detail: err.message }, { status: 500 });
   }
 
-  const { data: loginUser } = await supabaseServer
-    .from("login_users")
-    .select("line_user_id")
-    .eq("emp_id", session.emp_id)
-    .maybeSingle();
+  let loginUser = null;
+  try {
+    loginUser = await prisma.loginUser.findFirst({
+      where: { emp_id: session.emp_id },
+      select: { line_user_id: true },
+    });
+  } catch {
+    // non-critical — continue without line_user_id
+  }
 
   let suggestedAction = "scan_in";
   if (attendance?.scan_in_time && !attendance?.scan_out_time) {

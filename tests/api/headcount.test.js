@@ -19,7 +19,7 @@ describe('headcount request API handler', () => {
       canApproveAsManager: (s) => ['manager', 'admin', 'super_admin'].includes(s?.role) || Boolean(s?.is_admin),
       canApproveAsHR: (s) => Boolean(s?.is_admin) || ['admin', 'super_admin'].includes(s?.role),
       extractIdFromUrl: (req) => new URL(req.url).pathname.split('/').filter(Boolean).pop(),
-      generateHeadcountRequestNumber: async () => 'HC-2026-0001',
+      generateHeadcountRequestNumber: async () => ({ requestNumber: 'HC-2026-0001', error: null }),
       resolveEmployeeId: async () => ({ employee: { id: 'emp-uuid-1' }, error: null }),
       ...overrides,
     };
@@ -31,20 +31,9 @@ describe('headcount request API handler', () => {
 
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeSupervisorMock() }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
-      vi.doMock('@/lib/supabaseServer', () => ({
-        supabaseServer: {
-          from: vi.fn((table) => {
-            if (table === 'employees') {
-              return { select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: vi.fn(async () => ({ data: { id: 'emp-uuid-1' }, error: null })) })) })) };
-            }
-            if (table === 'headcount_requests') {
-              return {
-                select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: vi.fn(async () => ({ data: null, error: null })) })) })),
-                insert: vi.fn(() => ({ select: vi.fn(() => ({ maybeSingle: vi.fn(async () => ({ data: newReq, error: null })) })) })),
-              };
-            }
-            return { select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: vi.fn(async () => ({ data: null, error: null })) })) })) };
-          }),
+      vi.doMock('@/lib/prisma', () => ({
+        default: {
+          headcountRequest: { create: vi.fn(async () => newReq) },
         },
       }));
 
@@ -72,7 +61,7 @@ describe('headcount request API handler', () => {
     it('returns FORBIDDEN when regular employee tries to submit', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeEmployeeMock() }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
-      vi.doMock('@/lib/supabaseServer', () => ({ supabaseServer: { from: vi.fn() } }));
+      vi.doMock('@/lib/prisma', () => ({ default: { headcountRequest: { create: vi.fn() } } }));
 
       const { POST } = await import('../../server/api/requests/headcount/route.js');
       const req = new Request('http://localhost/api/requests/headcount', {
@@ -88,7 +77,7 @@ describe('headcount request API handler', () => {
     it('returns MISSING_REQUIRED_FIELDS when justification is absent', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeSupervisorMock() }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
-      vi.doMock('@/lib/supabaseServer', () => ({ supabaseServer: { from: vi.fn() } }));
+      vi.doMock('@/lib/prisma', () => ({ default: { headcountRequest: { create: vi.fn() } } }));
 
       const { POST } = await import('../../server/api/requests/headcount/route.js');
       const req = new Request('http://localhost/api/requests/headcount', {
@@ -107,34 +96,19 @@ describe('headcount request API handler', () => {
   describe('POST /api/admin/headcount/:id (approve step 1)', () => {
     it('allows admin to approve step 1 (pending_manager → pending_hr)', async () => {
       const hcRequest = { id: 'hc1', status: 'pending_manager', current_approval_step: 1 };
-      const afterApprove = { ...hcRequest, status: 'pending_hr', current_approval_step: 2 };
+      const afterApprove = { id: 'hc1', status: 'pending_hr', current_approval_step: 2 };
 
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
-      vi.doMock('@/lib/supabaseServer', () => ({
-        supabaseServer: {
-          from: vi.fn((table) => {
-            if (table === 'headcount_requests') {
-              return {
-                select: vi.fn(() => ({
-                  eq: vi.fn(() => ({
-                    maybeSingle: vi.fn(async () => ({ data: hcRequest, error: null })),
-                  })),
-                })),
-                update: vi.fn(() => ({
-                  eq: vi.fn(() => ({
-                    select: vi.fn(() => ({
-                      maybeSingle: vi.fn(async () => ({ data: afterApprove, error: null })),
-                    })),
-                  })),
-                })),
-              };
-            }
-            if (table === 'headcount_approval_actions') {
-              return { insert: vi.fn(async () => ({ error: null })) };
-            }
-            return { from: vi.fn() };
-          }),
+      vi.doMock('@/lib/prisma', () => ({
+        default: {
+          headcountRequest: {
+            findUnique: vi.fn(async () => hcRequest),
+            update: vi.fn(async () => afterApprove),
+          },
+          headcountApprovalAction: {
+            create: vi.fn(async () => ({})),
+          },
         },
       }));
 

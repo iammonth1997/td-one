@@ -1,5 +1,5 @@
 import { validateSession } from "@/lib/validateSession";
-import { supabaseServer } from "@/lib/supabaseServer";
+import prisma from "@/lib/prisma";
 import { buildSessionAccessProfile, canManageAdminActions } from "@/lib/rbac/sessionAccess";
 
 export async function GET(req) {
@@ -13,17 +13,24 @@ export async function GET(req) {
     return Response.json({ error: "FORBIDDEN" }, { status: 403 });
   }
 
-  const { data, error } = await supabaseServer
-    .from("employee_devices")
-    .select("id, employee_id, device_id, device_name, registered_at, is_active")
-    .order("registered_at", { ascending: false })
-    .limit(200);
+  try {
+    const data = await prisma.authEmployeeDevice.findMany({
+      select: {
+        id: true,
+        employee_id: true,
+        device_id: true,
+        device_name: true,
+        registered_at: true,
+        is_active: true,
+      },
+      orderBy: { registered_at: "desc" },
+      take: 200,
+    });
 
-  if (error) {
-    return Response.json({ error: "DEVICE_LIST_FAILED", detail: error.message }, { status: 500 });
+    return Response.json({ success: true, rows: data });
+  } catch (err) {
+    return Response.json({ error: "DEVICE_LIST_FAILED", detail: err.message }, { status: 500 });
   }
-
-  return Response.json({ success: true, rows: data || [] });
 }
 
 export async function POST(req) {
@@ -43,27 +50,27 @@ export async function POST(req) {
     return Response.json({ error: "INVALID_INPUT" }, { status: 400 });
   }
 
-  const { data: employee, error: employeeError } = await supabaseServer
-    .from("employees")
-    .select("id, employee_code")
-    .eq("employee_code", empCode)
-    .maybeSingle();
-
-  if (employeeError) {
-    return Response.json({ error: "EMPLOYEE_QUERY_FAILED", detail: employeeError.message }, { status: 500 });
+  let employee = null;
+  try {
+    employee = await prisma.employee.findFirst({
+      where: { employee_code: empCode },
+      select: { id: true, employee_code: true },
+    });
+  } catch (err) {
+    return Response.json({ error: "EMPLOYEE_QUERY_FAILED", detail: err.message }, { status: 500 });
   }
 
   if (!employee) {
     return Response.json({ error: "EMPLOYEE_NOT_FOUND" }, { status: 400 });
   }
 
-  const { error: updateError } = await supabaseServer
-    .from("employee_devices")
-    .update({ is_active: false })
-    .eq("employee_id", employee.id);
-
-  if (updateError) {
-    return Response.json({ error: "RESET_DEVICE_FAILED", detail: updateError.message }, { status: 500 });
+  try {
+    await prisma.authEmployeeDevice.updateMany({
+      where: { employee_id: employee.id },
+      data: { is_active: false },
+    });
+  } catch (err) {
+    return Response.json({ error: "RESET_DEVICE_FAILED", detail: err.message }, { status: 500 });
   }
 
   return Response.json({ success: true, employee_code: empCode });

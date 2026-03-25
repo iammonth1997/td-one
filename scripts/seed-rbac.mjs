@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { prisma } from '@/lib/prisma';
 
 const APP_ROLES = [
   "SUPER_ADMIN",
@@ -117,7 +117,9 @@ async function main() {
     throw new Error(`[seed-rbac] Failed clearing table: ${clearError.message}`);
   }
 
-  const { error: insertError } = await supabase.from("rbac_role_permissions").insert(rows);
+  const { error: insertError } = await prisma.rbac_role_permissions.createMany({
+    data: rows,
+  });
 
   if (insertError) {
     throw new Error(`[seed-rbac] Failed inserting rows: ${insertError.message}`);

@@ -1,21 +1,19 @@
 import { validateSession } from "@/lib/validateSession";
-import { supabaseServer } from "@/lib/supabaseServer";
+import prisma from "@/lib/prisma";
 import { getEmployeeByEmpCode } from "@/lib/otRequestUtils";
 import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
 import { hasAnyPermission } from "@/lib/rbac/access";
 
-// Helper to hash salary token
 async function hashToken(token) {
   const enc = new TextEncoder();
   const digest = await crypto.subtle.digest("SHA-256", enc.encode(token));
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-// Helper to validate salary session token
 async function validateSalaryToken(req) {
   const authHeader = req.headers.get("x-salary-token");
   if (!authHeader) {
-    return { emp_id: null, error: null }; // Not required, fall back to session
+    return { emp_id: null, error: null };
   }
 
   const rawToken = authHeader.startsWith("SalaryToken ") ? authHeader.slice(12).trim() : authHeader;
@@ -24,14 +22,15 @@ async function validateSalaryToken(req) {
   }
 
   const tokenHash = await hashToken(rawToken);
-  const { data, error: dbErr } = await supabaseServer
-    .from("salary_sessions")
-    .select("emp_id, expires_at")
-    .eq("token_hash", tokenHash)
-    .maybeSingle();
 
-  if (dbErr) {
-    console.error("validateSalaryToken DB error:", dbErr.message);
+  let data;
+  try {
+    data = await prisma.salarySession.findUnique({
+      where: { token_hash: tokenHash },
+      select: { emp_id: true, expires_at: true },
+    });
+  } catch (dbErr) {
+    console.error("validateSalaryToken DB error:", dbErr);
     return { emp_id: null, error: "SESSION_VALIDATION_FAILED" };
   }
 
@@ -40,7 +39,7 @@ async function validateSalaryToken(req) {
   }
 
   if (new Date(data.expires_at) < new Date()) {
-    await supabaseServer.from("salary_sessions").delete().eq("token_hash", tokenHash);
+    await prisma.salarySession.deleteMany({ where: { token_hash: tokenHash } });
     return { emp_id: null, error: "SALARY_TOKEN_EXPIRED" };
   }
 
@@ -48,17 +47,14 @@ async function validateSalaryToken(req) {
 }
 
 export async function GET(req) {
-  // Check for salary-specific token first
   const { emp_id: salaryEmpId, error: salaryTokenError } = await validateSalaryToken(req);
   if (salaryTokenError) {
     return Response.json({ error: salaryTokenError }, { status: 401 });
   }
 
-  // If salary token was provided, use that emp_id; otherwise use session
   let empId = salaryEmpId;
 
   if (!empId) {
-    // Fall back to main session
     const { session, error: authError, status: authStatus } = await validateSession(req);
     if (authError) return Response.json({ error: authError }, { status: authStatus });
 
@@ -78,36 +74,31 @@ export async function GET(req) {
   const year = Number(searchParams.get("year") || new Date().getFullYear());
   const month = Number(searchParams.get("month") || new Date().getMonth() + 1);
 
-  const { data: slip, error } = await supabaseServer
-    .from("ot_slips")
-    .select("*")
-    .eq("employee_id", employee.id)
-    .eq("year", year)
-    .eq("month", month)
-    .maybeSingle();
+  try {
+    const slip = await prisma.otSlip.findFirst({
+      where: { employee_id: employee.id, year, month },
+    });
 
-  if (error) {
-    return Response.json({ error: "OT_SLIP_QUERY_FAILED", detail: error.message }, { status: 500 });
+    return Response.json(
+      {
+        success: true,
+        slip: slip || null,
+        employee: {
+          id: employee.id,
+          name: employee.name,
+          employee_code: employee.employee_code,
+        },
+        period: { year, month },
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0",
+        },
+      }
+    );
+  } catch (err) {
+    return Response.json({ error: "OT_SLIP_QUERY_FAILED", detail: err.message }, { status: 500 });
   }
-
-  // Set Cache-Control for OT slip responses
-  return Response.json(
-    {
-      success: true,
-      slip: slip || null,
-      employee: {
-        id: employee.id,
-        name: employee.name,
-        employee_code: employee.employee_code,
-      },
-      period: { year, month },
-    },
-    {
-      headers: {
-        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-        "Pragma": "no-cache",
-        "Expires": "0",
-      },
-    }
-  );
 }

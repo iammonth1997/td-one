@@ -1,4 +1,4 @@
-import { supabaseServer } from "@/lib/supabaseServer";
+import prisma from "@/lib/prisma";
 import { deleteCloudinaryAssetByPublicId, extractCloudinaryPublicId } from "@/lib/cloudinaryServerUtils";
 
 function isAuthorized(req) {
@@ -16,19 +16,30 @@ export async function GET(req) {
     return Response.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
 
-  const nowIso = new Date().toISOString();
-  const { data: rows, error: queryError } = await supabaseServer
-    .from("leave_requests")
-    .select("id, employee_id, status, attachment_url, attachment_public_id, attachment_resource_type")
-    .eq("status", "cancelled")
-    .eq("attachment_active", false)
-    .is("attachment_deleted_at", null)
-    .not("attachment_url", "is", null)
-    .lte("attachment_delete_after", nowIso)
-    .limit(500);
+  const now = new Date();
 
-  if (queryError) {
-    const message = String(queryError.message || "");
+  let rows;
+  try {
+    rows = await prisma.leaveRequest.findMany({
+      where: {
+        status: "cancelled",
+        attachment_active: false,
+        attachment_deleted_at: null,
+        attachment_url: { not: null },
+        attachment_delete_after: { lte: now },
+      },
+      select: {
+        id: true,
+        employee_id: true,
+        status: true,
+        attachment_url: true,
+        attachment_public_id: true,
+        attachment_resource_type: true,
+      },
+      take: 500,
+    });
+  } catch (queryErr) {
+    const message = String(queryErr.message || "");
     if (message.includes("does not exist")) {
       return Response.json({
         success: true,
@@ -41,7 +52,7 @@ export async function GET(req) {
         failures: [],
       });
     }
-    return Response.json({ error: "CLEANUP_QUERY_FAILED", detail: queryError.message }, { status: 500 });
+    return Response.json({ error: "CLEANUP_QUERY_FAILED", detail: queryErr.message }, { status: 500 });
   }
 
   const summary = {
@@ -60,36 +71,33 @@ export async function GET(req) {
 
       await deleteCloudinaryAssetByPublicId(publicId, row.attachment_resource_type || null);
 
-      const deletedAt = new Date().toISOString();
-      const { error: updateError } = await supabaseServer
-        .from("leave_requests")
-        .update({
+      const deletedAt = new Date();
+
+      await prisma.leaveRequest.update({
+        where: { id: row.id },
+        data: {
           attachment_url: null,
           attachment_public_id: null,
           attachment_resource_type: null,
           attachment_deleted_at: deletedAt,
-          updated_at: deletedAt,
-        })
-        .eq("id", row.id);
+        },
+      });
 
-      if (updateError) {
-        throw new Error(`UPDATE_FAILED:${updateError.message}`);
-      }
-
-      const { error: auditError } = await supabaseServer
-        .from("leave_request_file_deletion_audit")
-        .upsert({
+      await prisma.leaveRequestFileDeletionAudit.upsert({
+        where: { request_id: row.id },
+        create: {
           request_id: row.id,
           employee_id: row.employee_id,
           leave_type_code: "unknown",
           status: row.status,
           cloudinary_public_id: publicId,
           deleted_at: deletedAt,
-        }, { onConflict: "request_id" });
-
-      if (auditError) {
-        throw new Error(`AUDIT_INSERT_FAILED:${auditError.message}`);
-      }
+        },
+        update: {
+          cloudinary_public_id: publicId,
+          deleted_at: deletedAt,
+        },
+      });
 
       summary.deleted += 1;
     } catch (error) {

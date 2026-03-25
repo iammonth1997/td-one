@@ -1,5 +1,5 @@
 import { validateSession } from '@/lib/validateSession';
-import { supabaseServer } from '@/lib/supabaseServer';
+import prisma from '@/lib/prisma';
 import { isAdminSession, checkBlacklist } from '@/lib/recruitmentExpandedUtils';
 
 export async function GET(req) {
@@ -27,17 +27,30 @@ export async function GET(req) {
 
   const status = String(searchParams.get('status') || 'active').trim().toLowerCase();
 
-  let query = supabaseServer
-    .from('blacklist')
-    .select('id, full_name, reason_category, severity, blacklisted_date, expiry_date, can_reapply, status, created_at')
-    .order('blacklisted_date', { ascending: false })
-    .limit(limit);
+  const where = {};
+  if (status !== 'all') where.status = status;
 
-  if (status !== 'all') query = query.eq('status', status);
-
-  const { data, error } = await query;
-  if (error) return Response.json({ error: 'BLACKLIST_QUERY_FAILED', detail: error.message }, { status: 500 });
-  return Response.json({ success: true, rows: data || [] });
+  try {
+    const data = await prisma.blacklist.findMany({
+      where,
+      orderBy: { blacklisted_date: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        full_name: true,
+        reason_category: true,
+        severity: true,
+        blacklisted_date: true,
+        expiry_date: true,
+        can_reapply: true,
+        status: true,
+        created_at: true,
+      },
+    });
+    return Response.json({ success: true, rows: data || [] });
+  } catch (err) {
+    return Response.json({ error: 'BLACKLIST_QUERY_FAILED', detail: err.message }, { status: 500 });
+  }
 }
 
 export async function POST(req) {
@@ -61,28 +74,28 @@ export async function POST(req) {
       return Response.json({ error: 'TEMPORARY_REQUIRES_EXPIRY_DATE' }, { status: 400 });
     }
 
-    const { data, error } = await supabaseServer
-      .from('blacklist')
-      .insert({
-        full_name: fullName,
-        id_card_number: body.id_card_number ? String(body.id_card_number).trim() : null,
-        phone: body.phone ? String(body.phone).trim() : null,
-        previous_employee_id: body.previous_employee_id || null,
-        previous_candidate_id: body.previous_candidate_id || null,
-        reason_category: reasonCategory,
-        reason_detail: reasonDetail,
-        blacklisted_date: body.blacklisted_date || new Date().toISOString().split('T')[0],
-        blacklisted_by: session.emp_id,
-        severity,
-        expiry_date: body.expiry_date ? String(body.expiry_date).trim() : null,
-        can_reapply: Boolean(body.can_reapply ?? false),
-        evidence_files: body.evidence_files || null,
-      })
-      .select('*')
-      .maybeSingle();
-
-    if (error) return Response.json({ error: 'BLACKLIST_ADD_FAILED', detail: error.message }, { status: 500 });
-    return Response.json({ success: true, row: data }, { status: 201 });
+    try {
+      const data = await prisma.blacklist.create({
+        data: {
+          full_name: fullName,
+          id_card_number: body.id_card_number ? String(body.id_card_number).trim() : null,
+          phone: body.phone ? String(body.phone).trim() : null,
+          previous_employee_id: body.previous_employee_id || null,
+          previous_candidate_id: body.previous_candidate_id || null,
+          reason_category: reasonCategory,
+          reason_detail: reasonDetail,
+          blacklisted_date: body.blacklisted_date || new Date().toISOString().split('T')[0],
+          blacklisted_by: session.emp_id,
+          severity,
+          expiry_date: body.expiry_date ? String(body.expiry_date).trim() : null,
+          can_reapply: Boolean(body.can_reapply ?? false),
+          evidence_files: body.evidence_files || null,
+        },
+      });
+      return Response.json({ success: true, row: data }, { status: 201 });
+    } catch (err) {
+      return Response.json({ error: 'BLACKLIST_ADD_FAILED', detail: err.message }, { status: 500 });
+    }
   }
 
   return Response.json({ error: 'UNKNOWN_ACTION' }, { status: 400 });

@@ -16,14 +16,10 @@ describe('admin deductions API handler', () => {
       })),
     }));
 
-    vi.doMock('@/lib/supabaseServer', () => ({
-      supabaseServer: {
-        from: vi.fn(() => ({
-          select: vi.fn(() => ({
-            order: vi.fn(async () => ({ data: [], error: null })),
-            eq: vi.fn(async () => ({ count: 0, error: null })),
-          })),
-        })),
+    vi.doMock('@/lib/prisma', () => ({
+      default: {
+        deductionTemplate: { findMany: vi.fn(async () => []) },
+        employeeDeduction: { count: vi.fn(async () => 0) },
       },
     }));
 
@@ -43,16 +39,6 @@ describe('admin deductions API handler', () => {
       { id: 't2', name: 'SSI', deduction_type: 'percentage', is_active: true },
     ];
 
-    const templatesChain = {
-      order: vi.fn(async () => ({ data: templates, error: null })),
-      select: vi.fn(() => templatesChain),
-    };
-
-    const countChain = {
-      eq: vi.fn(async () => ({ count: 5, error: null })),
-      select: vi.fn(() => countChain),
-    };
-
     vi.doMock('@/lib/validateSession', () => ({
       validateSession: vi.fn(async () => ({
         session: { is_admin: true },
@@ -61,13 +47,10 @@ describe('admin deductions API handler', () => {
       })),
     }));
 
-    vi.doMock('@/lib/supabaseServer', () => ({
-      supabaseServer: {
-        from: vi.fn((table) => {
-          if (table === 'deduction_templates') return templatesChain;
-          if (table === 'employee_deductions') return countChain;
-          return templatesChain;
-        }),
+    vi.doMock('@/lib/prisma', () => ({
+      default: {
+        deductionTemplate: { findMany: vi.fn(async () => templates) },
+        employeeDeduction: { count: vi.fn(async () => 5) },
       },
     }));
 
@@ -83,4 +66,3 @@ describe('admin deductions API handler', () => {
     expect(body.active_employee_deductions).toBe(5);
   });
 });
-

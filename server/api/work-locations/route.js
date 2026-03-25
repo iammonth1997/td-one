@@ -1,6 +1,6 @@
 import { validateSession } from "@/lib/validateSession";
 import { loadActiveWorkLocations } from "@/lib/attendanceUtils";
-import { supabaseServer } from "@/lib/supabaseServer";
+import prisma from "@/lib/prisma";
 import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
 import { hasAnyPermission } from "@/lib/rbac/access";
 
@@ -134,6 +134,19 @@ function buildLocationPayload(input) {
   return { payload, error: null };
 }
 
+// Shared field selection returned to callers
+const LOCATION_SELECT = {
+  id: true,
+  name: true,
+  latitude: true,
+  longitude: true,
+  radius_meters: true,
+  boundary_type: true,
+  boundary_json: true,
+  is_active: true,
+  created_at: true,
+};
+
 export async function GET(req) {
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) {
@@ -151,18 +164,19 @@ export async function GET(req) {
   }
 
   if (includeInactive) {
-    const { data, error } = await supabaseServer
-      .from("work_locations")
-      .select("id, name, latitude, longitude, radius_meters, boundary_type, boundary_json, is_active, created_at")
-      .order("created_at", { ascending: false });
+    try {
+      const data = await prisma.attendanceWorkLocation.findMany({
+        select: LOCATION_SELECT,
+        orderBy: { created_at: "desc" },
+      });
 
-    if (error) {
-      return Response.json({ error: "WORK_LOCATION_QUERY_FAILED", detail: error.message }, { status: 500 });
+      return Response.json({ success: true, rows: data });
+    } catch (err) {
+      return Response.json({ error: "WORK_LOCATION_QUERY_FAILED", detail: err.message }, { status: 500 });
     }
-
-    return Response.json({ success: true, rows: data || [] });
   }
 
+  // Active locations — uses the shared Prisma helper in attendanceUtils
   const { rows, error } = await loadActiveWorkLocations();
   if (error) {
     return Response.json({ error: "WORK_LOCATION_QUERY_FAILED", detail: error.message }, { status: 500 });
@@ -189,17 +203,16 @@ export async function POST(req) {
     return Response.json({ error: payloadError }, { status: 400 });
   }
 
-  const { data, error } = await supabaseServer
-    .from("work_locations")
-    .insert(payload)
-    .select("id, name, latitude, longitude, radius_meters, boundary_type, boundary_json, is_active, created_at")
-    .maybeSingle();
+  try {
+    const row = await prisma.attendanceWorkLocation.create({
+      data: payload,
+      select: LOCATION_SELECT,
+    });
 
-  if (error) {
-    return Response.json({ error: "WORK_LOCATION_CREATE_FAILED", detail: error.message }, { status: 500 });
+    return Response.json({ success: true, row });
+  } catch (err) {
+    return Response.json({ error: "WORK_LOCATION_CREATE_FAILED", detail: err.message }, { status: 500 });
   }
-
-  return Response.json({ success: true, row: data });
 }
 
 export async function PUT(req) {
@@ -248,18 +261,20 @@ export async function PUT(req) {
 
   if (requestBody.is_active !== undefined) updates.is_active = Boolean(requestBody.is_active);
 
-  const { data, error } = await supabaseServer
-    .from("work_locations")
-    .update(updates)
-    .eq("id", locationId)
-    .select("id, name, latitude, longitude, radius_meters, boundary_type, boundary_json, is_active, created_at")
-    .maybeSingle();
+  try {
+    const row = await prisma.attendanceWorkLocation.update({
+      where: { id: locationId },
+      data: updates,
+      select: LOCATION_SELECT,
+    });
 
-  if (error) {
-    return Response.json({ error: "WORK_LOCATION_UPDATE_FAILED", detail: error.message }, { status: 500 });
+    return Response.json({ success: true, row });
+  } catch (err) {
+    if (err.code === "P2025") {
+      return Response.json({ error: "WORK_LOCATION_NOT_FOUND" }, { status: 404 });
+    }
+    return Response.json({ error: "WORK_LOCATION_UPDATE_FAILED", detail: err.message }, { status: 500 });
   }
-
-  return Response.json({ success: true, row: data });
 }
 
 export async function DELETE(req) {
@@ -279,14 +294,13 @@ export async function DELETE(req) {
     return Response.json({ error: "INVALID_INPUT" }, { status: 400 });
   }
 
-  const { error } = await supabaseServer
-    .from("work_locations")
-    .delete()
-    .eq("id", id);
-
-  if (error) {
-    return Response.json({ error: "WORK_LOCATION_DELETE_FAILED", detail: error.message }, { status: 500 });
+  try {
+    await prisma.attendanceWorkLocation.delete({ where: { id } });
+    return Response.json({ success: true, id });
+  } catch (err) {
+    if (err.code === "P2025") {
+      return Response.json({ error: "WORK_LOCATION_NOT_FOUND" }, { status: 404 });
+    }
+    return Response.json({ error: "WORK_LOCATION_DELETE_FAILED", detail: err.message }, { status: 500 });
   }
-
-  return Response.json({ success: true, id });
 }

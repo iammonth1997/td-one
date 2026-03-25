@@ -1,9 +1,9 @@
-﻿import type { ActionFunctionArgs } from "react-router";
+import type { ActionFunctionArgs } from "react-router";
 import { clearFailedAttempts, checkRateLimit, recordLoginAttempt } from "~/lib/rate-limit.server";
 import { generateResetToken } from "~/lib/reset-token.server";
 import { canManagePinReset } from "~/lib/role-access.server";
 import { validateSession } from "~/lib/session-validation.server";
-import { getSupabaseServerClient } from "~/lib/supabase.server";
+import prisma from "~/lib/prisma.server";
 
 function json(data: unknown, init?: ResponseInit) {
   return new Response(JSON.stringify(data), {
@@ -16,14 +16,6 @@ function json(data: unknown, init?: ResponseInit) {
 }
 
 export async function action({ request, context }: ActionFunctionArgs) {
-  const { isServiceRoleEnabled, supabaseServer } = getSupabaseServerClient(context);
-  if (!isServiceRoleEnabled) {
-    return json(
-      { error: "SERVER_CONFIG_MISSING", message: "SUPABASE_SERVICE_ROLE_KEY is required" },
-      { status: 500 }
-    );
-  }
-
   const { session, error: authError, status: authStatus } = await validateSession(request, context);
   if (authError || !session) {
     return json({ error: authError || "UNAUTHORIZED" }, { status: authStatus || 401 });
@@ -53,23 +45,29 @@ export async function action({ request, context }: ActionFunctionArgs) {
     return json({ error: "INVALID_INPUT" }, { status: 400 });
   }
 
-  const { locked, minutesRemaining } = await checkRateLimit(supabaseServer, empId);
+  const { locked, minutesRemaining } = await checkRateLimit(empId);
   if (locked) {
     return json({ error: "ACCOUNT_LOCKED", minutesRemaining }, { status: 429 });
   }
 
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
 
-  const { data: emp, error: empQueryError } = await supabaseServer
-    .from("employees")
-    .select("date_of_birth, start_date, status")
-    .eq("employee_code", empId)
-    .maybeSingle();
-
-  if (empQueryError) {
-    console.error("forgot-pin employees query failed:", empQueryError.message);
+  // Use raw query to access start_date which is not in the Prisma Employee model
+  type EmpRow = { date_of_birth: Date | null; start_date: Date | null; status: string };
+  let empRows: EmpRow[];
+  try {
+    empRows = await prisma.$queryRaw<EmpRow[]>`
+      SELECT date_of_birth, start_date, status
+      FROM employees
+      WHERE employee_code = ${empId}
+      LIMIT 1
+    `;
+  } catch (dbError) {
+    console.error("forgot-pin employees query failed:", dbError);
     return json({ error: "DB_QUERY_FAILED" }, { status: 500 });
   }
+
+  const emp = empRows[0] ?? null;
 
   if (!emp) {
     return json({ error: "EMPLOYEE_NOT_FOUND" }, { status: 400 });
@@ -79,9 +77,12 @@ export async function action({ request, context }: ActionFunctionArgs) {
     return json({ error: "ACCOUNT_BLOCKED", reason: emp.status }, { status: 403 });
   }
 
-  const employeeDob = String(emp.date_of_birth || "").slice(0, 10);
+  // Compare date_of_birth: normalise to YYYY-MM-DD
+  const employeeDob = emp.date_of_birth
+    ? new Date(emp.date_of_birth).toISOString().slice(0, 10)
+    : "";
   if (employeeDob !== dob) {
-    await recordLoginAttempt(supabaseServer, empId, false, ip);
+    await recordLoginAttempt(empId, false, ip);
     return json({ error: "INVALID_DOB" }, { status: 400 });
   }
 
@@ -94,15 +95,14 @@ export async function action({ request, context }: ActionFunctionArgs) {
   const empStartYear = empStartDate.getFullYear();
 
   if (empStartMonth !== startMonth || empStartYear !== startYear) {
-    await recordLoginAttempt(supabaseServer, empId, false, ip);
+    await recordLoginAttempt(empId, false, ip);
     return json({ error: "INVALID_START_DATE" }, { status: 400 });
   }
 
-  const { data: user } = await supabaseServer
-    .from("login_users")
-    .select("emp_id")
-    .eq("emp_id", empId)
-    .maybeSingle();
+  const user = await prisma.loginUser.findFirst({
+    where: { emp_id: empId },
+    select: { emp_id: true },
+  });
 
   if (!user) {
     return json({ error: "USER_NOT_REGISTERED" }, { status: 400 });
@@ -119,8 +119,6 @@ export async function action({ request, context }: ActionFunctionArgs) {
     );
   }
 
-  await clearFailedAttempts(supabaseServer, empId);
+  await clearFailedAttempts(empId);
   return json({ success: true, token }, { status: 200 });
 }
-
-

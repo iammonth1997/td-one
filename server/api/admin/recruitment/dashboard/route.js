@@ -1,5 +1,5 @@
 import { validateSession } from '@/lib/validateSession';
-import { supabaseServer } from '@/lib/supabaseServer';
+import prisma from '@/lib/prisma';
 import { isAdminSession } from '@/lib/recruitmentExpandedUtils';
 
 export async function GET(req) {
@@ -8,43 +8,53 @@ export async function GET(req) {
   if (!isAdminSession(session)) return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
 
   const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const currentYear = now.getFullYear();
 
-  const [
-    openReqResult,
-    candidatesMonthResult,
-    pendingHCResult,
-    talentPoolResult,
-    activeBlacklistResult,
-    costYearResult,
-    stageCountResult,
-  ] = await Promise.all([
-    supabaseServer.from('recruitment_requisitions').select('id', { count: 'exact', head: true }).in('status', ['open', 'in_progress']),
-    supabaseServer.from('recruitment_candidates').select('id', { count: 'exact', head: true }).gte('created_at', monthStart),
-    supabaseServer.from('headcount_requests').select('id', { count: 'exact', head: true }).in('status', ['pending_manager', 'pending_hr']),
-    supabaseServer.from('recruitment_candidates').select('id', { count: 'exact', head: true }).eq('in_talent_pool', true),
-    supabaseServer.from('blacklist').select('id', { count: 'exact', head: true }).eq('status', 'active'),
-    supabaseServer.from('recruitment_costs').select('amount').eq('budget_year', now.getFullYear()),
-    supabaseServer.from('recruitment_candidates').select('current_stage').not('current_stage', 'is', null),
-  ]);
+  try {
+    const [
+      openPositions,
+      applicationsThisMonth,
+      pendingHeadcount,
+      talentPoolCount,
+      activeBlacklist,
+      costRows,
+      stageCandidates,
+    ] = await Promise.all([
+      prisma.recruitmentRequisition.count({ where: { status: { in: ['open', 'in_progress'] } } }),
+      prisma.recruitmentCandidate.count({ where: { created_at: { gte: monthStart } } }),
+      prisma.headcountRequest.count({ where: { status: { in: ['pending_manager', 'pending_hr'] } } }),
+      prisma.recruitmentCandidate.count({ where: { in_talent_pool: true } }),
+      prisma.blacklist.count({ where: { status: 'active' } }),
+      prisma.recruitmentCost.findMany({ where: { budget_year: currentYear }, select: { amount: true } }),
+      prisma.recruitmentCandidate.findMany({
+        where: { current_stage: { not: null } },
+        select: { current_stage: true },
+      }),
+    ]);
 
-  const totalCostThisYear = (costYearResult.data || []).reduce((s, r) => s + Number(r.amount), 0);
+    const totalCostThisYear = costRows.reduce((s, r) => s + Number(r.amount), 0);
 
-  const funnel = {};
-  for (const row of stageCountResult.data || []) {
-    funnel[row.current_stage] = (funnel[row.current_stage] || 0) + 1;
+    const funnel = {};
+    for (const row of stageCandidates) {
+      if (row.current_stage) {
+        funnel[row.current_stage] = (funnel[row.current_stage] || 0) + 1;
+      }
+    }
+
+    return Response.json({
+      success: true,
+      metrics: {
+        open_positions: openPositions,
+        applications_this_month: applicationsThisMonth,
+        pending_headcount_requests: pendingHeadcount,
+        talent_pool_count: talentPoolCount,
+        active_blacklist_entries: activeBlacklist,
+        total_recruitment_cost_this_year: totalCostThisYear,
+      },
+      hiring_funnel: funnel,
+    });
+  } catch (err) {
+    return Response.json({ error: 'DASHBOARD_QUERY_FAILED', detail: err.message }, { status: 500 });
   }
-
-  return Response.json({
-    success: true,
-    metrics: {
-      open_positions: openReqResult.count || 0,
-      applications_this_month: candidatesMonthResult.count || 0,
-      pending_headcount_requests: pendingHCResult.count || 0,
-      talent_pool_count: talentPoolResult.count || 0,
-      active_blacklist_entries: activeBlacklistResult.count || 0,
-      total_recruitment_cost_this_year: totalCostThisYear,
-    },
-    hiring_funnel: funnel,
-  });
 }

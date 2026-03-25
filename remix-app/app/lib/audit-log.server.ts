@@ -12,7 +12,7 @@
  *  - Repeated out-of-bounds scan attempts
  */
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import prisma from "~/lib/prisma.server";
 
 // ─── Event Type Constants ────────────────────────────────────────────────────
 
@@ -73,24 +73,22 @@ interface AuditLogEntry {
  * failing the primary operation because of a logging side-effect.
  */
 export async function writeAuditLog(
-  supabase: SupabaseClient,
   entry: AuditLogEntry
 ): Promise<void> {
   try {
-    const { error } = await supabase.from("security_audit_logs").insert({
-      event_type: entry.event_type,
-      severity: entry.severity ?? "info",
-      emp_id: entry.emp_id ?? null,
-      device_id: entry.device_id ?? null,
-      ip_address: entry.ip_address ?? null,
-      latitude: entry.latitude ?? null,
-      longitude: entry.longitude ?? null,
-      metadata: entry.metadata ?? null,
-      is_alert: entry.is_alert ?? false,
+    await prisma.securityAuditLog.create({
+      data: {
+        event_type: entry.event_type,
+        severity: entry.severity ?? "info",
+        emp_id: entry.emp_id ?? null,
+        device_id: entry.device_id ?? null,
+        ip_address: entry.ip_address ?? null,
+        latitude: entry.latitude ?? null,
+        longitude: entry.longitude ?? null,
+        metadata: entry.metadata ?? null,
+        is_alert: entry.is_alert ?? false,
+      },
     });
-    if (error) {
-      console.error("[audit-log] insert error:", error.message);
-    }
   } catch (err) {
     console.error("[audit-log] unexpected error:", err);
   }

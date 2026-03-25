@@ -1,10 +1,11 @@
 /**
  * GET  /api/admin/pay-policies           – list all site pay policies
  * POST /api/admin/pay-policies           – create or update a pay policy
- * POST /api/admin/pay-policies (action=set_rate) – upsert a single pay rate
+ * POST /api/admin/pay-policies (action=set_rate)    – upsert a single pay rate
+ * POST /api/admin/pay-policies (action=add_holiday) – add a public holiday
  */
 import { validateSession } from '@/lib/validateSession';
-import { supabaseServer } from '@/lib/supabaseServer';
+import prisma from '@/lib/prisma';
 
 const VALID_PAY_TYPES = [
   'OT_NORMAL_DAY', 'OT_NORMAL_NIGHT',
@@ -18,25 +19,44 @@ export async function GET(req) {
   if (authError) return Response.json({ error: authError }, { status: authStatus });
   if (!session.is_admin) return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
 
-  const supabase = supabaseServer;
   const { searchParams } = new URL(req.url);
   const siteId = searchParams.get('site_id');
 
-  let q = supabase
-    .from('site_pay_policies')
-    .select(`
-      id, effective_from, effective_to, notes,
-      work_site:work_locations(id, name, site_code, site_type),
-      site_pay_rates(id, pay_type, multiplier, fixed_amount, calculation_method)
-    `)
-    .order('effective_from', { ascending: false });
+  try {
+    const rows = await prisma.sitePayPolicy.findMany({
+      where: siteId ? { work_site_id: siteId } : undefined,
+      select: {
+        id: true,
+        effective_from: true,
+        effective_to: true,
+        notes: true,
+        workSite: {
+          select: { id: true, name: true, site_code: true, site_type: true },
+        },
+        rates: {
+          select: {
+            id: true,
+            pay_type: true,
+            multiplier: true,
+            fixed_amount: true,
+            calculation_method: true,
+          },
+        },
+      },
+      orderBy: { effective_from: 'desc' },
+    });
 
-  if (siteId) q = q.eq('work_site_id', siteId);
+    // Rename relation fields to match original Supabase API shape
+    const policies = rows.map(({ workSite, rates, ...rest }) => ({
+      ...rest,
+      work_site:      workSite ?? null,
+      site_pay_rates: rates,
+    }));
 
-  const { data, error } = await q;
-  if (error) return Response.json({ error: error.message }, { status: 500 });
-
-  return Response.json({ policies: data });
+    return Response.json({ policies });
+  } catch (err) {
+    return Response.json({ error: err.message }, { status: 500 });
+  }
 }
 
 export async function POST(req) {
@@ -44,7 +64,6 @@ export async function POST(req) {
   if (authError) return Response.json({ error: authError }, { status: authStatus });
   if (!session.is_admin) return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
 
-  const supabase = supabaseServer;
   const body = await req.json();
   const action = String(body.action ?? 'create_policy').trim();
 
@@ -54,14 +73,19 @@ export async function POST(req) {
       return Response.json({ error: 'MISSING_REQUIRED_FIELDS' }, { status: 400 });
     }
 
-    const { data, error } = await supabase
-      .from('site_pay_policies')
-      .insert({ work_site_id, effective_from, effective_to: effective_to ?? null, notes: notes ?? null })
-      .select()
-      .single();
-
-    if (error) return Response.json({ error: error.message }, { status: 500 });
-    return Response.json({ policy: data }, { status: 201 });
+    try {
+      const policy = await prisma.sitePayPolicy.create({
+        data: {
+          work_site_id,
+          effective_from,
+          effective_to: effective_to ?? null,
+          notes:        notes ?? null,
+        },
+      });
+      return Response.json({ policy }, { status: 201 });
+    } catch (err) {
+      return Response.json({ error: err.message }, { status: 500 });
+    }
   }
 
   if (action === 'set_rate') {
@@ -77,20 +101,32 @@ export async function POST(req) {
       return Response.json({ error: 'INVALID_MULTIPLIER (0–10)' }, { status: 400 });
     }
 
-    const { data, error } = await supabase
-      .from('site_pay_rates')
-      .upsert({
-        policy_id,
-        pay_type,
-        multiplier: multiplier ?? null,
-        fixed_amount: fixed_amount ?? null,
+    try {
+      const rateData = {
+        multiplier:         multiplier ?? null,
+        fixed_amount:       fixed_amount ?? null,
         calculation_method: calculation_method ?? 'multiplier',
-      }, { onConflict: 'policy_id,pay_type' })
-      .select()
-      .single();
+      };
 
-    if (error) return Response.json({ error: error.message }, { status: 500 });
-    return Response.json({ rate: data }, { status: 200 });
+      const rate = await prisma.sitePayRate.upsert({
+        where: {
+          site_pay_policy_id_pay_type: {
+            site_pay_policy_id: policy_id,
+            pay_type,
+          },
+        },
+        create: {
+          site_pay_policy_id: policy_id,
+          pay_type,
+          ...rateData,
+        },
+        update: rateData,
+      });
+
+      return Response.json({ rate }, { status: 200 });
+    } catch (err) {
+      return Response.json({ error: err.message }, { status: 500 });
+    }
   }
 
   if (action === 'add_holiday') {
@@ -99,17 +135,21 @@ export async function POST(req) {
       return Response.json({ error: 'MISSING_REQUIRED_FIELDS' }, { status: 400 });
     }
 
-    const { data, error } = await supabase
-      .from('public_holidays')
-      .insert({ holiday_date, holiday_name, country_code: country_code ?? 'LA' })
-      .select()
-      .single();
-
-    if (error) {
-      if (error.code === '23505') return Response.json({ error: 'HOLIDAY_ALREADY_EXISTS' }, { status: 409 });
-      return Response.json({ error: error.message }, { status: 500 });
+    try {
+      const holiday = await prisma.publicHoliday.create({
+        data: {
+          holiday_date,
+          holiday_name,
+          country_code: country_code ?? 'LA',
+        },
+      });
+      return Response.json({ holiday }, { status: 201 });
+    } catch (err) {
+      if (err.code === 'P2002') {
+        return Response.json({ error: 'HOLIDAY_ALREADY_EXISTS' }, { status: 409 });
+      }
+      return Response.json({ error: err.message }, { status: 500 });
     }
-    return Response.json({ holiday: data }, { status: 201 });
   }
 
   return Response.json({ error: 'UNKNOWN_ACTION' }, { status: 400 });

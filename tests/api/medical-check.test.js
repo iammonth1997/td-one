@@ -20,7 +20,13 @@ describe('medical-check API handler', () => {
     it('returns FORBIDDEN for non-admin', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeNonAdminMock() }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
-      vi.doMock('@/lib/supabaseServer', () => ({ supabaseServer: { from: vi.fn() } }));
+      vi.doMock('@/lib/prisma', () => ({
+        default: {
+          medicalCheckType: { findMany: vi.fn(), create: vi.fn() },
+          medicalCheck: { findMany: vi.fn(), create: vi.fn() },
+          employee: { findFirst: vi.fn() },
+        },
+      }));
 
       const { GET } = await import('../../server/api/admin/medical-check/route.js');
       const res = await GET(new Request('http://localhost/api/admin/medical-check'));
@@ -31,13 +37,11 @@ describe('medical-check API handler', () => {
       const types = [{ id: 't1', check_name: 'Blood Test', is_mandatory_pre_employment: true }];
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
-      vi.doMock('@/lib/supabaseServer', () => ({
-        supabaseServer: {
-          from: vi.fn(() => ({
-            select: vi.fn(() => ({
-              order: vi.fn(async () => ({ data: types, error: null })),
-            })),
-          })),
+      vi.doMock('@/lib/prisma', () => ({
+        default: {
+          medicalCheckType: { findMany: vi.fn(async () => types), create: vi.fn() },
+          medicalCheck: { findMany: vi.fn(), create: vi.fn() },
+          employee: { findFirst: vi.fn() },
         },
       }));
 
@@ -54,24 +58,11 @@ describe('medical-check API handler', () => {
       const checks = [{ id: 'mc1', person_type: 'employee', result: 'fit', check_date: '2026-01-15' }];
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
-      vi.doMock('@/lib/supabaseServer', () => ({
-        supabaseServer: {
-          from: vi.fn((table) => {
-            if (table === 'employees') {
-              return { select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: vi.fn(async () => ({ data: { id: 'emp-uuid-1' }, error: null })) })) })) };
-            }
-            return {
-              select: vi.fn(() => ({
-                order: vi.fn(() => ({
-                  limit: vi.fn(() => ({
-                    eq: vi.fn(() => ({
-                      eq: vi.fn(async () => ({ data: checks, error: null })),
-                    })),
-                  })),
-                })),
-              })),
-            };
-          }),
+      vi.doMock('@/lib/prisma', () => ({
+        default: {
+          medicalCheckType: { findMany: vi.fn(), create: vi.fn() },
+          medicalCheck: { findMany: vi.fn(async () => checks), create: vi.fn() },
+          employee: { findFirst: vi.fn(async () => ({ id: 'emp-uuid-1' })) },
         },
       }));
 
@@ -88,15 +79,11 @@ describe('medical-check API handler', () => {
       const newCheck = { id: 'mc2', person_type: 'candidate', result: 'fit', check_date: '2026-03-10', hospital_name: 'City Hospital' };
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
-      vi.doMock('@/lib/supabaseServer', () => ({
-        supabaseServer: {
-          from: vi.fn(() => ({
-            insert: vi.fn(() => ({
-              select: vi.fn(() => ({
-                maybeSingle: vi.fn(async () => ({ data: newCheck, error: null })),
-              })),
-            })),
-          })),
+      vi.doMock('@/lib/prisma', () => ({
+        default: {
+          medicalCheckType: { findMany: vi.fn(), create: vi.fn() },
+          medicalCheck: { findMany: vi.fn(), create: vi.fn(async () => newCheck) },
+          employee: { findFirst: vi.fn() },
         },
       }));
 
@@ -124,7 +111,13 @@ describe('medical-check API handler', () => {
     it('returns INVALID_RESULT for unknown result value', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
-      vi.doMock('@/lib/supabaseServer', () => ({ supabaseServer: { from: vi.fn() } }));
+      vi.doMock('@/lib/prisma', () => ({
+        default: {
+          medicalCheckType: { findMany: vi.fn(), create: vi.fn() },
+          medicalCheck: { findMany: vi.fn(), create: vi.fn() },
+          employee: { findFirst: vi.fn() },
+        },
+      }));
 
       const { POST } = await import('../../server/api/admin/medical-check/route.js');
       const req = new Request('http://localhost/api/admin/medical-check', {
@@ -149,7 +142,13 @@ describe('medical-check API handler', () => {
     it('returns MISSING_REQUIRED_FIELDS when check_date absent', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
-      vi.doMock('@/lib/supabaseServer', () => ({ supabaseServer: { from: vi.fn() } }));
+      vi.doMock('@/lib/prisma', () => ({
+        default: {
+          medicalCheckType: { findMany: vi.fn(), create: vi.fn() },
+          medicalCheck: { findMany: vi.fn(), create: vi.fn() },
+          employee: { findFirst: vi.fn() },
+        },
+      }));
 
       const { POST } = await import('../../server/api/admin/medical-check/route.js');
       const req = new Request('http://localhost/api/admin/medical-check', {

@@ -14,7 +14,7 @@
 
 import type { ActionFunctionArgs } from "react-router";
 import { validateSession } from "~/lib/session-validation.server";
-import { getSupabaseServerClient } from "~/lib/supabase.server";
+import prisma from "~/lib/prisma.server";
 import { writeAuditLog, AuditEvent } from "~/lib/audit-log.server";
 import bcrypt from "bcryptjs";
 
@@ -63,14 +63,11 @@ export async function action({ request, context }: ActionFunctionArgs) {
     return json({ error: "INVALID_INPUT" }, { status: 400 });
   }
 
-  const { supabaseServer } = getSupabaseServerClient(context);
-
   // Verify employee exists
-  const { data: emp } = await supabaseServer
-    .from("employees")
-    .select("id, status")
-    .eq("employee_code", targetEmpId)
-    .maybeSingle();
+  const emp = await prisma.employee.findFirst({
+    where: { employee_code: targetEmpId },
+    select: { id: true, status: true },
+  });
 
   if (!emp) {
     return json({ error: "EMPLOYEE_NOT_FOUND" }, { status: 404 });
@@ -80,40 +77,40 @@ export async function action({ request, context }: ActionFunctionArgs) {
   }
 
   // Invalidate any previous unused codes for this employee
-  await supabaseServer
-    .from("employee_activations")
-    .update({ is_invalidated: true })
-    .eq("emp_id", targetEmpId)
-    .eq("is_used", false)
-    .eq("is_invalidated", false);
+  // is_active = true means not yet invalidated; used_at = null means not yet used
+  await prisma.employeeActivation.updateMany({
+    where: { emp_id: targetEmpId, is_active: true, used_at: null },
+    data: { is_active: false },
+  });
 
   const plainCode = generateActivationCode();
   const codeHash = await bcrypt.hash(plainCode, 10);
-  const expiresAt = new Date(Date.now() + CODE_EXPIRY_HOURS * 60 * 60 * 1000).toISOString();
+  const expiresAt = new Date(Date.now() + CODE_EXPIRY_HOURS * 60 * 60 * 1000);
 
-  const { error: insertErr } = await supabaseServer.from("employee_activations").insert({
-    emp_id: targetEmpId,
-    activation_code_hash: codeHash,
-    expires_at: expiresAt,
-    created_by: session.emp_id,
-  });
-
-  if (insertErr) {
-    console.error("activation code insert error:", insertErr.message);
+  try {
+    await prisma.employeeActivation.create({
+      data: {
+        emp_id: targetEmpId,
+        code: codeHash,
+        expires_at: expiresAt,
+      },
+    });
+  } catch (insertErr) {
+    console.error("activation code insert error:", insertErr);
     return json({ error: "DB_INSERT_FAILED" }, { status: 500 });
   }
 
-  void writeAuditLog(supabaseServer, {
+  void writeAuditLog({
     event_type: AuditEvent.ACTIVATION_CODE_USED,
     emp_id: targetEmpId,
     ip_address: request.headers.get("x-forwarded-for") || null,
-    metadata: { action: "code_created", created_by: session.emp_id, expires_at: expiresAt },
+    metadata: { action: "code_created", created_by: session.emp_id, expires_at: expiresAt.toISOString() },
   });
 
   // Return plain code ONCE — HR must give it directly to the employee
   return json({
     activation_code: plainCode,
-    expires_at: expiresAt,
+    expires_at: expiresAt.toISOString(),
     note: "Share this code directly with the employee. It expires in 72 hours and cannot be retrieved again.",
   });
 }

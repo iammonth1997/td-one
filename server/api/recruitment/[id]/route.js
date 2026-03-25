@@ -1,5 +1,5 @@
 import { validateSession } from '@/lib/validateSession';
-import { supabaseServer } from '@/lib/supabaseServer';
+import prisma from '@/lib/prisma';
 import { isAdminSession, extractIdFromUrl } from '@/lib/recruitmentExpandedUtils';
 
 const REQUISITION_STATUSES = ['draft', 'open', 'on_hold', 'closed', 'cancelled'];
@@ -12,24 +12,24 @@ export async function GET(req) {
   const id = extractIdFromUrl(req);
   if (!id) return Response.json({ error: 'INVALID_ID' }, { status: 400 });
 
-  const { data: requisition, error: requisitionError } = await supabaseServer
-    .from('recruitment_requisitions')
-    .select('*')
-    .eq('id', id)
-    .maybeSingle();
+  try {
+    const requisition = await prisma.recruitmentRequisition.findUnique({ where: { id } });
+    if (!requisition) return Response.json({ error: 'RECRUITMENT_REQUISITION_NOT_FOUND' }, { status: 404 });
 
-  if (requisitionError) return Response.json({ error: 'RECRUITMENT_REQUISITION_QUERY_FAILED', detail: requisitionError.message }, { status: 500 });
-  if (!requisition) return Response.json({ error: 'RECRUITMENT_REQUISITION_NOT_FOUND' }, { status: 404 });
+    const candidates = await prisma.recruitmentCandidate.findMany({
+      where: { requisition_id: id },
+      select: {
+        id: true, full_name: true, email: true, phone: true, source: true,
+        current_stage: true, expected_salary: true, applied_at: true, hired_at: true,
+        rejected_reason: true, notes: true, created_at: true, updated_at: true,
+      },
+      orderBy: { created_at: 'desc' },
+    });
 
-  const { data: candidates, error: candidatesError } = await supabaseServer
-    .from('recruitment_candidates')
-    .select('id, full_name, email, phone, source, current_stage, expected_salary, applied_at, hired_at, rejected_reason, notes, created_at, updated_at')
-    .eq('requisition_id', id)
-    .order('created_at', { ascending: false });
-
-  if (candidatesError) return Response.json({ error: 'RECRUITMENT_CANDIDATES_QUERY_FAILED', detail: candidatesError.message }, { status: 500 });
-
-  return Response.json({ success: true, requisition, candidates: candidates || [] });
+    return Response.json({ success: true, requisition, candidates });
+  } catch (err) {
+    return Response.json({ error: 'RECRUITMENT_REQUISITION_QUERY_FAILED', detail: err.message }, { status: 500 });
+  }
 }
 
 export async function PUT(req) {
@@ -49,28 +49,24 @@ export async function PUT(req) {
       return Response.json({ error: 'INVALID_STATUS' }, { status: 400 });
     }
 
-    const patch = {
-      status,
-      opened_at: status === 'open' ? new Date().toISOString() : null,
-      closed_at: status === 'closed' || status === 'cancelled' ? new Date().toISOString() : null,
-      updated_at: new Date().toISOString(),
-    };
-
-    const { data, error } = await supabaseServer
-      .from('recruitment_requisitions')
-      .update(patch)
-      .eq('id', id)
-      .select('*')
-      .maybeSingle();
-
-    if (error) return Response.json({ error: 'RECRUITMENT_REQUISITION_UPDATE_FAILED', detail: error.message }, { status: 500 });
-    if (!data) return Response.json({ error: 'RECRUITMENT_REQUISITION_NOT_FOUND' }, { status: 404 });
-    return Response.json({ success: true, row: data });
+    try {
+      const data = await prisma.recruitmentRequisition.update({
+        where: { id },
+        data: {
+          status,
+          opened_at: status === 'open' ? new Date() : null,
+          closed_at: (status === 'closed' || status === 'cancelled') ? new Date() : null,
+        },
+      });
+      return Response.json({ success: true, row: data });
+    } catch (err) {
+      if (err.code === 'P2025') return Response.json({ error: 'RECRUITMENT_REQUISITION_NOT_FOUND' }, { status: 404 });
+      return Response.json({ error: 'RECRUITMENT_REQUISITION_UPDATE_FAILED', detail: err.message }, { status: 500 });
+    }
   }
 
   if (action === 'update') {
     const patch = {};
-
     if (body.title != null) patch.title = String(body.title).trim();
     if (body.department != null) patch.department = String(body.department).trim();
     if (body.headcount != null) {
@@ -87,18 +83,13 @@ export async function PUT(req) {
       return Response.json({ error: 'NO_CHANGES' }, { status: 400 });
     }
 
-    patch.updated_at = new Date().toISOString();
-
-    const { data, error } = await supabaseServer
-      .from('recruitment_requisitions')
-      .update(patch)
-      .eq('id', id)
-      .select('*')
-      .maybeSingle();
-
-    if (error) return Response.json({ error: 'RECRUITMENT_REQUISITION_UPDATE_FAILED', detail: error.message }, { status: 500 });
-    if (!data) return Response.json({ error: 'RECRUITMENT_REQUISITION_NOT_FOUND' }, { status: 404 });
-    return Response.json({ success: true, row: data });
+    try {
+      const data = await prisma.recruitmentRequisition.update({ where: { id }, data: patch });
+      return Response.json({ success: true, row: data });
+    } catch (err) {
+      if (err.code === 'P2025') return Response.json({ error: 'RECRUITMENT_REQUISITION_NOT_FOUND' }, { status: 404 });
+      return Response.json({ error: 'RECRUITMENT_REQUISITION_UPDATE_FAILED', detail: err.message }, { status: 500 });
+    }
   }
 
   return Response.json({ error: 'UNKNOWN_ACTION' }, { status: 400 });

@@ -7,14 +7,14 @@
  *
  * Flow:
  *  1. Employee enters emp_id + 8-digit activation code
- *  2. System validates code (not used, not expired, not invalidated, < 5 failures)
+ *  2. System validates code (not used, not expired, not invalidated)
  *  3. Employee sets initial NIST-compliant password (min 12 chars)
  *  4. First device auto-registered
  *  5. 30-day session created
  */
 
 import type { ActionFunctionArgs } from "react-router";
-import { getSupabaseServerClient } from "~/lib/supabase.server";
+import prisma from "~/lib/prisma.server";
 import { validatePasswordPolicy, hashPassword } from "~/lib/password.server";
 import { sessionTokenCookie } from "~/lib/session-cookie.server";
 import { EMPLOYEE_PORTAL } from "~/lib/session-context";
@@ -23,7 +23,6 @@ import bcrypt from "bcryptjs";
 import { getDeviceIdFromRequest } from "~/lib/device-cookie.server";
 
 const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
-const MAX_CODE_FAILURES = 5;
 
 function createSessionToken(byteLength = 32): string {
   const bytes = new Uint8Array(byteLength);
@@ -41,12 +40,7 @@ function json(data: unknown, init?: ResponseInit) {
   });
 }
 
-export async function action({ request, context }: ActionFunctionArgs) {
-  const { isServiceRoleEnabled, supabaseServer } = getSupabaseServerClient(context);
-  if (!isServiceRoleEnabled) {
-    return json({ error: "SERVER_CONFIG_MISSING" }, { status: 500 });
-  }
-
+export async function action({ request }: ActionFunctionArgs) {
   const body = (await request.json().catch(() => null)) as {
     emp_id?: string;
     activation_code?: string;
@@ -80,18 +74,19 @@ export async function action({ request, context }: ActionFunctionArgs) {
   }
 
   // ─── Look up activation record ────────────────────────────────────────────
-  const { data: activation, error: actErr } = await supabaseServer
-    .from("employee_activations")
-    .select("id, activation_code_hash, expires_at, failed_attempts, is_used, is_invalidated")
-    .eq("emp_id", empId)
-    .eq("is_used", false)
-    .eq("is_invalidated", false)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (actErr) {
-    console.error("activate: DB query error:", actErr.message);
+  // Prisma EmployeeActivation fields:
+  //   code         = activation_code_hash (bcrypt hash of the plain code)
+  //   used_at      = null means not used yet (replaces is_used = false)
+  //   is_active    = true means not invalidated (replaces is_invalidated = false)
+  let activation;
+  try {
+    activation = await prisma.employeeActivation.findFirst({
+      where: { emp_id: empId, is_active: true, used_at: null },
+      orderBy: { created_at: "desc" },
+      select: { id: true, code: true, expires_at: true },
+    });
+  } catch (actErr) {
+    console.error("activate: DB query error:", actErr);
     return json({ error: "DB_QUERY_FAILED" }, { status: 500 });
   }
 
@@ -100,38 +95,19 @@ export async function action({ request, context }: ActionFunctionArgs) {
     return json({ error: "INVALID_ACTIVATION_CODE" }, { status: 400 });
   }
 
-  if (new Date(activation.expires_at) < new Date()) {
-    void supabaseServer
-      .from("employee_activations")
-      .update({ is_invalidated: true })
-      .eq("id", activation.id);
+  if (activation.expires_at && new Date(activation.expires_at) < new Date()) {
+    void prisma.employeeActivation.update({
+      where: { id: activation.id },
+      data: { is_active: false },
+    });
     return json({ error: "ACTIVATION_CODE_EXPIRED" }, { status: 400 });
   }
 
-  if ((activation.failed_attempts ?? 0) >= MAX_CODE_FAILURES) {
-    void supabaseServer
-      .from("employee_activations")
-      .update({ is_invalidated: true })
-      .eq("id", activation.id);
-    void writeAuditLog(supabaseServer, {
-      event_type: AuditEvent.ACTIVATION_CODE_INVALIDATED,
-      severity: "warning",
-      emp_id: empId,
-      ip_address: ipAddress,
-      metadata: { reason: "too_many_failures" },
-    });
-    return json({ error: "ACTIVATION_CODE_LOCKED" }, { status: 400 });
-  }
-
   // ─── Verify code ──────────────────────────────────────────────────────────
-  const codeValid = await bcrypt.compare(activationCode, activation.activation_code_hash);
+  const codeValid = await bcrypt.compare(activationCode, activation.code);
 
   if (!codeValid) {
-    void supabaseServer
-      .from("employee_activations")
-      .update({ failed_attempts: (activation.failed_attempts ?? 0) + 1 })
-      .eq("id", activation.id);
-    void writeAuditLog(supabaseServer, {
+    void writeAuditLog({
       event_type: AuditEvent.ACTIVATION_CODE_FAILED,
       severity: "warning",
       emp_id: empId,
@@ -140,12 +116,11 @@ export async function action({ request, context }: ActionFunctionArgs) {
     return json({ error: "INVALID_ACTIVATION_CODE" }, { status: 400 });
   }
 
-  // ─── Look up employee ────────────────────────────────────────────────────
-  const { data: emp } = await supabaseServer
-    .from("employees")
-    .select("id, status")
-    .eq("employee_code", empId)
-    .maybeSingle();
+  // ─── Look up employee ─────────────────────────────────────────────────────
+  const emp = await prisma.employee.findFirst({
+    where: { employee_code: empId },
+    select: { id: true, status: true },
+  });
 
   if (!emp || emp.status !== "active") {
     return json({ error: emp ? "ACCOUNT_BLOCKED" : "EMPLOYEE_NOT_FOUND" }, { status: 403 });
@@ -154,74 +129,78 @@ export async function action({ request, context }: ActionFunctionArgs) {
   // ─── Set password ─────────────────────────────────────────────────────────
   const passwordHash = await hashPassword(rawPassword);
 
-  const { error: upsertErr } = await supabaseServer
-    .from("login_users")
-    .upsert(
-      {
-        emp_id: empId,
+  try {
+    await prisma.loginUser.upsert({
+      where: { emp_id: empId },
+      update: {
         pin_hash: passwordHash,
-        password_changed_at: new Date().toISOString(),
-        password_history: [],
-        is_registered: true,
         force_pin_change: false,
         must_change_password: false,
       },
-      { onConflict: "emp_id" }
-    );
-
-  if (upsertErr) {
-    console.error("activate: upsert error:", upsertErr.message);
+      create: {
+        emp_id: empId,
+        pin_hash: passwordHash,
+        force_pin_change: false,
+        must_change_password: false,
+      },
+    });
+  } catch (upsertErr) {
+    console.error("activate: upsert error:", upsertErr);
     return json({ error: "UPDATE_FAILED" }, { status: 500 });
   }
 
   // ─── Mark activation code as used ────────────────────────────────────────
-  void supabaseServer
-    .from("employee_activations")
-    .update({ is_used: true, used_at: new Date().toISOString() })
-    .eq("id", activation.id);
+  void prisma.employeeActivation.update({
+    where: { id: activation.id },
+    data: { used_at: new Date(), is_active: false },
+  });
 
   // ─── Register device ──────────────────────────────────────────────────────
   if (deviceId) {
-    void supabaseServer.from("employee_devices").insert({
-      employee_id: emp.id,
-      device_id: deviceId,
-      device_name: deviceName,
-      platform,
-      registered_at: new Date().toISOString(),
-      last_active_at: new Date().toISOString(),
-      is_active: true,
+    void prisma.authEmployeeDevice.upsert({
+      where: { employee_id_device_id: { employee_id: emp.id, device_id: deviceId } },
+      update: { last_active_at: new Date(), is_active: true },
+      create: {
+        employee_id: emp.id,
+        device_id: deviceId,
+        device_name: deviceName,
+        platform,
+        last_active_at: new Date(),
+        is_active: true,
+      },
     });
   }
 
-  // ─── Create session ───────────────────────────────────────────────────────
-  const sessionToken = createSessionToken(32);
-  const expiresAt = new Date(Date.now() + SESSION_DURATION_MS).toISOString();
-
-  // Get default role
-  const { data: loginUser } = await supabaseServer
-    .from("login_users")
-    .select("role")
-    .eq("emp_id", empId)
-    .maybeSingle();
-
-  const { error: sessionErr } = await supabaseServer.from("sessions").insert({
-    session_token: sessionToken,
-    emp_id: empId,
-    role: loginUser?.role ?? "employee",
-    expires_at: expiresAt,
-    is_active: true,
-    login_context: EMPLOYEE_PORTAL,
-    ip_address: ipAddress,
-    device_id: deviceId,
-    user_agent: request.headers.get("user-agent") || null,
+  // ─── Get default role ─────────────────────────────────────────────────────
+  const loginUser = await prisma.loginUser.findFirst({
+    where: { emp_id: empId },
+    select: { role: true },
   });
 
-  if (sessionErr) {
-    console.error("activate: session insert error:", sessionErr.message);
+  // ─── Create session ───────────────────────────────────────────────────────
+  const sessionToken = createSessionToken(32);
+  const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
+
+  try {
+    await prisma.authSession.create({
+      data: {
+        session_token: sessionToken,
+        emp_id: empId,
+        role: loginUser?.role ?? "employee",
+        expires_at: expiresAt,
+        is_active: true,
+        login_context: EMPLOYEE_PORTAL,
+        ip_address: ipAddress,
+        device_id: deviceId,
+        user_agent: request.headers.get("user-agent") ?? null,
+      },
+    });
+  } catch (sessionErr) {
+    console.error("activate: session insert error:", sessionErr);
     return json({ error: "SESSION_CREATE_FAILED" }, { status: 500 });
   }
 
-  void writeAuditLog(supabaseServer, {
+  void writeAuditLog({
     event_type: AuditEvent.ACTIVATION_CODE_USED,
     emp_id: empId,
     device_id: deviceId,

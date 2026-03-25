@@ -1,5 +1,5 @@
 import { validateSession } from "@/lib/validateSession";
-import { supabaseServer } from "@/lib/supabaseServer";
+import prisma from "@/lib/prisma";
 import { getEmployeeByEmpCode } from "@/lib/otRequestUtils";
 import { buildSessionAccessProfile, canManageAdminActions } from "@/lib/rbac/sessionAccess";
 import { hasAnyPermission } from "@/lib/rbac/access";
@@ -26,14 +26,14 @@ export async function PUT(req) {
     return Response.json({ error: "UNSUPPORTED_ACTION" }, { status: 400 });
   }
 
-  const { data: existing, error: queryError } = await supabaseServer
-    .from("leave_requests")
-    .select("id, employee_id, leave_type_code, status, attachment_url")
-    .eq("id", id)
-    .maybeSingle();
-
-  if (queryError) {
-    return Response.json({ error: "LEAVE_REQUEST_QUERY_FAILED", detail: queryError.message }, { status: 500 });
+  let existing;
+  try {
+    existing = await prisma.leaveRequest.findUnique({
+      where: { id },
+      select: { id: true, employee_id: true, leave_type_code: true, status: true, attachment_url: true },
+    });
+  } catch (err) {
+    return Response.json({ error: "LEAVE_REQUEST_QUERY_FAILED", detail: err.message }, { status: 500 });
   }
   if (!existing) {
     return Response.json({ error: "LEAVE_REQUEST_NOT_FOUND" }, { status: 404 });
@@ -55,26 +55,20 @@ export async function PUT(req) {
       return Response.json({ error: "EMPLOYEE_NOT_FOUND" }, { status: 404 });
     }
 
-    const nowIso = new Date().toISOString();
     const patch =
       action === "approve"
-        ? { status: "approved", approved_by: approver.id, approved_at: nowIso, rejected_reason: null, updated_at: nowIso }
-        : { status: "rejected", rejected_reason: String(body.reason || "").trim() || null, updated_at: nowIso };
+        ? { status: "approved", approved_by: approver.id, approved_at: new Date(), rejected_reason: null }
+        : { status: "rejected", rejected_reason: String(body.reason || "").trim() || null };
 
-    const { data: row, error: updateError } = await supabaseServer
-      .from("leave_requests")
-      .update(patch)
-      .eq("id", id)
-      .select("*")
-      .maybeSingle();
-
-    if (updateError) {
-      return Response.json({ error: "LEAVE_REQUEST_UPDATE_FAILED", detail: updateError.message }, { status: 500 });
+    try {
+      const row = await prisma.leaveRequest.update({ where: { id }, data: patch });
+      return Response.json({ success: true, row });
+    } catch (err) {
+      return Response.json({ error: "LEAVE_REQUEST_UPDATE_FAILED", detail: err.message }, { status: 500 });
     }
-
-    return Response.json({ success: true, row });
   }
 
+  // cancel / delete actions
   if (!canManageAdminActions(session, accessProfile)) {
     const { employee, error: employeeError } = await getEmployeeByEmpCode(session.emp_id);
     if (employeeError) {
@@ -93,29 +87,22 @@ export async function PUT(req) {
     return Response.json({ success: true, row: existing });
   }
 
-  const nowIso = new Date().toISOString();
-  const deleteAfterIso = new Date(Date.now() + (60 * 24 * 60 * 60 * 1000)).toISOString();
+  const nowIso = new Date();
+  const deleteAfter = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
   const hasAttachment = Boolean(existing.attachment_url);
 
   const updatePayload = {
     status: "cancelled",
     cancelled_at: nowIso,
-    updated_at: nowIso,
     attachment_active: false,
     attachment_inactivated_at: hasAttachment ? nowIso : null,
-    attachment_delete_after: hasAttachment ? deleteAfterIso : null,
+    attachment_delete_after: hasAttachment ? deleteAfter : null,
   };
 
-  const { data: row, error: updateError } = await supabaseServer
-    .from("leave_requests")
-    .update(updatePayload)
-    .eq("id", id)
-    .select("*")
-    .maybeSingle();
-
-  if (updateError) {
-    return Response.json({ error: "LEAVE_REQUEST_CANCEL_FAILED", detail: updateError.message }, { status: 500 });
+  try {
+    const row = await prisma.leaveRequest.update({ where: { id }, data: updatePayload });
+    return Response.json({ success: true, row });
+  } catch (err) {
+    return Response.json({ error: "LEAVE_REQUEST_CANCEL_FAILED", detail: err.message }, { status: 500 });
   }
-
-  return Response.json({ success: true, row });
 }

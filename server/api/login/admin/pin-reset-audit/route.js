@@ -1,4 +1,4 @@
-import { supabaseServer } from "@/lib/supabaseServer";
+import prisma from "@/lib/prisma";
 import { validateSession } from "@/lib/validateSession";
 import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
 import { hasAnyPermission } from "@/lib/rbac/access";
@@ -19,20 +19,28 @@ export async function GET(req) {
   const empId = String(searchParams.get("emp_id") || "").trim().toUpperCase();
   const limit = Math.min(Math.max(Number(searchParams.get("limit") || 100), 1), 200);
 
-  let query = supabaseServer
-    .from("pin_reset_audit")
-    .select("id, target_emp_id, reset_by_emp_id, reset_by_role, ip_address, user_agent, created_at")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (empId) {
-    query = query.eq("target_emp_id", empId);
-  }
-
-  const { data, error } = await query;
-  if (error) {
-    console.error("pin-reset-audit query failed:", error.message);
-    return Response.json({ error: "DB_QUERY_FAILED", detail: error.message }, { status: 500 });
+  // pin_reset_audit table is not yet in the Prisma schema; use raw SQL
+  let data;
+  try {
+    if (empId) {
+      data = await prisma.$queryRaw`
+        SELECT id, target_emp_id, reset_by_emp_id, reset_by_role, ip_address, user_agent, created_at
+        FROM pin_reset_audit
+        WHERE target_emp_id = ${empId}
+        ORDER BY created_at DESC
+        LIMIT ${limit}
+      `;
+    } else {
+      data = await prisma.$queryRaw`
+        SELECT id, target_emp_id, reset_by_emp_id, reset_by_role, ip_address, user_agent, created_at
+        FROM pin_reset_audit
+        ORDER BY created_at DESC
+        LIMIT ${limit}
+      `;
+    }
+  } catch (err) {
+    console.error("pin-reset-audit query failed:", err.message);
+    return Response.json({ error: "DB_QUERY_FAILED", detail: err.message }, { status: 500 });
   }
 
   return Response.json({ success: true, rows: data || [] });

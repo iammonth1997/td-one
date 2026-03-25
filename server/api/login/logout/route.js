@@ -1,4 +1,4 @@
-import { supabaseServer } from "@/lib/supabaseServer";
+import prisma from "@/lib/prisma";
 import { validateSession } from "@/lib/validateSession";
 
 export async function POST(req) {
@@ -7,10 +7,10 @@ export async function POST(req) {
     return Response.json({ error }, { status });
   }
 
-  await supabaseServer
-    .from("sessions")
-    .update({ is_active: false })
-    .eq("id", session.id);
+  await prisma.authSession.update({
+    where: { id: session.id },
+    data: { is_active: false },
+  });
 
   return Response.json({ success: true });
 }

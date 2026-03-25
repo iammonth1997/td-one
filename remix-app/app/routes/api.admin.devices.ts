@@ -13,7 +13,7 @@
 
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { validateSession } from "~/lib/session-validation.server";
-import { getSupabaseServerClient } from "~/lib/supabase.server";
+import prisma from "~/lib/prisma.server";
 import { writeAuditLog, AuditEvent } from "~/lib/audit-log.server";
 
 const ADMIN_ROLES = new Set(["admin", "super_admin", "hr_manager", "hr_payroll", "hr-payroll"]);
@@ -47,26 +47,33 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
     return json({ error: "emp_id query param required" }, { status: 400 });
   }
 
-  const { supabaseServer } = getSupabaseServerClient(context);
-
-  const { data: empRow } = await supabaseServer
-    .from("employees")
-    .select("id")
-    .eq("employee_code", targetEmpId.toUpperCase())
-    .maybeSingle();
+  const empRow = await prisma.employee.findFirst({
+    where: { employee_code: targetEmpId.toUpperCase() },
+    select: { id: true },
+  });
 
   if (!empRow) {
     return json({ error: "EMPLOYEE_NOT_FOUND" }, { status: 404 });
   }
 
-  const { data: devices, error: dbErr } = await supabaseServer
-    .from("employee_devices")
-    .select("id, device_id, device_name, platform, app_version, registered_at, last_active_at, is_active, deactivated_at, deactivated_by")
-    .eq("employee_id", empRow.id)
-    .order("registered_at", { ascending: false });
-
-  if (dbErr) {
-    console.error("admin/devices list error:", dbErr.message);
+  let devices;
+  try {
+    devices = await prisma.authEmployeeDevice.findMany({
+      where: { employee_id: empRow.id },
+      orderBy: { registered_at: "desc" },
+      select: {
+        id: true,
+        device_id: true,
+        device_name: true,
+        platform: true,
+        app_version: true,
+        registered_at: true,
+        last_active_at: true,
+        is_active: true,
+      },
+    });
+  } catch (dbErr) {
+    console.error("admin/devices list error:", dbErr);
     return json({ error: "DB_QUERY_FAILED" }, { status: 500 });
   }
 
@@ -93,22 +100,18 @@ export async function action({ request, context }: ActionFunctionArgs) {
     return json({ error: "INVALID_INPUT" }, { status: 400 });
   }
 
-  const { supabaseServer } = getSupabaseServerClient(context);
   const ipAddress = request.headers.get("x-forwarded-for") || null;
   const targetEmpId = String(body.emp_id).toUpperCase();
 
   // Resolve employee UUID
-  const { data: empRow } = await supabaseServer
-    .from("employees")
-    .select("id")
-    .eq("employee_code", targetEmpId)
-    .maybeSingle();
+  const empRow = await prisma.employee.findFirst({
+    where: { employee_code: targetEmpId },
+    select: { id: true },
+  });
 
   if (!empRow) {
     return json({ error: "EMPLOYEE_NOT_FOUND" }, { status: 404 });
   }
-
-  const now = new Date().toISOString();
 
   if (body.action === "deactivate") {
     // ─── Deactivate specific device ───────────────────────────────────────
@@ -118,30 +121,24 @@ export async function action({ request, context }: ActionFunctionArgs) {
     }
 
     // a) Mark device inactive
-    const { error: deviceErr } = await supabaseServer
-      .from("employee_devices")
-      .update({
-        is_active: false,
-        deactivated_at: now,
-        deactivated_by: session.emp_id,
-      })
-      .eq("employee_id", empRow.id)
-      .eq("device_id", deviceId);
-
-    if (deviceErr) {
-      console.error("admin/devices deactivate error:", deviceErr.message);
+    try {
+      await prisma.authEmployeeDevice.updateMany({
+        where: { employee_id: empRow.id, device_id: deviceId },
+        data: { is_active: false },
+      });
+    } catch (deviceErr) {
+      console.error("admin/devices deactivate error:", deviceErr);
       return json({ error: "DB_UPDATE_FAILED" }, { status: 500 });
     }
 
     // b) Revoke all sessions tied to this device
-    void supabaseServer
-      .from("sessions")
-      .update({ is_active: false })
-      .eq("emp_id", targetEmpId)
-      .eq("device_id", deviceId);
+    void prisma.authSession.updateMany({
+      where: { emp_id: targetEmpId, device_id: deviceId },
+      data: { is_active: false },
+    });
 
     // c) Audit log
-    void writeAuditLog(supabaseServer, {
+    void writeAuditLog({
       event_type: AuditEvent.DEVICE_DEACTIVATED,
       severity: "warning",
       emp_id: targetEmpId,
@@ -159,33 +156,27 @@ export async function action({ request, context }: ActionFunctionArgs) {
 
   if (body.action === "deactivate_all") {
     // ─── Emergency wipe: deactivate ALL devices ────────────────────────────
-    const { error: devErr } = await supabaseServer
-      .from("employee_devices")
-      .update({
-        is_active: false,
-        deactivated_at: now,
-        deactivated_by: session.emp_id,
-      })
-      .eq("employee_id", empRow.id)
-      .eq("is_active", true);
-
-    if (devErr) {
-      console.error("admin/devices deactivate_all error:", devErr.message);
+    try {
+      await prisma.authEmployeeDevice.updateMany({
+        where: { employee_id: empRow.id, is_active: true },
+        data: { is_active: false },
+      });
+    } catch (devErr) {
+      console.error("admin/devices deactivate_all error:", devErr);
       return json({ error: "DB_UPDATE_FAILED" }, { status: 500 });
     }
 
     // Revoke ALL sessions for this employee
-    const { error: sessErr } = await supabaseServer
-      .from("sessions")
-      .update({ is_active: false })
-      .eq("emp_id", targetEmpId)
-      .eq("is_active", true);
-
-    if (sessErr) {
-      console.error("admin/devices revoke all sessions error:", sessErr.message);
+    try {
+      await prisma.authSession.updateMany({
+        where: { emp_id: targetEmpId, is_active: true },
+        data: { is_active: false },
+      });
+    } catch (sessErr) {
+      console.error("admin/devices revoke all sessions error:", sessErr);
     }
 
-    void writeAuditLog(supabaseServer, {
+    void writeAuditLog({
       event_type: AuditEvent.DEVICE_ALL_DEACTIVATED,
       severity: "critical",
       emp_id: targetEmpId,

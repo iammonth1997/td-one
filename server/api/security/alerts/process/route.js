@@ -9,7 +9,7 @@
  * Returns: { processed: number, alerts_sent: number }
  */
 
-import { supabaseServer } from "@/lib/supabaseServer";
+import prisma from "@/lib/prisma";
 import { validateSession } from "@/lib/validateSession";
 import { processSecurityAlerts, checkAlertConfig } from "@/lib/alert.server";
 
@@ -37,12 +37,16 @@ export async function POST(req) {
       return Response.json({ error: authError }, { status: authStatus });
     }
 
-    // Check if user is admin by checking rbac
-    const { data: adminUser } = await supabaseServer
-      .from("login_users")
-      .select("admin")
-      .eq("emp_id", session.emp_id)
-      .maybeSingle();
+    // Check if user is admin
+    let adminUser = null;
+    try {
+      adminUser = await prisma.loginUser.findFirst({
+        where: { emp_id: session.emp_id },
+        select: { admin: true },
+      });
+    } catch {
+      // continue — treat as non-admin if lookup fails
+    }
 
     if (!adminUser?.admin) {
       return Response.json(
@@ -65,7 +69,7 @@ export async function POST(req) {
   }
 
   try {
-    const result = await processSecurityAlerts(supabaseServer, {
+    const result = await processSecurityAlerts({
       slackEnabled: config.slackConfigured,
       emailEnabled: config.emailConfigured,
     });
@@ -101,11 +105,15 @@ export async function GET(req) {
   }
 
   // Check if user is admin
-  const { data: adminUser } = await supabaseServer
-    .from("login_users")
-    .select("admin")
-    .eq("emp_id", session.emp_id)
-    .maybeSingle();
+  let adminUser = null;
+  try {
+    adminUser = await prisma.loginUser.findFirst({
+      where: { emp_id: session.emp_id },
+      select: { admin: true },
+    });
+  } catch {
+    // treat as non-admin
+  }
 
   if (!adminUser?.admin) {
     return Response.json(
@@ -116,13 +124,19 @@ export async function GET(req) {
 
   const config = checkAlertConfig();
 
-  // Get recent alerts sent count
-  const { data: recentAlerts, error: countError } = await supabaseServer
-    .from("security_alerts_sent")
-    .select("id", { count: "exact" })
-    .gt("sent_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-
-  const alertsLast24h = !countError ? (recentAlerts?.length ?? 0) : -1;
+  // Get count of alerts sent in the last 24 hours
+  let alertsLast24h = -1;
+  try {
+    alertsLast24h = await prisma.securityAlertSent.count({
+      where: {
+        sent_at: {
+          gt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        },
+      },
+    });
+  } catch {
+    alertsLast24h = -1;
+  }
 
   return Response.json({
     system_status: "operational",

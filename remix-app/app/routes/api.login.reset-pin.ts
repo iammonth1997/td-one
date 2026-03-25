@@ -1,8 +1,8 @@
-﻿import type { ActionFunctionArgs } from "react-router";
+import type { ActionFunctionArgs } from "react-router";
 import { verifyResetToken } from "~/lib/reset-token.server";
 import { canManagePinReset } from "~/lib/role-access.server";
 import { validateSession } from "~/lib/session-validation.server";
-import { getSupabaseServerClient } from "~/lib/supabase.server";
+import prisma from "~/lib/prisma.server";
 import { validatePasswordPolicy, hashPassword } from "~/lib/password.server";
 
 function json(data: unknown, init?: ResponseInit) {
@@ -20,14 +20,6 @@ function getClientIp(request: Request) {
 }
 
 export async function action({ request, context }: ActionFunctionArgs) {
-  const { isServiceRoleEnabled, supabaseServer } = getSupabaseServerClient(context);
-  if (!isServiceRoleEnabled) {
-    return json(
-      { error: "SERVER_CONFIG_MISSING", message: "SUPABASE_SERVICE_ROLE_KEY is required" },
-      { status: 500 }
-    );
-  }
-
   const { session, error: authError, status: authStatus } = await validateSession(request, context);
   if (authError || !session) {
     return json({ error: authError || "UNAUTHORIZED" }, { status: authStatus || 401 });
@@ -75,11 +67,10 @@ export async function action({ request, context }: ActionFunctionArgs) {
 
   const empId = payload.emp_id;
 
-  const { data: emp } = await supabaseServer
-    .from("employees")
-    .select("status")
-    .eq("employee_code", empId)
-    .maybeSingle();
+  const emp = await prisma.employee.findFirst({
+    where: { employee_code: empId },
+    select: { status: true },
+  });
 
   if (!emp || emp.status !== "active") {
     return json({ error: "ACCOUNT_BLOCKED" }, { status: 403 });
@@ -87,40 +78,32 @@ export async function action({ request, context }: ActionFunctionArgs) {
 
   const passwordHash = await hashPassword(rawPassword);
 
-  const { error: updateError } = await supabaseServer
-    .from("login_users")
-    .update({
-      pin_hash: passwordHash,
-      force_pin_change: false,
-      must_change_password: false,
-      password_changed_at: new Date().toISOString(),
-      temp_pin_expires_at: null,
-      temp_pin_issued_at: null,
-      temp_pin_issued_by: null,
-      is_registered: true,
-    })
-    .eq("emp_id", empId);
-
-  if (updateError) {
-    console.error("reset-pin update failed:", updateError.message);
+  try {
+    await prisma.loginUser.update({
+      where: { emp_id: empId },
+      data: {
+        pin_hash: passwordHash,
+        force_pin_change: false,
+        must_change_password: false,
+        temp_pin_expires_at: null,
+      },
+    });
+  } catch (updateError) {
+    console.error("reset-pin update failed:", updateError);
     return json({ error: "UPDATE_FAILED" }, { status: 500 });
   }
 
+  // Write pin reset audit record
   const ipAddress = getClientIp(request);
   const userAgent = request.headers.get("user-agent") || null;
-  const { error: auditError } = await supabaseServer.from("pin_reset_audit").insert({
-    target_emp_id: empId,
-    reset_by_emp_id: session.emp_id,
-    reset_by_role: session.role,
-    ip_address: ipAddress,
-    user_agent: userAgent,
-  });
-
-  if (auditError) {
-    console.error("password reset audit insert failed:", auditError.message);
+  try {
+    await prisma.$executeRaw`
+      INSERT INTO pin_reset_audit (target_emp_id, reset_by_emp_id, reset_by_role, ip_address, user_agent)
+      VALUES (${empId}, ${session.emp_id}, ${session.role}, ${ipAddress}, ${userAgent})
+    `;
+  } catch (auditError) {
+    console.error("password reset audit insert failed:", auditError);
   }
 
   return json({ success: true }, { status: 200 });
 }
-
-
