@@ -46,7 +46,7 @@ export async function GET(req) {
       orderBy: { effective_from: 'desc' },
     });
 
-    // Rename relation fields to match original Supabase API shape
+    // Rename relation fields to match API shape
     const policies = rows.map(({ workSite, rates, ...rest }) => ({
       ...rest,
       work_site:      workSite ?? null,

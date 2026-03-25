@@ -1,0 +1,10 @@
+Remove all Supabase references from codebase
+
+- Remove Supabase env vars from remix-app/app/lib/env.server.ts
+- Replace Supabase client logic with Prisma in scripts/seed-rbac.mjs
+- Remove Supabase secrets from remix-app/scripts/setup-cloudflare.sh
+- Remove Supabase secrets from remix-app/scripts/setup-cloudflare.ps1
+- Remove Supabase type declarations from remix-app/worker-configuration.d.ts
+- Remove Supabase comments from server and lib JS files
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

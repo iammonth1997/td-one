@@ -5,6 +5,19 @@
   "compatibility_flags": ["nodejs_compat"],
   "main": "./workers/app.ts",
   "workers_dev": true,
+  "no_bundle": true,
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "ab3148bf6f654345aedefc6a792d12bd"
+    }
+  ],
+  "routes": [
+    {
+      "pattern": "tdone-erp.com",
+      "custom_domain": true
+    }
+  ],
   "vars": {
     "ATTENDANCE_MIN_RADIUS_METERS": "100",
     "ATTENDANCE_MAX_RADIUS_METERS": "500",

@@ -93,39 +93,17 @@ async function main() {
 
   if (!apply) {
     console.log(`[seed-rbac] Dry run mode. Generated ${rows.length} role-permission rows.`);
-    console.log("[seed-rbac] Run: npm run seed:rbac:apply to upsert into Supabase table rbac_role_permissions.");
+    console.log("[seed-rbac] Run: npm run seed:rbac:apply to upsert into database table rbac_role_permissions.");
     return;
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  await prisma.rbac_role_permissions.deleteMany({});
 
-  if (!supabaseUrl || !serviceKey) {
-    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
-  }
-
-  const supabase = createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-
-  const { error: clearError } = await supabase
-    .from("rbac_role_permissions")
-    .delete()
-    .not("role", "is", null);
-
-  if (clearError) {
-    throw new Error(`[seed-rbac] Failed clearing table: ${clearError.message}`);
-  }
-
-  const { error: insertError } = await prisma.rbac_role_permissions.createMany({
+  const { count } = await prisma.rbac_role_permissions.createMany({
     data: rows,
   });
 
-  if (insertError) {
-    throw new Error(`[seed-rbac] Failed inserting rows: ${insertError.message}`);
-  }
-
-  console.log(`[seed-rbac] Seed completed. Inserted ${rows.length} rows.`);
+  console.log(`[seed-rbac] Seed completed. Inserted ${count} rows.`);
 }
 
 main().catch((error) => {

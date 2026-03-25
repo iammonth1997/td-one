@@ -1,3 +1,4 @@
+import { cloudflare } from "@cloudflare/vite-plugin";
 import { reactRouter } from "@react-router/dev/vite";
 import tailwindcss from "@tailwindcss/vite";
 import path from "node:path";
@@ -19,14 +20,18 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, ".."),
+      // Force Vite to bundle .prisma/client/default → wasm entry (workerd-compatible)
+      // instead of leaving it as an unresolvable external on Cloudflare Workers
+      ".prisma/client/default": path.resolve(
+        __dirname,
+        "../node_modules/.prisma/client/wasm.js"
+      ),
     },
   },
   plugins: [
+    cloudflare({ viteEnvironment: { name: "ssr" } }),
     tailwindcss(),
     reactRouter(),
     tsconfigPaths(),
   ],
-  ssr: {
-    external: ["@prisma/client"],
-  },
 });
