@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "npm --prefix remix-app run dev",
     "dev:turbo": "npm --prefix remix-app run dev",
-    "prisma:generate": "prisma generate --schema ./prisma/schema.prisma --no-engine",
+    "prisma:generate": "prisma generate --schema ./prisma/schema.prisma",
     "build": "npm --prefix remix-app run build",
     "start": "npm --prefix remix-app run preview",
     "typecheck": "npm --prefix remix-app run typecheck",

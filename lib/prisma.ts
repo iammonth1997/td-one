@@ -9,34 +9,18 @@ type CloudflareEnv = {
 
 export function getPrisma(env: CloudflareEnv): PrismaClient {
   const hyperdriveUrl = env.HYPERDRIVE?.connectionString;
-
-  // In local dev wrangler injects the real Aiven URL as localConnectionString.
-  // Detect .hyperdrive.local (production proxy) vs direct URL (local dev).
-  // In local dev (wrangler dev), Hyperdrive may surface as a .hyperdrive.local proxy
-  // that pg cannot reach - fall back to DATABASE_URL in that case.
-  const isLocalProxy = hyperdriveUrl?.includes('.hyperdrive.local') ?? false;
-
-  const connectionString = isLocalProxy
-    ? (env.DATABASE_URL ?? process.env.DATABASE_URL)
-    : (hyperdriveUrl ?? env.DATABASE_URL ?? process.env.DATABASE_URL);
+  // Prefer Hyperdrive in production Workers, fall back to DATABASE_URL for local/runtime compatibility.
+  const connectionString = hyperdriveUrl ?? env.DATABASE_URL ?? process.env.DATABASE_URL;
 
   if (!connectionString) {
     throw new Error('[prisma] No database connection string found in env');
   }
 
-  const sslDisabled = /[?&]sslmode=disable/.test(connectionString);
-  const cleanUrl = connectionString
-    .replace(/[?&](sslmode|uselibpqcompat)=[^&]*/g, '')
-    .replace(/\?$/, '')
-    .replace(/&&/g, '&')
-    .replace(/&$/, '');
-
   // No singleton - CF Workers kills idle TCP connections between requests.
   // In production Hyperdrive owns the pool, so creating a new Pool per request
   // is cheap. In local dev it connects directly to Aiven.
   const pool = new Pool({
-    connectionString: cleanUrl,
-    ssl: sslDisabled ? false : { rejectUnauthorized: false },
+    connectionString,
     max: 1,
     idleTimeoutMillis: 0,
     connectionTimeoutMillis: 10_000,

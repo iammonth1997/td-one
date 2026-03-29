@@ -19,7 +19,7 @@ const requestHandler = createRequestHandler(
 
 export default {
   async fetch(request, env, ctx) {
-    // Use Hyperdrive connection string if available, fallback to DATABASE_URL
+    // Prefer Hyperdrive connection string in Workers runtime.
     const connectionString = (env as any).HYPERDRIVE?.connectionString ?? (env as any).DATABASE_URL;
     if (connectionString) {
       process.env.DATABASE_URL = connectionString;
