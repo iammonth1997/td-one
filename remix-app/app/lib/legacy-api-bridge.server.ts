@@ -1,3 +1,4 @@
+import { deviceIdCookie } from "~/lib/device-cookie.server";
 import { sessionTokenCookie } from "~/lib/session-cookie.server";
 
 type LegacyHandler = (request: Request, context?: unknown) => Promise<Response> | Response;
@@ -16,38 +17,67 @@ type ContextWithCloudflare = {
   };
 };
 
-async function withAuthorizationHeaderFromCookie(request: Request) {
-  const existingAuth = request.headers.get("authorization");
-  if (existingAuth) {
-    return request;
+async function getParsedDeviceId(request: Request) {
+  const existingDeviceId = request.headers.get("x-device-id")?.trim();
+  if (existingDeviceId) {
+    return existingDeviceId;
   }
 
-  const token = await sessionTokenCookie.parse(request.headers.get("cookie"));
-  if (!token) {
+  const cookieHeader = request.headers.get("cookie");
+
+  try {
+    const parsed = await deviceIdCookie.parse(cookieHeader);
+    if (typeof parsed === "string" && parsed.trim()) {
+      return parsed.trim();
+    }
+  } catch {
+    // Fall back to plain cookie parsing for older/plain-string cookies.
+  }
+
+  if (!cookieHeader) {
+    return null;
+  }
+
+  const match = /(?:^|;\s*)tdone_device_id=([^;]+)/.exec(cookieHeader);
+  if (!match?.[1]) {
+    return null;
+  }
+
+  const raw = decodeURIComponent(match[1]).trim();
+  return raw || null;
+}
+
+async function withSessionHeadersFromCookie(request: Request) {
+  const existingAuth = request.headers.get("authorization");
+  const token = existingAuth?.startsWith("Bearer ")
+    ? existingAuth.slice(7).trim()
+    : await sessionTokenCookie.parse(request.headers.get("cookie"));
+  const deviceId = await getParsedDeviceId(request);
+
+  if (!token && !deviceId) {
     return request;
   }
 
   const headers = new Headers(request.headers);
-  headers.set("authorization", `Bearer ${token}`);
-
-  // Important: Do NOT try to create a new Request in Miniflare - it has issues with body cloning
-  // Instead, for GET/DELETE/HEAD (no body methods), create a simple new request
-  if (["GET", "DELETE", "HEAD"].includes(request.method)) {
-    return new Request(request.url, {
-      method: request.method,
-      headers,
-      redirect: request.redirect,
-    });
+  if (token && !existingAuth) {
+    headers.set("authorization", `Bearer ${token}`);
+  }
+  if (deviceId && !headers.get("x-device-id")) {
+    headers.set("x-device-id", deviceId);
   }
 
-  // For POST/PUT/PATCH: In a proper Node.js environment, we'd need to clone the body.
-  // But since we're in a Cloudflare Worker, keep  the original request and just
-  // rely on the handler being passed the request with modified headers via a proxy object
-  // For now, return the original request - the legacy handler will look for auth in the header
-  // which we can't modify on the original request.
-  // As a workaround, we'll just return the original request unchanged and accept that
-  // the auth header won't be added from cookies in POST requests
-  return request;
+  if (["GET", "DELETE", "HEAD"].includes(request.method)) {
+    return new Request(request.url, { method: request.method, headers, redirect: request.redirect });
+  }
+
+  const bodyBuffer = await request.clone().arrayBuffer();
+
+  return new Request(request.url, {
+    method: request.method,
+    headers,
+    body: bodyBuffer,
+    redirect: request.redirect,
+  });
 }
 
 function hydrateProcessEnvFromContext(context: unknown) {
@@ -92,7 +122,7 @@ export async function proxyLegacyApi(request: Request, mod: LegacyModule, contex
     });
   }
 
-  const adaptedRequest = await withAuthorizationHeaderFromCookie(request);
+  const adaptedRequest = await withSessionHeadersFromCookie(request);
   const restoreEnv = hydrateProcessEnvFromContext(context);
   try {
     return await handler(adaptedRequest, context);

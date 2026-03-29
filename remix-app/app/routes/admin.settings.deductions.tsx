@@ -1,6 +1,7 @@
 import type { Route } from "./+types/admin.settings.deductions";
 import AdminShell from "~/components/admin-shell";
 import { requireAdminSession } from "~/lib/require-admin-session.server";
+import { fetchJsonOrEmpty } from "~/lib/safe-server-fetch.server";
 import { useState } from "react";
 
 type DeductionTemplate = {
@@ -22,11 +23,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   url.pathname = "/api/admin/deductions";
   url.search = "";
 
-  const res = await fetch(url.toString(), {
-    headers: { cookie: request.headers.get("cookie") ?? "" },
-  });
-
-  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  const data = await fetchJsonOrEmpty(url.toString(), request.headers.get("cookie") ?? "");
   const templates = Array.isArray(data.templates) ? (data.templates as DeductionTemplate[]) : [];
   const activeEmployeeDeductions = Number(data.active_employee_deductions ?? 0);
 

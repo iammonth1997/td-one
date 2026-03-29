@@ -1,5 +1,6 @@
 import type { Route } from "./+types/admin.payroll.ot";
 import { requireAdminSession } from "~/lib/require-admin-session.server";
+import { fetchJsonOrEmpty } from "~/lib/safe-server-fetch.server";
 import AdminShell from "~/components/admin-shell";
 import { useState } from "react";
 
@@ -13,21 +14,26 @@ type PayrollRun = {
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const session = await requireAdminSession(request, context);
+  const cookie = request.headers.get("cookie") ?? "";
 
   const url = new URL(request.url);
   url.pathname = "/api/payroll/runs";
-  url.search = "?type=ot";
+  url.search = "?run_type=ot_incentive";
 
-  const res = await fetch(url.toString(), {
-    headers: { cookie: request.headers.get("cookie") ?? "" },
-  });
-
-  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  const rows = Array.isArray(data.runs)
-    ? (data.runs as PayrollRun[])
+  const data = await fetchJsonOrEmpty(url.toString(), cookie);
+  const runs = Array.isArray(data.runs)
+    ? (data.runs as Array<Record<string, unknown>>)
     : Array.isArray(data.rows)
-      ? (data.rows as PayrollRun[])
+      ? (data.rows as Array<Record<string, unknown>>)
       : [];
+
+  const rows: PayrollRun[] = runs.map((row) => ({
+    id: String(row.id ?? ""),
+    period_label: String(row.period_label ?? row.period_month ?? "-"),
+    total_amount: Number(row.total_amount ?? row.total_net ?? row.total_gross ?? 0),
+    created_at: typeof row.created_at === "string" ? row.created_at : null,
+    status: typeof row.status === "string" ? row.status : null,
+  })).filter((row) => row.id);
 
   return { session, rows };
 }
@@ -46,7 +52,7 @@ export default function AdminPayrollOtPage({ loaderData }: Route.ComponentProps)
     try {
       const res = await fetch("/api/payroll/runs", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ run_type: "ot", period_month: period, pay_date: payDate || null }),
+        body: JSON.stringify({ run_type: "ot_incentive", period_month: period, pay_date: payDate || null }),
       });
       const data = await res.json() as Record<string, unknown>;
       if (!res.ok) { setError(String(data.error || "Failed to create run")); return; }

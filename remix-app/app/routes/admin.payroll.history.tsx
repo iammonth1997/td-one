@@ -1,5 +1,6 @@
 import type { Route } from "./+types/admin.payroll.history";
 import { requireAdminSession } from "~/lib/require-admin-session.server";
+import { fetchJsonOrEmpty } from "~/lib/safe-server-fetch.server";
 import AdminShell from "~/components/admin-shell";
 
 type PayrollRun = {
@@ -13,37 +14,50 @@ type PayrollRun = {
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const session = await requireAdminSession(request, context);
+  const cookie = request.headers.get("cookie") ?? "";
 
   const salaryUrl = new URL(request.url);
   salaryUrl.pathname = "/api/payroll/runs";
-  salaryUrl.search = "?type=salary";
+  salaryUrl.search = "?run_type=salary";
 
   const otUrl = new URL(request.url);
   otUrl.pathname = "/api/payroll/runs";
-  otUrl.search = "?type=ot";
+  otUrl.search = "?run_type=ot_incentive";
 
-  const [salaryRes, otRes] = await Promise.all([
-    fetch(salaryUrl.toString(), { headers: { cookie: request.headers.get("cookie") ?? "" } }),
-    fetch(otUrl.toString(), { headers: { cookie: request.headers.get("cookie") ?? "" } }),
+  const [salaryData, otData] = await Promise.all([
+    fetchJsonOrEmpty(salaryUrl.toString(), cookie),
+    fetchJsonOrEmpty(otUrl.toString(), cookie),
   ]);
 
-  const [salaryData, otData] = (await Promise.all([
-    salaryRes.json().catch(() => ({})),
-    otRes.json().catch(() => ({})),
-  ])) as [Record<string, unknown>, Record<string, unknown>];
-
-  const salaryList = Array.isArray(salaryData.runs)
-    ? (salaryData.runs as PayrollRun[])
+  const salaryRuns = Array.isArray(salaryData.runs)
+    ? (salaryData.runs as Array<Record<string, unknown>>)
     : Array.isArray(salaryData.rows)
-      ? (salaryData.rows as PayrollRun[])
+      ? (salaryData.rows as Array<Record<string, unknown>>)
       : [];
-  const otList = Array.isArray(otData.runs)
-    ? (otData.runs as PayrollRun[])
+  const otRuns = Array.isArray(otData.runs)
+    ? (otData.runs as Array<Record<string, unknown>>)
     : Array.isArray(otData.rows)
-      ? (otData.rows as PayrollRun[])
+      ? (otData.rows as Array<Record<string, unknown>>)
       : [];
 
-  const rows = [...salaryList.map((row) => ({ ...row, type: "salary" })), ...otList.map((row) => ({ ...row, type: "ot" }))]
+  const salaryList: PayrollRun[] = salaryRuns.map((row) => ({
+    id: String(row.id ?? ""),
+    type: "salary",
+    period_label: String(row.period_label ?? row.period_month ?? "-"),
+    total_amount: Number(row.total_amount ?? row.total_net ?? row.total_gross ?? 0),
+    created_at: typeof row.created_at === "string" ? row.created_at : null,
+    status: typeof row.status === "string" ? row.status : null,
+  })).filter((row) => row.id);
+  const otList: PayrollRun[] = otRuns.map((row) => ({
+    id: String(row.id ?? ""),
+    type: "ot_incentive",
+    period_label: String(row.period_label ?? row.period_month ?? "-"),
+    total_amount: Number(row.total_amount ?? row.total_net ?? row.total_gross ?? 0),
+    created_at: typeof row.created_at === "string" ? row.created_at : null,
+    status: typeof row.status === "string" ? row.status : null,
+  })).filter((row) => row.id);
+
+  const rows = [...salaryList, ...otList]
     .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
 
   return { session, rows };

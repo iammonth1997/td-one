@@ -1,5 +1,6 @@
 import type { Route } from "./+types/admin.requests";
 import { requireAdminSession } from "~/lib/require-admin-session.server";
+import { fetchJsonOrEmpty } from "~/lib/safe-server-fetch.server";
 import AdminShell from "~/components/admin-shell";
 import { useState } from "react";
 
@@ -42,8 +43,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
   url.pathname = "/api/admin/requests";
   url.search = "?status=all&type=all&limit=100";
-  const res = await fetch(url.toString(), { headers: { cookie: request.headers.get("cookie") ?? "" } });
-  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  const data = await fetchJsonOrEmpty(url.toString(), request.headers.get("cookie") ?? "");
   const rows: RequestRow[] = Array.isArray(data.rows) ? (data.rows as RequestRow[]) : [];
   return { session, rows };
 }

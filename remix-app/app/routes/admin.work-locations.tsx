@@ -1,6 +1,7 @@
 import type { Route } from "./+types/admin.work-locations";
 import AdminShell from "~/components/admin-shell";
 import { requireAdminSession } from "~/lib/require-admin-session.server";
+import { fetchJsonOrEmpty } from "~/lib/safe-server-fetch.server";
 import { useState } from "react";
 
 type WorkLocation = {
@@ -17,8 +18,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const session = await requireAdminSession(request, context);
   const url = new URL(request.url);
   url.pathname = "/api/work-locations";
-  const res = await fetch(url.toString(), { headers: { cookie: request.headers.get("cookie") ?? "" } });
-  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  const data = await fetchJsonOrEmpty(url.toString(), request.headers.get("cookie") ?? "");
   const locations: WorkLocation[] = Array.isArray(data.rows)
     ? (data.rows as WorkLocation[])
     : Array.isArray(data.locations)
