@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import prisma from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
 import { hasAnyPermission } from "@/lib/rbac/access";
 import { ADMIN_PORTAL } from "@/lib/sessionContext";
@@ -30,7 +30,10 @@ const ADMIN_UI_PERMISSIONS = [
   "rbac.manage",
 ];
 
-export async function POST(req) {
+export async function POST(req, context) {
+  const env = context?.cloudflare?.env ?? { DATABASE_URL: process.env.DATABASE_URL };
+  const prisma = getPrisma(env);
+
   try {
     const { email, password } = await req.json();
     const normalizedEmail = String(email || "").trim().toLowerCase();
@@ -50,7 +53,7 @@ export async function POST(req) {
         WHERE admin_email = ${normalizedEmail}
         LIMIT 1
       `;
-    } catch (err) {
+    } catch {
       return Response.json({ error: "DB_QUERY_FAILED" }, { status: 500 });
     }
 
@@ -73,10 +76,10 @@ export async function POST(req) {
     let employee;
     try {
       employee = await prisma.employee.findFirst({
-        where: { employee_code: user.emp_id },
+        where: { employee_id: user.emp_id },
         select: { status: true },
       });
-    } catch (err) {
+    } catch {
       return Response.json({ error: "DB_QUERY_FAILED" }, { status: 500 });
     }
 
@@ -84,7 +87,8 @@ export async function POST(req) {
       return Response.json({ error: "EMPLOYEE_NOT_FOUND" }, { status: 400 });
     }
 
-    if (employee.status !== "active") {
+    // Supports legacy Thai status and normalized active status.
+    if (employee.status !== "active" && employee.status !== "\u0e1e\u0e19\u0e31\u0e01\u0e07\u0e32\u0e19") {
       return Response.json({ error: "ACCOUNT_BLOCKED", reason: employee.status }, { status: 403 });
     }
 
@@ -110,7 +114,7 @@ export async function POST(req) {
           user_agent: req.headers.get("user-agent") || null,
         },
       });
-    } catch (err) {
+    } catch {
       return Response.json({ error: "SESSION_CREATE_FAILED" }, { status: 500 });
     }
 

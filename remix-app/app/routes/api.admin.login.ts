@@ -5,13 +5,13 @@ import { proxyLegacyApi } from "~/lib/legacy-api-bridge.server";
 import { sessionTokenCookie } from "~/lib/session-cookie.server";
 import { deviceIdCookie, getDeviceIdFromRequest } from "~/lib/device-cookie.server";
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  return proxyLegacyApi(request, legacy);
+export async function loader({ request, context }: LoaderFunctionArgs) {
+  return proxyLegacyApi(request, legacy, context);
 }
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, context }: ActionFunctionArgs) {
   // Clone body so we can read device_id, then let legacy handler process
-  const response = await proxyLegacyApi(request, legacy);
+  const response = await proxyLegacyApi(request, legacy, context);
 
   // Only set cookies on successful login
   if (response.status !== 200) return response;

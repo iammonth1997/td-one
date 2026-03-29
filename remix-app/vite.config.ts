@@ -9,29 +9,34 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export default defineConfig({
-  server: {
-    hmr: {
-      overlay: false,
+export default defineConfig(({ command }) => {
+  const useCloudflareRuntimeInDev = process.env.CLOUDFLARE_DEV_RUNTIME === "1";
+  const useCloudflarePlugin = command === "build" || useCloudflareRuntimeInDev;
+
+  return {
+    server: {
+      hmr: {
+        overlay: false,
+      },
+      host: "localhost",
+      port: 5173,
     },
-    host: "localhost",
-    port: 5173,
-  },
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, ".."),
-      // Force Vite to bundle .prisma/client/default → wasm entry (workerd-compatible)
-      // instead of leaving it as an unresolvable external on Cloudflare Workers
-      ".prisma/client/default": path.resolve(
-        __dirname,
-        "../node_modules/.prisma/client/wasm.js"
-      ),
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, ".."),
+        // Force Vite to bundle .prisma/client/default -> wasm entry (workerd-compatible)
+        // instead of leaving it as an unresolvable external on Cloudflare Workers
+        ".prisma/client/default": path.resolve(
+          __dirname,
+          "../node_modules/.prisma/client/wasm.js"
+        ),
+      },
     },
-  },
-  plugins: [
-    cloudflare({ viteEnvironment: { name: "ssr" } }),
-    tailwindcss(),
-    reactRouter(),
-    tsconfigPaths(),
-  ],
+    plugins: [
+      ...(useCloudflarePlugin ? [cloudflare({ viteEnvironment: { name: "ssr" } })] : []),
+      tailwindcss(),
+      reactRouter(),
+      tsconfigPaths(),
+    ],
+  };
 });

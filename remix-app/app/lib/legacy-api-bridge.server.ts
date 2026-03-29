@@ -1,6 +1,6 @@
 import { sessionTokenCookie } from "~/lib/session-cookie.server";
 
-type LegacyHandler = (request: Request) => Promise<Response> | Response;
+type LegacyHandler = (request: Request, context?: unknown) => Promise<Response> | Response;
 
 type LegacyModule = {
   GET?: LegacyHandler;
@@ -95,7 +95,7 @@ export async function proxyLegacyApi(request: Request, mod: LegacyModule, contex
   const adaptedRequest = await withAuthorizationHeaderFromCookie(request);
   const restoreEnv = hydrateProcessEnvFromContext(context);
   try {
-    return await handler(adaptedRequest);
+    return await handler(adaptedRequest, context);
   } catch (error) {
     console.error("[legacy-api-bridge] handler error:", error instanceof Error ? error.message : String(error));
     return new Response(

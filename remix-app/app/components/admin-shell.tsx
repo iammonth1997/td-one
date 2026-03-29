@@ -59,11 +59,15 @@ function isActive(pathname: string, href: string) {
 
 export default function AdminShell({ title, session, children }: AdminShellProps) {
   const location = useLocation();
+  const sidebarWidth = 240;
 
   return (
     <div className="min-h-screen bg-[#f2f4f8] text-[#111111]">
-      <aside className="fixed left-0 top-0 z-30 h-screen w-[240px] border-r border-[#2C3C52] bg-[#1A2332] text-[#D7E3F4]">
-        <div className="h-16 border-b border-[#2C3C52] px-4 flex items-center">
+      <aside
+        className="fixed left-0 top-0 z-30 h-screen border-r"
+        style={{ width: `${sidebarWidth}px`, borderColor: "#2C3C52", backgroundColor: "#1A2332", color: "#D7E3F4" }}
+      >
+        <div className="flex h-16 items-center border-b px-4" style={{ borderColor: "#2C3C52" }}>
           <p className="text-sm font-semibold tracking-wide text-white">ADMIN PANEL</p>
         </div>
 
@@ -93,7 +97,7 @@ export default function AdminShell({ title, session, children }: AdminShellProps
         </nav>
       </aside>
 
-      <div className="ml-[240px]">
+      <div style={{ marginLeft: `${sidebarWidth}px` }}>
         <header className="sticky top-0 z-20 h-16 border-b border-[#d8dee8] bg-white/95 backdrop-blur px-4">
           <div className="flex h-full items-center justify-between">
             <div>
