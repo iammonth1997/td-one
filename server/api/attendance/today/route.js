@@ -1,6 +1,6 @@
 import { validateSession } from "@/lib/validateSession";
 import { getEmployeeFromSessionEmpId, getTodayDateInBangkok, pickEmployeeName } from "@/lib/attendanceUtils";
-import prisma from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
 import { hasAnyPermission } from "@/lib/rbac/access";
 import { EMPLOYEE_PORTAL, isPortalContextAllowed } from "@/lib/sessionContext";
@@ -32,6 +32,7 @@ function buildTodayHistory(row) {
 }
 
 export async function GET(req) {
+  const prisma = getPrisma({ DATABASE_URL: process.env.DATABASE_URL });
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) {
     return Response.json({ error: authError }, { status: authStatus });

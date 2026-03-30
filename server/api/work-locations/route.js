@@ -1,6 +1,6 @@
 import { validateSession } from "@/lib/validateSession";
 import { loadActiveWorkLocations } from "@/lib/attendanceUtils";
-import prisma from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
 import { hasAnyPermission } from "@/lib/rbac/access";
 
@@ -148,6 +148,7 @@ const LOCATION_SELECT = {
 };
 
 export async function GET(req) {
+  const prisma = getPrisma({ DATABASE_URL: process.env.DATABASE_URL });
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) {
     return Response.json({ error: authError }, { status: authStatus });
@@ -186,6 +187,7 @@ export async function GET(req) {
 }
 
 export async function POST(req) {
+  const prisma = getPrisma({ DATABASE_URL: process.env.DATABASE_URL });
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) {
     return Response.json({ error: authError }, { status: authStatus });
@@ -216,6 +218,7 @@ export async function POST(req) {
 }
 
 export async function PUT(req) {
+  const prisma = getPrisma({ DATABASE_URL: process.env.DATABASE_URL });
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) {
     return Response.json({ error: authError }, { status: authStatus });
@@ -278,6 +281,7 @@ export async function PUT(req) {
 }
 
 export async function DELETE(req) {
+  const prisma = getPrisma({ DATABASE_URL: process.env.DATABASE_URL });
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) {
     return Response.json({ error: authError }, { status: authStatus });

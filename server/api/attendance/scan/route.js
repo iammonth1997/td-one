@@ -6,7 +6,7 @@ import {
   logAttendanceScanAttempt,
   verifyWorkLocation,
 } from "@/lib/attendanceUtils";
-import prisma from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
 import { hasAnyPermission } from "@/lib/rbac/access";
 import { EMPLOYEE_PORTAL, isPortalContextAllowed } from "@/lib/sessionContext";
@@ -146,6 +146,7 @@ async function notifyHrBlockedScan({ employeeCode, suspicionScore, suspicionFlag
 }
 
 export async function POST(req) {
+  const prisma = getPrisma({ DATABASE_URL: process.env.DATABASE_URL });
   try {
     const { session, error: authError, status: authStatus } = await validateSession(req);
     if (authError) {

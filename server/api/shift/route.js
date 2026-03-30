@@ -4,10 +4,11 @@
  * Query params: ?year=2026&month=3
  */
 import { validateSession } from '@/lib/validateSession';
-import prisma from '@/lib/prisma';
+import { getPrisma } from "@/lib/prisma";
 import { getEmployeeMonthSchedule, getActiveShiftAssignment } from '@/lib/shiftService';
 
 export async function GET(req) {
+  const prisma = getPrisma({ DATABASE_URL: process.env.DATABASE_URL });
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) return Response.json({ error: authError }, { status: authStatus });
 
