@@ -45,6 +45,7 @@ tmpclaude-*
 dev.log
 nul
 .claude/
+docs/live-database-schema.md
 
 # typescript
 *.tsbuildinfo
