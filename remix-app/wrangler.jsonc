@@ -1,11 +1,10 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "tdone-remix",
-  "compatibility_date": "2025-04-04",
+  "compatibility_date": "2026-03-17",
   "compatibility_flags": ["nodejs_compat"],
   "main": "./workers/app.ts",
   "workers_dev": true,
-  "no_bundle": true,
   "hyperdrive": [
     {
       "binding": "HYPERDRIVE",

@@ -11,7 +11,9 @@ function createPrismaClient() {
     return new PrismaClient();
   }
 
-  const pool = new Pool({ connectionString });
+  const sslDisabled = /[?&]sslmode=disable/.test(connectionString ?? '');
+  const cleanUrl = connectionString?.replace(/[?&](sslmode|uselibpqcompat)=[^&]*/g, '').replace(/\?$/, '').replace(/&$/, '');
+  const pool = new Pool({ connectionString: cleanUrl, ssl: sslDisabled ? false : { rejectUnauthorized: false } });
   const adapter = new PrismaPg(pool);
   return new PrismaClient({ adapter } as ConstructorParameters<typeof PrismaClient>[0]);
 }

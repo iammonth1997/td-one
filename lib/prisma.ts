@@ -9,8 +9,12 @@ type CloudflareEnv = {
 
 export function getPrisma(env: CloudflareEnv): PrismaClient {
   const hyperdriveUrl = env.HYPERDRIVE?.connectionString;
-  // Prefer Hyperdrive in production Workers, fall back to DATABASE_URL for local/runtime compatibility.
-  const connectionString = hyperdriveUrl ?? env.DATABASE_URL ?? process.env.DATABASE_URL;
+  // Prefer Hyperdrive in Workers, but fall back when local dev exposes a
+  // .hyperdrive.local proxy that the Node pg driver cannot reach.
+  const isLocalProxy = hyperdriveUrl?.includes('.hyperdrive.local') ?? false;
+  const connectionString = isLocalProxy
+    ? (env.DATABASE_URL ?? process.env.DATABASE_URL)
+    : (hyperdriveUrl ?? env.DATABASE_URL ?? process.env.DATABASE_URL);
 
   if (!connectionString) {
     throw new Error('[prisma] No database connection string found in env');
