@@ -1,10 +1,11 @@
 import { validateSession } from "@/lib/validateSession";
-import prisma from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 import { getEmployeeByEmpCode } from "@/lib/otRequestUtils";
 import { buildSessionAccessProfile, canManageAdminActions } from "@/lib/rbac/sessionAccess";
 import { hasAnyPermission } from "@/lib/rbac/access";
 
 export async function PUT(req) {
+  const prisma = getPrisma({ DATABASE_URL: process.env.DATABASE_URL });
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) {
     return Response.json({ error: authError }, { status: authStatus });

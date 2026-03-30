@@ -1,4 +1,4 @@
-import prisma from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 import { deleteCloudinaryAssetByPublicId, extractCloudinaryPublicId } from "@/lib/cloudinaryServerUtils";
 
 function isAuthorized(req) {
@@ -12,6 +12,7 @@ function isAuthorized(req) {
 }
 
 export async function GET(req) {
+  const prisma = getPrisma({ DATABASE_URL: process.env.DATABASE_URL });
   if (!isAuthorized(req)) {
     return Response.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }

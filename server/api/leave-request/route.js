@@ -1,5 +1,5 @@
 import { validateSession } from "@/lib/validateSession";
-import prisma from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 import { getEmployeeByEmpCode } from "@/lib/otRequestUtils";
 import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
 import { hasAnyPermission } from "@/lib/rbac/access";
@@ -12,6 +12,7 @@ function calcLeaveDays(startDate, endDate) {
 }
 
 export async function POST(req) {
+  const prisma = getPrisma({ DATABASE_URL: process.env.DATABASE_URL });
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) return Response.json({ error: authError }, { status: authStatus });
 
@@ -93,6 +94,7 @@ export async function POST(req) {
 }
 
 export async function GET(req) {
+  const prisma = getPrisma({ DATABASE_URL: process.env.DATABASE_URL });
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) return Response.json({ error: authError }, { status: authStatus });
 
