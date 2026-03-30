@@ -7,6 +7,7 @@ export default function LoginPage() {
   const [searchParams] = useSearchParams();
   const [empId, setEmpId] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [passwordSet, setPasswordSet] = useState<boolean | null>(null);
@@ -81,9 +82,11 @@ export default function LoginPage() {
         if (data.error === "INVALID_CREDENTIALS") {
           setPasswordSet(true);
           setError("Invalid Employee ID or password.");
-        } else if (data.error === "TEMP_PIN_EXPIRED") setError("Temporary password expired. Please contact HR.");
-        else if (data.error === "ACCOUNT_BLOCKED") setError(`Account blocked (${data.reason || "unknown"}).`);
-        else if (data.error === "ACCOUNT_LOCKED") {
+        } else if (data.error === "TEMP_PIN_EXPIRED") {
+          setError("Temporary password expired. Please contact HR.");
+        } else if (data.error === "ACCOUNT_BLOCKED") {
+          setError(`Account blocked (${data.reason || "unknown"}).`);
+        } else if (data.error === "ACCOUNT_LOCKED") {
           setError(`Too many attempts. Try again in ${data.minutes_remaining || 15} minute(s).`);
         } else if (data.error === "DEVICE_LIMIT_REACHED") {
           setError("Maximum 2 devices allowed. Please contact HR/Admin to deactivate an old device.");
@@ -100,8 +103,11 @@ export default function LoginPage() {
         return;
       }
 
-      if (data.must_change_pin || data.must_change_password) navigate("/change-password");
-      else navigate("/dashboard");
+      if (data.must_change_pin || data.must_change_password) {
+        navigate("/change-password");
+      } else {
+        navigate("/dashboard");
+      }
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -145,20 +151,43 @@ export default function LoginPage() {
           onChange={(e) => setEmpId(e.target.value)}
           onKeyDown={handleKeyDown}
           className="mb-4 mt-1 w-full rounded-xl border border-[#FECACA] bg-[#FEF2F2] p-2.5 text-[#111111] placeholder:text-[#777777] focus:border-[#DC2626] focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
-          placeholder="EMP001"
+          placeholder="กรุณากรอกรหัสพนักงาน"
           disabled={loading}
         />
 
         <label className="text-sm font-medium text-[#555555]">Password</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className="mb-4 mt-1 w-full rounded-xl border border-[#FECACA] bg-[#FEF2F2] p-2.5 text-[#111111] placeholder:text-[#777777] focus:border-[#DC2626] focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
-          placeholder="••••••••••••"
-          disabled={loading}
-        />
+        <div className="relative mb-4 mt-1">
+          <input
+            type={showPassword ? "text" : "password"}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="w-full rounded-xl border border-[#FECACA] bg-[#FEF2F2] p-2.5 pr-11 text-[#111111] placeholder:text-[#777777] focus:border-[#DC2626] focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
+            placeholder="Enter your password"
+            autoComplete="current-password"
+            disabled={loading}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((value) => !value)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9CA3AF] transition hover:text-[#DC2626]"
+            tabIndex={-1}
+            aria-label={showPassword ? "Hide password" : "Show password"}
+          >
+            {showPassword ? (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                <line x1="1" y1="1" x2="23" y2="23" />
+              </svg>
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            )}
+          </button>
+        </div>
 
         {error && <p className="mb-3 text-center text-sm text-red-600">{error}</p>}
 
