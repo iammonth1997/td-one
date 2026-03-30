@@ -9,7 +9,7 @@
  * Returns: { processed: number, alerts_sent: number }
  */
 
-import prisma from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 import { validateSession } from "@/lib/validateSession";
 import { processSecurityAlerts, checkAlertConfig } from "@/lib/alert.server";
 
@@ -27,6 +27,7 @@ function validateCronSecret(req) {
 }
 
 export async function POST(req) {
+  const prisma = getPrisma({ DATABASE_URL: process.env.DATABASE_URL });
   // Check if this is a cron job or authenticated admin request
   const isCronRequest = validateCronSecret(req);
 
@@ -99,6 +100,7 @@ export async function POST(req) {
  * Admin only.
  */
 export async function GET(req) {
+  const prisma = getPrisma({ DATABASE_URL: process.env.DATABASE_URL });
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) {
     return Response.json({ error: authError }, { status: authStatus });
