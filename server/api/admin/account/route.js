@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import prisma from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 import { validateSession } from "@/lib/validateSession";
 import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
 import { hasAnyPermission } from "@/lib/rbac/access";
@@ -8,6 +8,7 @@ import { ADMIN_PORTAL, isPortalContextAllowed } from "@/lib/sessionContext";
 const REQUIRED_PERMISSIONS = ["rbac.manage", "security.pin.reset.manage"];
 
 export async function POST(req) {
+  const prisma = getPrisma({ DATABASE_URL: process.env.DATABASE_URL });
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) {
     return Response.json({ error: authError }, { status: authStatus });

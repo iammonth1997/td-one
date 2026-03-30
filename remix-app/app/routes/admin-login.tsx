@@ -60,7 +60,7 @@ export default function AdminLoginPage() {
         } else if (data.error === "MISSING_DEVICE_ID") {
           setError("ไม่พบ Device ID กรุณารีเฟรชหน้า");
         } else if (data.error === "DB_QUERY_FAILED") {
-          setError("เชื่อมต่อฐานข้อมูลไม่ได้ กรุณาลองใหม่");
+          setError(`เชื่อมต่อฐานข้อมูลไม่ได้: ${String(data.detail ?? "unknown")}`);
         } else if (data.error === "SESSION_CREATE_FAILED") {
           setError("สร้าง Session ไม่สำเร็จ กรุณาลองใหม่");
         } else if (data.error === "ADMIN_LOGIN_FAILED") {
@@ -159,7 +159,7 @@ export default function AdminLoginPage() {
           </button>
         </div>
 
-        {error && <p className="mb-3 text-center text-sm text-red-400">{error}</p>}
+        {error && <p className="mb-3 text-center text-sm text-red-500">{error}</p>}
 
         <button
           type="button"

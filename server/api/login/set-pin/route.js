@@ -1,8 +1,9 @@
-import prisma from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { checkRateLimit, recordLoginAttempt, clearFailedAttempts } from "@/lib/checkRateLimit";
 
 export async function POST(req) {
+  const prisma = getPrisma({ DATABASE_URL: process.env.DATABASE_URL });
   const { emp_id, date_of_birth, pin } = await req.json();
   const empId = String(emp_id || "").trim().toUpperCase();
   const dob = String(date_of_birth || "").trim();

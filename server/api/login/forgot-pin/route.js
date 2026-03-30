@@ -1,4 +1,4 @@
-import prisma from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 import crypto from "crypto";
 import { checkRateLimit, recordLoginAttempt, clearFailedAttempts } from "@/lib/checkRateLimit";
 import { validateSession } from "@/lib/validateSession";
@@ -20,6 +20,7 @@ function generateResetToken(empId, issuedByEmpId) {
 }
 
 export async function POST(req) {
+  const prisma = getPrisma({ DATABASE_URL: process.env.DATABASE_URL });
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) {
     return Response.json({ error: authError }, { status: authStatus });

@@ -1,4 +1,4 @@
-import prisma from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { checkRateLimit, recordLoginAttempt, clearFailedAttempts } from "@/lib/checkRateLimit";
@@ -17,6 +17,7 @@ function getCookieValue(cookieHeader, name) {
 }
 
 export async function POST(req) {
+  const prisma = getPrisma({ DATABASE_URL: process.env.DATABASE_URL });
   const perfStart = performance.now();
   const checkpoints = {};
   const stamp = (label) => {

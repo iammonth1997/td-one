@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import prisma from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 import { EMPLOYEE_PORTAL } from "@/lib/sessionContext";
 
 const SESSION_DURATION_MS = 8 * 60 * 60 * 1000;
@@ -16,6 +16,7 @@ function getCookieValue(cookieHeader, name) {
 }
 
 export async function POST(req) {
+  const prisma = getPrisma({ DATABASE_URL: process.env.DATABASE_URL });
   try {
     const { emp_id, pin, line_user_id, id_token } = await req.json();
     const empId = String(emp_id || "").trim().toUpperCase();

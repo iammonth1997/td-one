@@ -1,4 +1,4 @@
-import prisma from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { validateSession } from "@/lib/validateSession";
@@ -34,6 +34,7 @@ function getClientIp(req) {
 }
 
 export async function POST(req) {
+  const prisma = getPrisma({ DATABASE_URL: process.env.DATABASE_URL });
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) {
     return Response.json({ error: authError }, { status: authStatus });
