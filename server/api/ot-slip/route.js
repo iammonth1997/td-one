@@ -1,5 +1,5 @@
 import { validateSession } from "@/lib/validateSession";
-import prisma from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 import { getEmployeeByEmpCode } from "@/lib/otRequestUtils";
 import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
 import { hasAnyPermission } from "@/lib/rbac/access";
@@ -47,6 +47,7 @@ async function validateSalaryToken(req) {
 }
 
 export async function GET(req) {
+  const prisma = getPrisma({ DATABASE_URL: process.env.DATABASE_URL });
   const { emp_id: salaryEmpId, error: salaryTokenError } = await validateSalaryToken(req);
   if (salaryTokenError) {
     return Response.json({ error: salaryTokenError }, { status: 401 });

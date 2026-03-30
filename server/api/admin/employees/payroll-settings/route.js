@@ -3,9 +3,10 @@
  * POST /api/admin/employees/payroll-settings       – create or update settings
  */
 import { validateSession } from '@/lib/validateSession';
-import prisma from '@/lib/prisma';
+import { getPrisma } from "@/lib/prisma";
 
 export async function GET(req) {
+  const prisma = getPrisma({ DATABASE_URL: process.env.DATABASE_URL });
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) return Response.json({ error: authError }, { status: authStatus });
   if (!session.is_admin) return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
@@ -53,6 +54,7 @@ export async function GET(req) {
 }
 
 export async function POST(req) {
+  const prisma = getPrisma({ DATABASE_URL: process.env.DATABASE_URL });
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) return Response.json({ error: authError }, { status: authStatus });
   if (!session.is_admin) return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
