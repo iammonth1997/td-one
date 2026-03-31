@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { Form, Link, redirect, useActionData, useNavigation } from "react-router";
-import { Prisma } from "@prisma/client";
 
 import type { Route } from "./+types/admin.requests.new";
 import { EmployeeSelector } from "~/components/requests/EmployeeSelector";
@@ -13,7 +12,13 @@ import {
   uploadRequestAttachments,
   type UploadedRequestAttachment,
 } from "~/lib/request-attachments.server";
-import prisma from "~/lib/prisma.server";
+import {
+  createRequestRecord,
+  findRequestRecordById,
+  listScopedEmployeesByIds,
+  listSelectableEmployees,
+  updateRequestRecord,
+} from "~/lib/request-db.server";
 import {
   DEFAULT_PIECE_WORK_HOURS,
   MAX_REQUEST_ATTACHMENT_BYTES,
@@ -75,7 +80,7 @@ function employeeDisplayName(employee: {
 }
 
 function toDateValue(value: string) {
-  return new Date(`${value}T00:00:00.000Z`);
+  return value.trim() || null;
 }
 
 function getListViewForRequestType(requestType: RequestType) {
@@ -95,36 +100,16 @@ function getListViewForRequestStatus(status: string) {
   return "pending";
 }
 
-function buildSelectableEmployeeWhere(departmentId: number, preserveEmployeeIds: string[] = []) {
-  return {
-    department_id: departmentId,
-    ...(preserveEmployeeIds.length > 0
-      ? {
-          OR: [
-            {
-              status: {
-                equals: REQUEST_VISIBLE_EMPLOYEE_STATUS,
-                mode: "insensitive" as const,
-              },
-            },
-            {
-              employee_id: {
-                in: preserveEmployeeIds,
-              },
-            },
-          ],
-        }
-      : {
-          status: {
-            equals: REQUEST_VISIBLE_EMPLOYEE_STATUS,
-            mode: "insensitive" as const,
-          },
-        }),
-  };
-}
-
-function toIsoDateString(value: Date | null | undefined) {
-  return value ? value.toISOString().slice(0, 10) : "";
+function toIsoDateString(value: Date | string | null | undefined) {
+  if (!value) return "";
+  if (typeof value === "string") {
+    const candidate = value.trim();
+    if (!candidate) return "";
+    if (/^\d{4}-\d{2}-\d{2}$/.test(candidate)) return candidate;
+    const parsed = new Date(candidate);
+    return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString().slice(0, 10);
+  }
+  return value.toISOString().slice(0, 10);
 }
 
 function formatHoursInputValue(value: number) {
@@ -141,7 +126,7 @@ function parsePieceWorkHours(value: unknown) {
   return Math.abs(normalized - parsed) < 0.000_001 ? normalized : null;
 }
 
-function toPieceWorkFormDates(value: Prisma.JsonValue | null, legacyHours: number | null) {
+function toPieceWorkFormDates(value: unknown, legacyHours: number | null) {
   if (!Array.isArray(value)) {
     return [] satisfies PieceWorkDateEntry[];
   }
@@ -163,7 +148,7 @@ function toPieceWorkFormDates(value: Prisma.JsonValue | null, legacyHours: numbe
       continue;
     }
 
-    const candidate = item as Record<string, Prisma.JsonValue>;
+    const candidate = item as Record<string, unknown>;
     const date = String(candidate.date || "").trim();
     if (!isValidIsoDate(date)) {
       continue;
@@ -222,13 +207,13 @@ function toStoredPieceWorkDates(values: PieceWorkDateEntry[]) {
 
 function toFormStateFromRequest(requestRecord: {
   request_type: string;
-  start_date: Date | null;
-  end_date: Date | null;
+  start_date: Date | string | null;
+  end_date: Date | string | null;
   half_day: string | null;
   reason: string | null;
   is_twins: boolean;
-  last_working_day: Date | null;
-  work_dates: Prisma.JsonValue | null;
+  last_working_day: Date | string | null;
+  work_dates: unknown;
   work_hours: number | null;
   employees: Array<{ employee_id: string }>;
 }): RequestFormState {
@@ -284,135 +269,103 @@ function toSubmittedState(formData: FormData): RequestFormState {
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const [session, { messages }] = await Promise.all([
-    requireRequestAdminSession(request, context),
-    loadRequestMessages(request),
-  ]);
+  let session: Awaited<ReturnType<typeof requireRequestAdminSession>>;
+  let messages: Awaited<ReturnType<typeof loadRequestMessages>>["messages"];
+
+  try {
+    [session, { messages }] = await Promise.all([
+      requireRequestAdminSession(request, context),
+      loadRequestMessages(request),
+    ]);
+  } catch (error) {
+    if (error instanceof Response) throw error;
+    console.error("admin.requests.new loader preflight failed:", error);
+    throw new Response("ADMIN_REQUESTS_NEW_PREFLIGHT_FAILED", { status: 500 });
+  }
+
   const searchParams = new URL(request.url).searchParams;
   const editRequestId = searchParams.get("edit");
 
-  const editingRequest = editRequestId
-    ? await prisma.request.findFirst({
-        where: {
-          id: editRequestId,
-          ...(session.canReviewAll ? {} : { department_id: session.departmentId ?? -1 }),
-        },
-        include: {
-          employees: {
-            select: {
-              employee_id: true,
-            },
-          },
-          attachments: {
-            select: {
-              id: true,
-              file_name: true,
-              file_url: true,
-              uploaded_at: true,
-            },
-          },
-        },
-      })
-    : null;
+  try {
+    const scope = {
+      canReviewAll: session.canReviewAll,
+      departmentId: session.departmentId,
+    };
+    const editingRequest = editRequestId ? await findRequestRecordById(context, scope, editRequestId) : null;
 
-  if (editRequestId && !editingRequest) {
-    throw new Response("REQUEST_NOT_FOUND", { status: 404 });
+    if (editRequestId && !editingRequest) {
+      throw new Response("REQUEST_NOT_FOUND", { status: 404 });
+    }
+
+    if (editingRequest && !canManageRequestStatus(editingRequest.status as RequestStatus)) {
+      throw redirect(`/admin/requests?view=${getListViewForRequestStatus(editingRequest.status)}&error=request_locked`);
+    }
+
+    const targetDepartmentId = editingRequest?.department_id ?? session.departmentId;
+    const preservedEmployeeIds = editingRequest?.employees.map((employee) => employee.employee_id) ?? [];
+    const employees = targetDepartmentId
+      ? await listSelectableEmployees(context, targetDepartmentId, REQUEST_VISIBLE_EMPLOYEE_STATUS, preservedEmployeeIds)
+      : [];
+
+    return {
+      session: {
+        emp_id: session.emp_id,
+        role: session.role,
+      },
+      currentUser: session.currentUser,
+      departmentId: targetDepartmentId,
+      employees: employees.map((employee) => ({
+        employeeId: employee.employee_id,
+        fullName: employeeDisplayName(employee),
+        position: employee.position,
+      })),
+      messages,
+      mode: editingRequest ? "edit" : "create",
+      returnToListUrl: editingRequest
+        ? `/admin/requests?view=${getListViewForRequestStatus(editingRequest.status)}`
+        : "/admin/requests?view=pending",
+      editingRequest: editingRequest
+        ? {
+            id: editingRequest.id,
+            requestType: editingRequest.request_type,
+            status: editingRequest.status as RequestStatus,
+          }
+        : null,
+      initialFormState: editingRequest ? toFormStateFromRequest(editingRequest) : createEmptyRequestFormState(),
+      existingAttachments: editingRequest
+        ? editingRequest.attachments.map((attachment) => ({
+            id: attachment.id,
+            fileName: attachment.file_name,
+            fileUrl: attachment.file_url,
+            uploadedAt:
+              attachment.uploaded_at instanceof Date
+                ? attachment.uploaded_at.toISOString()
+                : new Date(attachment.uploaded_at).toISOString(),
+          }))
+        : ([] satisfies ExistingAttachmentSummary[]),
+    };
+  } catch (error) {
+    if (error instanceof Response) throw error;
+    console.error("admin.requests.new loader query/render failed:", error);
+    throw new Response("ADMIN_REQUESTS_NEW_QUERY_FAILED", { status: 500 });
   }
-
-  if (editingRequest && !canManageRequestStatus(editingRequest.status)) {
-    throw redirect(`/admin/requests?view=${getListViewForRequestStatus(editingRequest.status)}&error=request_locked`);
-  }
-
-  const targetDepartmentId = editingRequest?.department_id ?? session.departmentId;
-  const preservedEmployeeIds = editingRequest?.employees.map((employee) => employee.employee_id) ?? [];
-
-  const employees = targetDepartmentId
-    ? await prisma.employee.findMany({
-        where: buildSelectableEmployeeWhere(targetDepartmentId, preservedEmployeeIds),
-        orderBy: [{ employee_id: "asc" }],
-        select: {
-          employee_id: true,
-          first_name: true,
-          last_name: true,
-          full_name_en: true,
-          full_name_lo: true,
-          position: true,
-        },
-      })
-    : [];
-
-  return {
-    session: {
-      emp_id: session.emp_id,
-      role: session.role,
-    },
-    currentUser: session.currentUser,
-    departmentId: targetDepartmentId,
-    employees: employees.map((employee) => ({
-      employeeId: employee.employee_id,
-      fullName: employeeDisplayName(employee),
-      position: employee.position,
-    })),
-    messages,
-    mode: editingRequest ? "edit" : "create",
-    returnToListUrl: editingRequest
-      ? `/admin/requests?view=${getListViewForRequestStatus(editingRequest.status)}`
-      : "/admin/requests?view=pending",
-    editingRequest: editingRequest
-      ? {
-          id: editingRequest.id,
-          requestType: editingRequest.request_type,
-          status: editingRequest.status as RequestStatus,
-        }
-      : null,
-    initialFormState: editingRequest ? toFormStateFromRequest(editingRequest) : createEmptyRequestFormState(),
-    existingAttachments: editingRequest
-      ? editingRequest.attachments.map((attachment) => ({
-          id: attachment.id,
-          fileName: attachment.file_name,
-          fileUrl: attachment.file_url,
-          uploadedAt: attachment.uploaded_at.toISOString(),
-        }))
-      : ([] satisfies ExistingAttachmentSummary[]),
-  };
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
   const session = await requireRequestAdminSession(request, context);
   const searchParams = new URL(request.url).searchParams;
   const editRequestId = searchParams.get("edit");
-  const editingRequest = editRequestId
-    ? await prisma.request.findFirst({
-        where: {
-          id: editRequestId,
-          ...(session.canReviewAll ? {} : { department_id: session.departmentId ?? -1 }),
-        },
-        include: {
-          employees: {
-            select: {
-              employee_id: true,
-            },
-          },
-          attachments: {
-            select: {
-              id: true,
-              file_name: true,
-              file_url: true,
-              file_size: true,
-              mime_type: true,
-              file_public_id: true,
-              file_resource_type: true,
-            },
-          },
-        },
-      })
-    : null;
+  const scope = {
+    canReviewAll: session.canReviewAll,
+    departmentId: session.departmentId,
+  };
+  const editingRequest = editRequestId ? await findRequestRecordById(context, scope, editRequestId) : null;
 
   if (editRequestId && !editingRequest) {
     throw new Response("REQUEST_NOT_FOUND", { status: 404 });
   }
 
-  if (editingRequest && !canManageRequestStatus(editingRequest.status)) {
+  if (editingRequest && !canManageRequestStatus(editingRequest.status as RequestStatus)) {
     return redirect(`/admin/requests?view=${getListViewForRequestStatus(editingRequest.status)}&error=request_locked`);
   }
 
@@ -441,16 +394,13 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   const selectedEmployees =
     submitted.selectedEmployeeIds.length > 0
-      ? await prisma.employee.findMany({
-          where: {
-            employee_id: { in: submitted.selectedEmployeeIds },
-            ...buildSelectableEmployeeWhere(
-              targetDepartmentId,
-              editingRequest?.employees.map((employee) => employee.employee_id) ?? [],
-            ),
-          },
-          select: { employee_id: true },
-        })
+      ? await listScopedEmployeesByIds(
+          context,
+          targetDepartmentId,
+          submitted.selectedEmployeeIds,
+          REQUEST_VISIBLE_EMPLOYEE_STATUS,
+          editingRequest?.employees.map((employee) => employee.employee_id) ?? [],
+        )
       : [];
 
   if (submitted.selectedEmployeeIds.length > 0 && selectedEmployees.length !== submitted.selectedEmployeeIds.length) {
@@ -552,88 +502,42 @@ export async function action({ request, context }: Route.ActionArgs) {
     const storedPieceWorkDates = requestType === "PIECE_WORK" ? toStoredPieceWorkDates(submitted.workDates) : [];
     const totalPieceWorkHours = requestType === "PIECE_WORK" ? calculatePieceWorkTotalHours(submitted.workDates) : null;
     const selectedEmployeeIds = selectedEmployees.map((employee) => employee.employee_id);
-    const attachmentCreateData = uploadedAttachments.map((attachment) => ({
-      file_name: attachment.fileName,
-      file_url: attachment.fileUrl,
-      file_size: attachment.fileSize,
-      mime_type: attachment.mimeType,
-      file_public_id: attachment.publicId,
-      file_resource_type: attachment.resourceType,
-    }));
+    const requestPayload = {
+      requestType,
+      status: getInitialRequestStatus(requestType),
+      startDate:
+        requestType === "RETURN_TO_WORK"
+          ? toDateValue(submitted.returnDate)
+          : requestType === "RESIGNATION" || requestType === "PIECE_WORK"
+            ? null
+            : toDateValue(submitted.startDate),
+      endDate:
+        requestType === "RETURN_TO_WORK"
+          ? toDateValue(submitted.returnDate)
+          : requestType === "RESIGNATION" || requestType === "PIECE_WORK"
+            ? null
+            : toDateValue(submitted.endDate),
+      halfDay: requestType === "SICK_LEAVE" && submitted.halfDayEnabled ? submitted.halfDay || null : null,
+      totalDays: totalDays || null,
+      workDates: requestType === "PIECE_WORK" ? storedPieceWorkDates : null,
+      workHours: requestType === "PIECE_WORK" ? totalPieceWorkHours : null,
+      lastWorkingDay: requestType === "RESIGNATION" ? toDateValue(submitted.lastWorkingDay) : null,
+      reason: submitted.reason || null,
+      isTwins: requestType === "MATERNITY_LEAVE" ? submitted.isTwins : false,
+      createdById: editingRequest?.created_by_id ?? session.emp_id,
+      departmentId: targetDepartmentId,
+      requiresApproval: requiresApproval(requestType),
+      employeeIds: selectedEmployeeIds,
+      attachments: uploadedAttachments,
+    };
 
     if (editingRequest) {
-      await prisma.request.update({
-        where: { id: editingRequest.id },
-        data: {
-          request_type: requestType,
-          status: getInitialRequestStatus(requestType),
-          start_date:
-            requestType === "RETURN_TO_WORK"
-              ? toDateValue(submitted.returnDate)
-              : requestType === "RESIGNATION" || requestType === "PIECE_WORK"
-                ? null
-                : toDateValue(submitted.startDate),
-          end_date:
-            requestType === "RETURN_TO_WORK"
-              ? toDateValue(submitted.returnDate)
-              : requestType === "RESIGNATION" || requestType === "PIECE_WORK"
-                ? null
-                : toDateValue(submitted.endDate),
-          half_day: requestType === "SICK_LEAVE" && submitted.halfDayEnabled ? submitted.halfDay || null : null,
-          total_days: totalDays || null,
-          work_dates: requestType === "PIECE_WORK" ? storedPieceWorkDates : Prisma.JsonNull,
-          work_hours: requestType === "PIECE_WORK" ? totalPieceWorkHours : null,
-          last_working_day: requestType === "RESIGNATION" ? toDateValue(submitted.lastWorkingDay) : null,
-          reason: submitted.reason || null,
-          is_twins: requestType === "MATERNITY_LEAVE" ? submitted.isTwins : false,
-          department_id: targetDepartmentId,
-          requires_approval: requiresApproval(requestType),
-          employees: {
-            deleteMany: {},
-            create: selectedEmployeeIds.map((employeeId) => ({
-              employee_id: employeeId,
-            })),
-          },
-          attachments: attachmentCreateData.length > 0 ? { create: attachmentCreateData } : undefined,
-        },
+      await updateRequestRecord(context, {
+        ...requestPayload,
+        requestId: editingRequest.id,
       });
     } else {
-      await prisma.request.create({
-        data: {
-          request_type: requestType,
-          status: getInitialRequestStatus(requestType),
-          start_date:
-            requestType === "RETURN_TO_WORK"
-              ? toDateValue(submitted.returnDate)
-              : requestType === "RESIGNATION" || requestType === "PIECE_WORK"
-                ? null
-                : toDateValue(submitted.startDate),
-          end_date:
-            requestType === "RETURN_TO_WORK"
-              ? toDateValue(submitted.returnDate)
-              : requestType === "RESIGNATION" || requestType === "PIECE_WORK"
-                ? null
-                : toDateValue(submitted.endDate),
-          half_day: requestType === "SICK_LEAVE" && submitted.halfDayEnabled ? submitted.halfDay || null : null,
-          total_days: totalDays || null,
-          work_dates: requestType === "PIECE_WORK" ? storedPieceWorkDates : undefined,
-          work_hours: requestType === "PIECE_WORK" ? totalPieceWorkHours : null,
-          last_working_day: requestType === "RESIGNATION" ? toDateValue(submitted.lastWorkingDay) : null,
-          reason: submitted.reason || null,
-          is_twins: requestType === "MATERNITY_LEAVE" ? submitted.isTwins : false,
-          created_by_id: session.emp_id,
-          department_id: targetDepartmentId,
-          requires_approval: requiresApproval(requestType),
-          employees: {
-            create: selectedEmployeeIds.map((employeeId) => ({
-              employee_id: employeeId,
-            })),
-          },
-          attachments: {
-            create: attachmentCreateData,
-          },
-        },
-      });
+      await createRequestRecord(context, requestPayload);
     }
   } catch (error) {
     console.error(editingRequest ? "update request failed:" : "create request failed:", error);

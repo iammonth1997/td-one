@@ -8,7 +8,13 @@ import {
   type UploadedRequestAttachment,
 } from "~/lib/request-attachments.server";
 import { requireRequestAdminSession } from "~/lib/request-admin-session.server";
-import prisma from "~/lib/prisma.server";
+import {
+  deleteRequestRecord,
+  findRequestRecordById,
+  loadRequestListData,
+  updateRequestDecision,
+  type RequestStatusCountRow,
+} from "~/lib/request-db.server";
 import { useRequestTranslation } from "~/lib/request-translations";
 import { loadRequestMessages } from "~/lib/request-translations.server";
 import {
@@ -34,13 +40,6 @@ type DepartmentRequestRow = {
 };
 
 type RequestListView = "pending" | "approved" | "rejected";
-
-type RequestStatusCountRow = {
-  status: string;
-  _count: {
-    _all: number;
-  };
-};
 
 type FlashState =
   | { kind: "created"; type: string; count: number }
@@ -96,7 +95,7 @@ function getStatusCounts(rows: RequestStatusCountRow[]) {
   return rows.reduce(
     (counts, row) => {
       const normalizedStatus = String(row.status || "").trim().toUpperCase();
-      const count = row._count._all;
+      const count = row.count;
 
       if (normalizedStatus === "PENDING") {
         counts.pending += count;
@@ -117,10 +116,20 @@ function getStatusCounts(rows: RequestStatusCountRow[]) {
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const [session, { messages }] = await Promise.all([
-    requireRequestAdminSession(request, context),
-    loadRequestMessages(request),
-  ]);
+  let session: Awaited<ReturnType<typeof requireRequestAdminSession>>;
+  let messages: Awaited<ReturnType<typeof loadRequestMessages>>["messages"];
+
+  try {
+    [session, { messages }] = await Promise.all([
+      requireRequestAdminSession(request, context),
+      loadRequestMessages(request),
+    ]);
+  } catch (error) {
+    if (error instanceof Response) throw error;
+    console.error("admin.requests loader preflight failed:", error);
+    throw new Response("ADMIN_REQUESTS_PREFLIGHT_FAILED", { status: 500 });
+  }
+
   const searchParams = new URL(request.url).searchParams;
   const activeView = normalizeRequestListView(searchParams.get("view"));
   const accessWhere = session.canReviewAll
@@ -129,128 +138,84 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         department_id: session.departmentId ?? -1,
       };
 
-  const [statusCountsRows, requestRows] = await Promise.all([
-    prisma.request.groupBy({
-      by: ["status"],
-      where: {
-        ...accessWhere,
-        status: {
-          in: ["PENDING", "APPROVED", "SUBMITTED", "REJECTED"],
-        },
+  try {
+    const { statusCountsRows, requestRows } = await loadRequestListData(
+      context,
+      {
+        canReviewAll: session.canReviewAll,
+        departmentId: session.departmentId,
       },
-      _count: {
-        _all: true,
-      },
-    }),
-    prisma.request.findMany({
-      where: {
-        ...accessWhere,
-        status: requestStatusFilterForView(activeView),
-      },
-      select: {
-        id: true,
-        request_type: true,
-        status: true,
-        created_at: true,
-        created_by_id: true,
-        total_days: true,
-        requires_approval: true,
-        created_by: {
-          select: {
-            first_name: true,
-            last_name: true,
-            full_name_en: true,
-            full_name_lo: true,
-          },
-        },
-        employees: {
-          orderBy: [{ employee_id: "asc" }],
-          take: 3,
-          select: {
-            employee: {
-              select: {
-                first_name: true,
-                last_name: true,
-                full_name_en: true,
-                full_name_lo: true,
-              },
-            },
-          },
-        },
-        _count: {
-          select: {
-            employees: true,
-          },
-        },
-      },
-      orderBy: [{ created_at: "desc" }],
-      take: 100,
-    }),
-  ]);
+      activeView,
+    );
 
-  const statusCounts = getStatusCounts(statusCountsRows as RequestStatusCountRow[]);
+    const statusCounts = getStatusCounts(statusCountsRows);
 
-  return {
-    session: {
-      emp_id: session.emp_id,
-      role: session.role,
-    },
-    messages,
-    activeView,
-    statusCounts,
-    flash: searchParams.get("created")
-      ? ({
-          kind: "created",
-          type: searchParams.get("type") || "",
-          count: Number.parseInt(searchParams.get("count") || "0", 10) || 0,
-        } satisfies FlashState)
-      : searchParams.get("updated")
+    return {
+      session: {
+        emp_id: session.emp_id,
+        role: session.role,
+      },
+      messages,
+      activeView,
+      statusCounts,
+      flash: searchParams.get("created")
         ? ({
-            kind: "updated",
+            kind: "created",
             type: searchParams.get("type") || "",
+            count: Number.parseInt(searchParams.get("count") || "0", 10) || 0,
           } satisfies FlashState)
-        : searchParams.get("deleted")
+        : searchParams.get("updated")
           ? ({
-              kind: "deleted",
+              kind: "updated",
               type: searchParams.get("type") || "",
             } satisfies FlashState)
-          : searchParams.get("approved")
+          : searchParams.get("deleted")
             ? ({
-                kind: "approved",
+                kind: "deleted",
                 type: searchParams.get("type") || "",
               } satisfies FlashState)
-            : searchParams.get("rejected")
+            : searchParams.get("approved")
               ? ({
-                  kind: "rejected",
+                  kind: "approved",
                   type: searchParams.get("type") || "",
                 } satisfies FlashState)
-          : searchParams.get("error")
-            ? ({
-                kind: "error",
-                code: searchParams.get("error") || "",
-              } satisfies FlashState)
-            : null,
-    departmentRequests: requestRows.map((requestRow) => {
-      const employeeNames = requestRow.employees.map((item) => employeeDisplayName(item.employee));
-      const requestStatus = requestRow.status as RequestStatus;
-      const canEdit = canEditDepartmentRequest(requestStatus, requestRow.created_by_id, session.emp_id, session.roleKey);
-      const canDecide = canDecideDepartmentRequest(requestStatus, requestRow.requires_approval, session.role);
-      return {
-        id: requestRow.id,
-        requestType: requestRow.request_type,
-        status: requestStatus,
-        createdAt: requestRow.created_at.toISOString(),
-        createdBy: employeeDisplayName(requestRow.created_by),
-        employeeCount: requestRow._count.employees,
-        employeePreview: employeeNames.join(", "),
-        totalDays: requestRow.total_days ?? null,
-        approvalMode: requestRow.requires_approval ? "pending" : "direct",
-        canEdit,
-        canDelete: canEdit,
-        canDecide,
-      } satisfies DepartmentRequestRow;
-    }),
-  };
+              : searchParams.get("rejected")
+                ? ({
+                    kind: "rejected",
+                    type: searchParams.get("type") || "",
+                  } satisfies FlashState)
+            : searchParams.get("error")
+              ? ({
+                  kind: "error",
+                  code: searchParams.get("error") || "",
+                } satisfies FlashState)
+              : null,
+      departmentRequests: requestRows.map((requestRow) => {
+        const requestStatus = requestRow.status as RequestStatus;
+        const canEdit = canEditDepartmentRequest(requestStatus, requestRow.created_by_id, session.emp_id, session.roleKey);
+        const canDecide = canDecideDepartmentRequest(requestStatus, requestRow.requires_approval, session.role);
+        return {
+          id: requestRow.id,
+          requestType: requestRow.request_type,
+          status: requestStatus,
+          createdAt:
+            requestRow.created_at instanceof Date ? requestRow.created_at.toISOString() : new Date(requestRow.created_at).toISOString(),
+          createdBy: requestRow.created_by_name,
+          employeeCount: requestRow.employee_count,
+          employeePreview: requestRow.employee_preview,
+          totalDays: requestRow.total_days ?? null,
+          approvalMode: requestRow.requires_approval ? "pending" : "direct",
+          canEdit,
+          canDelete: canEdit,
+          canDecide,
+        } satisfies DepartmentRequestRow;
+      }),
+    };
+  } catch (error) {
+    if (error instanceof Response) throw error;
+    console.error("admin.requests loader query/render failed:", error);
+    throw new Response("ADMIN_REQUESTS_QUERY_FAILED", { status: 500 });
+  }
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -268,15 +233,14 @@ export async function action({ request, context }: Route.ActionArgs) {
     throw new Response("REQUEST_ID_REQUIRED", { status: 400 });
   }
 
-  const managedRequest = await prisma.request.findFirst({
-    where: {
-      id: requestId,
-      ...(session.canReviewAll ? {} : { department_id: session.departmentId ?? -1 }),
+  const managedRequest = await findRequestRecordById(
+    context,
+    {
+      canReviewAll: session.canReviewAll,
+      departmentId: session.departmentId,
     },
-    include: {
-      attachments: true,
-    },
-  });
+    requestId,
+  );
 
   if (!managedRequest) {
     throw new Response("REQUEST_NOT_FOUND", { status: 404 });
@@ -300,9 +264,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       resourceType: attachment.file_resource_type,
     }));
 
-    await prisma.request.delete({
-      where: { id: managedRequest.id },
-    });
+    await deleteRequestRecord(context, managedRequest.id);
 
     await deleteUploadedRequestAttachments(attachmentsToDelete, context).catch((error) => {
       console.error("delete request attachments failed:", error);
@@ -317,23 +279,13 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   const rejectionReason = String(formData.get("rejection_reason") || "").trim();
 
-  await prisma.request.update({
-    where: { id: managedRequest.id },
-    data:
-      intent === "approve"
-        ? {
-            status: "APPROVED",
-            approved_by_id: session.emp_id,
-            approved_at: new Date(),
-            rejection_reason: null,
-          }
-        : {
-            status: "REJECTED",
-            approved_by_id: session.emp_id,
-            approved_at: new Date(),
-            rejection_reason: rejectionReason || null,
-          },
-  });
+  await updateRequestDecision(
+    context,
+    managedRequest.id,
+    intent === "approve" ? "APPROVED" : "REJECTED",
+    session.emp_id,
+    intent === "approve" ? null : rejectionReason || null,
+  );
 
   return redirect(
     `/admin/requests?view=${intent === "approve" ? "approved" : "rejected"}&${intent === "approve" ? "approved=1" : "rejected=1"}&type=${encodeURIComponent(managedRequest.request_type)}`,

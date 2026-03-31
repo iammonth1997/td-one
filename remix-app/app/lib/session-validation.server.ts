@@ -1,5 +1,5 @@
 import { getDeviceIdFromRequest } from "~/lib/device-cookie.server";
-import prisma from "~/lib/prisma.server";
+import { getConnectionString, withPgClient } from "~/lib/pg.server";
 import { getSessionTokenFromRequest } from "~/lib/session-cookie.server";
 import { ADMIN_PORTAL, normalizeLoginContext } from "~/lib/session-context";
 
@@ -32,15 +32,24 @@ export async function validateSession(request: Request, context: unknown) {
     return { session: null, error: "MISSING_DEVICE_ID", status: 401 };
   }
 
+  const connectionString = getConnectionString(context);
+  if (!connectionString) {
+    console.error("validateSession DB error: missing connection string");
+    return { session: null, error: "SESSION_VALIDATION_FAILED", status: 500 };
+  }
+
   let data: SessionRow | null = null;
   try {
-    const result = await prisma.$queryRaw<SessionRow[]>`
-      SELECT id, emp_id, role, device_id, expires_at, login_context
-      FROM auth_sessions
-      WHERE session_token = ${token} AND is_active = true
-      LIMIT 1
-    `;
-    data = result[0] || null;
+    data = await withPgClient(connectionString, async (client) => {
+      const result = await client.query<SessionRow>(
+        `SELECT id, emp_id, role, device_id, expires_at, login_context
+         FROM auth_sessions
+         WHERE session_token = $1 AND is_active = true
+         LIMIT 1`,
+        [token],
+      );
+      return result.rows[0] || null;
+    });
   } catch (dbError) {
     console.error("validateSession DB error:", dbError);
     return { session: null, error: "SESSION_VALIDATION_FAILED", status: 500 };
@@ -52,11 +61,14 @@ export async function validateSession(request: Request, context: unknown) {
 
   if (new Date(data.expires_at) < new Date()) {
     try {
-      await prisma.$executeRaw`
-        UPDATE auth_sessions
-        SET is_active = false
-        WHERE id = ${data.id}
-      `;
+      await withPgClient(connectionString, async (client) => {
+        await client.query(
+          `UPDATE auth_sessions
+           SET is_active = false
+           WHERE id = $1`,
+          [data!.id],
+        );
+      });
     } catch (dbError) {
       console.error("validateSession expiry cleanup error:", dbError);
     }
@@ -69,33 +81,43 @@ export async function validateSession(request: Request, context: unknown) {
 
   if (!data.device_id) {
     try {
-      const employeeResult = await prisma.$queryRaw<{ id: string }[]>`
-        SELECT id
-        FROM employees
-        WHERE employee_id = ${data.emp_id}
-        LIMIT 1
-      `;
-      const employeeId = employeeResult[0]?.id;
+      const employeeId = await withPgClient(connectionString, async (client) => {
+        const employeeResult = await client.query<{ id: string }>(
+          `SELECT id
+           FROM employees
+           WHERE employee_id = $1
+           LIMIT 1`,
+          [data!.emp_id],
+        );
+        return employeeResult.rows[0]?.id || null;
+      });
       if (!employeeId) {
         return { session: null, error: "EMPLOYEE_NOT_FOUND", status: 404 };
       }
 
-      const deviceResult = await prisma.$queryRaw<{ id: string }[]>`
-        SELECT id
-        FROM auth_employee_devices
-        WHERE employee_id = ${employeeId} AND device_id = ${deviceId} AND is_active = true
-        LIMIT 1
-      `;
+      const trustedDeviceId = await withPgClient(connectionString, async (client) => {
+        const deviceResult = await client.query<{ id: string }>(
+          `SELECT id
+           FROM auth_employee_devices
+           WHERE employee_id = $1 AND device_id = $2 AND is_active = true
+           LIMIT 1`,
+          [employeeId, deviceId],
+        );
+        return deviceResult.rows[0]?.id || null;
+      });
 
-      if (!deviceResult[0]?.id) {
+      if (!trustedDeviceId) {
         return { session: null, error: "DEVICE_NOT_TRUSTED", status: 403 };
       }
 
-      await prisma.$executeRaw`
-        UPDATE auth_sessions
-        SET device_id = ${deviceId}
-        WHERE id = ${data.id}
-      `;
+      await withPgClient(connectionString, async (client) => {
+        await client.query(
+          `UPDATE auth_sessions
+           SET device_id = $1
+           WHERE id = $2`,
+          [deviceId, data!.id],
+        );
+      });
 
     } catch (dbError) {
       console.error("validateSession device check DB error:", dbError);

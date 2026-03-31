@@ -1,5 +1,5 @@
 import { redirectToAdminLogin } from "~/lib/admin-login-redirect.server";
-import prisma from "~/lib/prisma.server";
+import { getConnectionString, withPgClient } from "~/lib/pg.server";
 import { validateSession } from "~/lib/session-validation.server";
 import { canAccessRequestAdmin, canReviewAllRequests, normalizeRoleKey } from "~/lib/request-types";
 
@@ -29,13 +29,27 @@ export async function requireRequestAdminSession(request: Request, context: unkn
     throw new Response("FORBIDDEN", { status: 403 });
   }
 
-  const currentUser = await prisma.employee.findUnique({
-    where: { employee_id: session.emp_id },
-    select: {
-      employee_id: true,
-      department_id: true,
-    },
-  });
+  const connectionString = getConnectionString(context);
+  if (!connectionString) {
+    throw new Response("CURRENT_USER_QUERY_FAILED", { status: 500 });
+  }
+
+  let currentUser: { employee_id: string; department_id: number | null } | null = null;
+  try {
+    currentUser = await withPgClient(connectionString, async (client) => {
+      const result = await client.query<{ employee_id: string; department_id: number | null }>(
+        `SELECT employee_id, department_id
+         FROM employees
+         WHERE employee_id = $1
+         LIMIT 1`,
+        [session.emp_id],
+      );
+      return result.rows[0] || null;
+    });
+  } catch (error) {
+    console.error("requireRequestAdminSession currentUser query failed:", error);
+    throw new Response("CURRENT_USER_QUERY_FAILED", { status: 500 });
+  }
 
   if (!currentUser) {
     throw new Response("CURRENT_USER_NOT_FOUND", { status: 404 });
