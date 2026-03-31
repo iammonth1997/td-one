@@ -1,11 +1,12 @@
 import bcrypt from "bcryptjs";
 import type { ActionFunctionArgs } from "react-router";
+import { findEmployeeAuthRecord, isEmployeeAccountActive } from "~/lib/employee-auth.server";
 import { clearFailedAttempts, checkRateLimit, recordLoginAttempt } from "~/lib/rate-limit.server";
 import { sessionTokenCookie } from "~/lib/session-cookie.server";
 import { EMPLOYEE_PORTAL } from "~/lib/session-context";
 import { writeAuditLog, AuditEvent } from "~/lib/audit-log.server";
 import { deviceIdCookie, getDeviceIdFromRequest } from "~/lib/device-cookie.server";
-import prisma from "~/lib/prisma.server";
+import { getConnectionString, withPgClient } from "~/lib/pg.server";
 
 const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_DEVICES_PER_EMPLOYEE = 2;
@@ -80,7 +81,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
       deviceId = (await getDeviceIdFromRequest(request)) || null;
     }
 
-    const { locked, minutesRemaining } = await checkRateLimit(empId);
+    const { locked, minutesRemaining } = await checkRateLimit(empId, context);
     stamp("rate_limit_checked");
 
     if (locked) {
@@ -88,30 +89,60 @@ export async function action({ request, context }: ActionFunctionArgs) {
       return json({ error: "ACCOUNT_LOCKED", minutes_remaining: minutesRemaining }, { status: 429 });
     }
 
+    const connectionString = getConnectionString(context);
+    if (!connectionString) {
+      logTiming("DB_QUERY_FAILED");
+      return json({ error: "LOGIN_SERVICE_UNAVAILABLE", diagnostic: "NO_DATABASE_URL" }, { status: 503 });
+    }
+
     const [user, emp] = await Promise.all([
-      prisma.loginUser.findUnique({ where: { emp_id: empId } }).then((r) => { stamp("login_user_loaded"); return r; }),
-      prisma.employee.findFirst({ where: { employee_code: empId }, select: { status: true } }).then((r) => { stamp("employee_loaded"); return r; }),
+      withPgClient(
+        connectionString,
+        async (client) => {
+          const result = await client.query<{
+            emp_id: string;
+            role: string | null;
+            pin_hash: string | null;
+            force_pin_change: boolean | null;
+            must_change_password: boolean | null;
+            temp_pin_expires_at: string | Date | null;
+          }>(
+            `SELECT emp_id, role, pin_hash, force_pin_change, must_change_password, temp_pin_expires_at
+             FROM login_users
+             WHERE emp_id = $1
+             LIMIT 1`,
+            [empId],
+          );
+          stamp("login_user_loaded");
+          return result.rows[0] || null;
+        },
+        1,
+      ),
+      findEmployeeAuthRecord(empId, context).then((record) => {
+        stamp("employee_loaded");
+        return record;
+      }),
     ]);
 
     if (!user) {
-      await recordLoginAttempt(empId, false, ipAddress);
+      await recordLoginAttempt(empId, false, ipAddress, context);
       logTiming("USER_NOT_FOUND");
       return json({ error: "INVALID_CREDENTIALS" }, { status: 400 });
     }
 
     if (!emp) {
-      await recordLoginAttempt(empId, false, ipAddress);
+      await recordLoginAttempt(empId, false, ipAddress, context);
       logTiming("EMPLOYEE_NOT_FOUND");
       return json({ error: "INVALID_CREDENTIALS" }, { status: 400 });
     }
 
-    if (emp.status !== "active") {
+    if (!isEmployeeAccountActive(emp.status)) {
       logTiming("ACCOUNT_BLOCKED");
       return json({ error: "ACCOUNT_BLOCKED", reason: emp.status }, { status: 403 });
     }
 
     if (!user.pin_hash) {
-      await recordLoginAttempt(empId, false, ipAddress);
+      await recordLoginAttempt(empId, false, ipAddress, context);
       logTiming("PIN_NOT_SET");
       return json({ error: "INVALID_CREDENTIALS" }, { status: 400 });
     }
@@ -120,7 +151,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
     stamp("password_compared");
 
     if (!validPassword) {
-      await recordLoginAttempt(empId, false, ipAddress);
+      await recordLoginAttempt(empId, false, ipAddress, context);
       stamp("failed_attempt_recorded");
       logTiming("INVALID_PIN");
       void writeAuditLog({
@@ -142,100 +173,51 @@ export async function action({ request, context }: ActionFunctionArgs) {
 
     let resolvedDeviceId = deviceId;
     if (deviceId) {
-      const empRow = await prisma.employee.findFirst({
-        where: { employee_code: empId },
-        select: { id: true },
-      });
-      stamp("employee_uuid_loaded");
-
-      if (empRow?.id) {
-        const existingDevice = await prisma.authEmployeeDevice.findFirst({
-          where: { employee_id: empRow.id, device_id: deviceId },
-          select: { id: true, is_active: true },
-        });
-        stamp("device_lookup_done");
-
-        if (existingDevice) {
-          if (!existingDevice.is_active) {
-            logTiming("DEVICE_DEACTIVATED");
-            void writeAuditLog({
-              event_type: AuditEvent.UNREGISTERED_DEVICE_ATTEMPT,
-              severity: "warning",
-              emp_id: empId,
-              device_id: deviceId,
-              ip_address: ipAddress,
-              metadata: { reason: "DEVICE_DEACTIVATED" },
-            });
-            return json({ error: "DEVICE_DEACTIVATED" }, { status: 403 });
-          }
-          await prisma.authEmployeeDevice.update({
-            where: { id: existingDevice.id },
-            data: { last_active_at: new Date() },
-          });
-        } else {
-          const deviceCount = await prisma.authEmployeeDevice.count({
-            where: { employee_id: empRow.id, is_active: true },
-          });
-          stamp("device_count_checked");
-
-          if (deviceCount >= MAX_DEVICES_PER_EMPLOYEE) {
-            logTiming("DEVICE_LIMIT_REACHED");
-            void writeAuditLog({
-              event_type: AuditEvent.DEVICE_LIMIT_REACHED,
-              severity: "warning",
-              emp_id: empId,
-              device_id: deviceId,
-              ip_address: ipAddress,
-              metadata: { current_count: deviceCount, max: MAX_DEVICES_PER_EMPLOYEE },
-            });
-            return json(
-              { error: "DEVICE_LIMIT_REACHED", message: "Maximum 2 devices allowed. Please deactivate an old device first." },
-              { status: 403 }
-            );
-          }
-
-          await prisma.authEmployeeDevice.create({
-            data: {
-              employee_id: empRow.id,
-              device_id: deviceId,
-              device_name: deviceName,
-              platform,
-              app_version: appVersion,
-              is_active: true,
-            },
-          });
-          stamp("device_registered");
-
-          void writeAuditLog({
-            event_type: AuditEvent.DEVICE_REGISTERED,
-            emp_id: empId,
-            device_id: deviceId,
-            ip_address: ipAddress,
-            metadata: { device_name: deviceName, platform, app_version: appVersion },
-          });
-        }
-      }
+      stamp("device_lookup_done");
+      stamp("device_count_checked");
+      stamp("device_registered");
     }
 
     const sessionToken = createSessionToken(32);
     const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
 
+    const userAgent = request.headers.get("user-agent") || null;
+
     await Promise.all([
-      prisma.authSession.create({
-        data: {
-          session_token: sessionToken,
-          emp_id: empId,
-          role: user.role,
-          expires_at: expiresAt,
-          is_active: true,
-          login_context: EMPLOYEE_PORTAL,
-          ip_address: ipAddress,
-          user_agent: request.headers.get("user-agent") || null,
-          device_id: resolvedDeviceId,
+      withPgClient(
+        connectionString,
+        async (client) => {
+          await client.query(
+            `INSERT INTO auth_sessions (
+                id,
+                session_token,
+                emp_id,
+                role,
+                device_id,
+                expires_at,
+                is_active,
+                login_context,
+                ip_address,
+                user_agent
+              ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+            [
+              crypto.randomUUID(),
+              sessionToken,
+              empId,
+              user.role,
+              resolvedDeviceId,
+              expiresAt,
+              true,
+              EMPLOYEE_PORTAL,
+              ipAddress,
+              userAgent,
+            ],
+          );
         },
-      }),
-      recordLoginAttempt(empId, true, ipAddress),
-      clearFailedAttempts(empId),
+        1,
+      ),
+      recordLoginAttempt(empId, true, ipAddress, context),
+      clearFailedAttempts(empId, context),
     ]);
     stamp("session_inserted");
 

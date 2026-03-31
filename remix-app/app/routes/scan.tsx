@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from "react-router";
 import type { Route } from "./+types/scan";
 import { requireSession } from "~/lib/require-session.server";
 import { ensureDeviceIdCookie } from "~/lib/device-id";
+import { useI18n } from "~/lib/i18n";
 import { useGPSCollection } from "@/lib/useGPSCollection";
 import { checkInternalNetwork, type NetworkCheckResult } from "@/lib/gpsSpoofingDetection";
 
@@ -918,7 +919,7 @@ async function uploadSelfieToCloudinary(dataUrl: string, folder: string) {
 
 export default function ScanPage({ loaderData }: Route.ComponentProps) {
   const navigate = useNavigate();
-  const [lang, setLang] = useState<LangCode>("th");
+  const { lang } = useI18n();
   const [now, setNow] = useState(new Date());
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [todayData, setTodayData] = useState<any>(null);
@@ -957,13 +958,6 @@ export default function ScanPage({ loaderData }: Route.ComponentProps) {
 
   useEffect(() => {
     deviceIdRef.current = ensureDeviceIdCookie();
-  }, []);
-
-  useEffect(() => {
-    const saved = localStorage.getItem("tdone_lang");
-    if (saved === "th" || saved === "en" || saved === "lo") {
-      setLang(saved);
-    }
   }, []);
 
   function attendanceHeaders(extra?: Record<string, string>) {

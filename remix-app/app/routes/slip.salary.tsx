@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import type { Route } from "./+types/slip.salary";
+import { useI18n } from "~/lib/i18n";
+import { getMonthNames } from "~/lib/i18n.shared";
 import { requireSession } from "~/lib/require-session.server";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -51,17 +53,10 @@ const I18N: Record<LangCode, {
 export default function SalarySlipPage() {
   const navigate = useNavigate();
   const now = new Date();
-  const [lang, setLang] = useState<LangCode>("th");
+  const { lang, setLang } = useI18n();
   const [year, setYear] = useState(() => now.getFullYear());
   const [month, setMonth] = useState(() => now.getMonth() + 1);
   const [day, setDay] = useState(() => now.getDate());
-
-  useEffect(() => {
-    const saved = localStorage.getItem("tdone_lang");
-    if (saved === "th" || saved === "en" || saved === "lo") {
-      setLang(saved);
-    }
-  }, []);
 
   const L = I18N[lang];
 
@@ -71,11 +66,6 @@ export default function SalarySlipPage() {
   }, [now]);
 
   const daysInMonth = new Date(year, month, 0).getDate();
-
-  function changeLanguage(next: LangCode) {
-    setLang(next);
-    localStorage.setItem("tdone_lang", next);
-  }
 
   function handleMonthChange(value: string) {
     const nextMonth = Number(value);
@@ -105,7 +95,7 @@ export default function SalarySlipPage() {
               <button
                 key={code}
                 type="button"
-                onClick={() => changeLanguage(code)}
+                onClick={() => setLang(code)}
                 className={`rounded-full border px-2 py-1 text-[10px] font-bold transition ${
                   lang === code
                     ? "border-[#DC2626] bg-[#DC2626] text-white"
@@ -139,7 +129,7 @@ export default function SalarySlipPage() {
               onChange={(e) => handleMonthChange(e.target.value)}
               className="block w-full rounded-xl border border-[#FECACA] bg-white px-3 py-2 text-[#111111] outline-none focus:border-[#DC2626]"
             >
-              {L.months.map((name, i) => (
+              {getMonthNames(lang).map((name, i) => (
                 <option key={i + 1} value={i + 1}>{name}</option>
               ))}
             </select>

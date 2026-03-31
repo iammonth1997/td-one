@@ -47,9 +47,9 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
     return json({ error: "emp_id query param required" }, { status: 400 });
   }
 
-  const empRow = await prisma.employee.findFirst({
-    where: { employee_code: targetEmpId.toUpperCase() },
-    select: { id: true },
+  const empRow = await prisma.employee.findUnique({
+    where: { employee_id: targetEmpId.toUpperCase() },
+    select: { employee_id: true },
   });
 
   if (!empRow) {
@@ -59,7 +59,7 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
   let devices;
   try {
     devices = await prisma.authEmployeeDevice.findMany({
-      where: { employee_id: empRow.id },
+      where: { employee_id: empRow.employee_id },
       orderBy: { registered_at: "desc" },
       select: {
         id: true,
@@ -104,9 +104,9 @@ export async function action({ request, context }: ActionFunctionArgs) {
   const targetEmpId = String(body.emp_id).toUpperCase();
 
   // Resolve employee UUID
-  const empRow = await prisma.employee.findFirst({
-    where: { employee_code: targetEmpId },
-    select: { id: true },
+  const empRow = await prisma.employee.findUnique({
+    where: { employee_id: targetEmpId },
+    select: { employee_id: true },
   });
 
   if (!empRow) {
@@ -123,7 +123,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
     // a) Mark device inactive
     try {
       await prisma.authEmployeeDevice.updateMany({
-        where: { employee_id: empRow.id, device_id: deviceId },
+        where: { employee_id: empRow.employee_id, device_id: deviceId },
         data: { is_active: false },
       });
     } catch (deviceErr) {
@@ -158,7 +158,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
     // ─── Emergency wipe: deactivate ALL devices ────────────────────────────
     try {
       await prisma.authEmployeeDevice.updateMany({
-        where: { employee_id: empRow.id, is_active: true },
+        where: { employee_id: empRow.employee_id, is_active: true },
         data: { is_active: false },
       });
     } catch (devErr) {

@@ -40,7 +40,7 @@ type RequisitionDetail = {
 type LoaderData = {
   session: {
     emp_id: string;
-    role: string;
+    role: string | null;
   };
   requisitions: RequisitionRow[];
   candidates: CandidateRow[];

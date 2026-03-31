@@ -1,199 +1,621 @@
+import { Form, Link, redirect } from "react-router";
+import { useMemo } from "react";
+
 import type { Route } from "./+types/admin.requests";
-import { requireAdminSession } from "~/lib/require-admin-session.server";
 import AdminShell from "~/components/admin-shell";
-import { useState } from "react";
+import {
+  deleteUploadedRequestAttachments,
+  type UploadedRequestAttachment,
+} from "~/lib/request-attachments.server";
+import { requireRequestAdminSession } from "~/lib/request-admin-session.server";
+import prisma from "~/lib/prisma.server";
+import { useRequestTranslation } from "~/lib/request-translations";
+import { loadRequestMessages } from "~/lib/request-translations.server";
+import {
+  REQUEST_STATUS_CLASSNAMES,
+  canApproveRequestDecision,
+  canManageRequestStatus,
+  type RequestStatus,
+} from "~/lib/request-types";
 
-type RequestRow = {
+type DepartmentRequestRow = {
   id: string;
-  request_type?: string | null;
-  status?: string | null;
-  created_at?: string | null;
-  emp_id?: string | null;
-  emp_code?: string | null;
-  leave_type?: string | null;
-  ot_hours?: number | null;
-  reason?: string | null;
-  start_date?: string | null;
-  end_date?: string | null;
-  correction_date?: string | null;
+  requestType: string;
+  status: RequestStatus;
+  createdAt: string;
+  createdBy: string;
+  employeeCount: number;
+  employeePreview: string;
+  totalDays: number | null;
+  approvalMode: "direct" | "pending";
+  canEdit: boolean;
+  canDelete: boolean;
+  canDecide: boolean;
 };
 
-const TYPE_LABELS: Record<string, string> = {
-  leave: "Leave",
-  ot: "OT",
-  time_correction: "Time Correction",
+type RequestListView = "pending" | "approved" | "rejected";
+
+type RequestStatusCountRow = {
+  status: string;
+  _count: {
+    _all: number;
+  };
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  pending: "bg-yellow-100 text-yellow-800",
-  approved: "bg-green-100 text-green-800",
-  rejected: "bg-red-100 text-red-800",
-  cancelled: "bg-gray-100 text-gray-600",
-};
+type FlashState =
+  | { kind: "created"; type: string; count: number }
+  | { kind: "updated"; type: string }
+  | { kind: "deleted"; type: string }
+  | { kind: "approved"; type: string }
+  | { kind: "rejected"; type: string }
+  | { kind: "error"; code: string };
 
-function apiPathForType(type: string, id: string) {
-  if (type === "leave") return `/api/leave-request/${id}`;
-  if (type === "ot") return `/api/ot-request/${id}`;
-  return `/api/time-correction-request/${id}`;
+function employeeDisplayName(employee: {
+  first_name: string | null;
+  last_name: string | null;
+  full_name_en: string | null;
+  full_name_lo: string | null;
+}) {
+  const joined = [employee.first_name, employee.last_name].filter(Boolean).join(" ").trim();
+  return joined || employee.full_name_lo || employee.full_name_en || "-";
+}
+
+function canEditDepartmentRequest(requestStatus: RequestStatus, createdById: string, currentEmpId: string, currentRoleKey: string) {
+  if (!canManageRequestStatus(requestStatus)) {
+    return false;
+  }
+
+  return createdById === currentEmpId || currentRoleKey === "SUPER_ADMIN" || currentRoleKey === "ADMIN";
+}
+
+function canDecideDepartmentRequest(requestStatus: RequestStatus, requiresApproval: boolean, currentRole: string | null) {
+  return requestStatus === "PENDING" && requiresApproval && canApproveRequestDecision(currentRole);
+}
+
+function normalizeRequestListView(value: unknown): RequestListView {
+  const candidate = String(value || "").trim().toLowerCase();
+  if (candidate === "approved" || candidate === "rejected") {
+    return candidate;
+  }
+  return "pending";
+}
+
+function requestStatusFilterForView(view: RequestListView) {
+  if (view === "approved") {
+    return { in: ["APPROVED", "SUBMITTED"] };
+  }
+
+  if (view === "rejected") {
+    return "REJECTED";
+  }
+
+  return "PENDING";
+}
+
+function getStatusCounts(rows: RequestStatusCountRow[]) {
+  return rows.reduce(
+    (counts, row) => {
+      const normalizedStatus = String(row.status || "").trim().toUpperCase();
+      const count = row._count._all;
+
+      if (normalizedStatus === "PENDING") {
+        counts.pending += count;
+      } else if (normalizedStatus === "REJECTED") {
+        counts.rejected += count;
+      } else if (normalizedStatus === "APPROVED" || normalizedStatus === "SUBMITTED") {
+        counts.approved += count;
+      }
+
+      return counts;
+    },
+    {
+      pending: 0,
+      approved: 0,
+      rejected: 0,
+    },
+  );
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const session = await requireAdminSession(request, context);
-  const url = new URL(request.url);
-  url.pathname = "/api/admin/requests";
-  url.search = "?status=all&type=all&limit=100";
-  const res = await fetch(url.toString(), { headers: { cookie: request.headers.get("cookie") ?? "" } });
-  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  const rows: RequestRow[] = Array.isArray(data.rows) ? (data.rows as RequestRow[]) : [];
-  return { session, rows };
+  const [session, { messages }] = await Promise.all([
+    requireRequestAdminSession(request, context),
+    loadRequestMessages(request),
+  ]);
+  const searchParams = new URL(request.url).searchParams;
+  const activeView = normalizeRequestListView(searchParams.get("view"));
+  const accessWhere = session.canReviewAll
+    ? {}
+    : {
+        department_id: session.departmentId ?? -1,
+      };
+
+  const [statusCountsRows, requestRows] = await Promise.all([
+    prisma.request.groupBy({
+      by: ["status"],
+      where: {
+        ...accessWhere,
+        status: {
+          in: ["PENDING", "APPROVED", "SUBMITTED", "REJECTED"],
+        },
+      },
+      _count: {
+        _all: true,
+      },
+    }),
+    prisma.request.findMany({
+      where: {
+        ...accessWhere,
+        status: requestStatusFilterForView(activeView),
+      },
+      select: {
+        id: true,
+        request_type: true,
+        status: true,
+        created_at: true,
+        created_by_id: true,
+        total_days: true,
+        requires_approval: true,
+        created_by: {
+          select: {
+            first_name: true,
+            last_name: true,
+            full_name_en: true,
+            full_name_lo: true,
+          },
+        },
+        employees: {
+          orderBy: [{ employee_id: "asc" }],
+          take: 3,
+          select: {
+            employee: {
+              select: {
+                first_name: true,
+                last_name: true,
+                full_name_en: true,
+                full_name_lo: true,
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            employees: true,
+          },
+        },
+      },
+      orderBy: [{ created_at: "desc" }],
+      take: 100,
+    }),
+  ]);
+
+  const statusCounts = getStatusCounts(statusCountsRows as RequestStatusCountRow[]);
+
+  return {
+    session: {
+      emp_id: session.emp_id,
+      role: session.role,
+    },
+    messages,
+    activeView,
+    statusCounts,
+    flash: searchParams.get("created")
+      ? ({
+          kind: "created",
+          type: searchParams.get("type") || "",
+          count: Number.parseInt(searchParams.get("count") || "0", 10) || 0,
+        } satisfies FlashState)
+      : searchParams.get("updated")
+        ? ({
+            kind: "updated",
+            type: searchParams.get("type") || "",
+          } satisfies FlashState)
+        : searchParams.get("deleted")
+          ? ({
+              kind: "deleted",
+              type: searchParams.get("type") || "",
+            } satisfies FlashState)
+          : searchParams.get("approved")
+            ? ({
+                kind: "approved",
+                type: searchParams.get("type") || "",
+              } satisfies FlashState)
+            : searchParams.get("rejected")
+              ? ({
+                  kind: "rejected",
+                  type: searchParams.get("type") || "",
+                } satisfies FlashState)
+          : searchParams.get("error")
+            ? ({
+                kind: "error",
+                code: searchParams.get("error") || "",
+              } satisfies FlashState)
+            : null,
+    departmentRequests: requestRows.map((requestRow) => {
+      const employeeNames = requestRow.employees.map((item) => employeeDisplayName(item.employee));
+      const requestStatus = requestRow.status as RequestStatus;
+      const canEdit = canEditDepartmentRequest(requestStatus, requestRow.created_by_id, session.emp_id, session.roleKey);
+      const canDecide = canDecideDepartmentRequest(requestStatus, requestRow.requires_approval, session.role);
+      return {
+        id: requestRow.id,
+        requestType: requestRow.request_type,
+        status: requestStatus,
+        createdAt: requestRow.created_at.toISOString(),
+        createdBy: employeeDisplayName(requestRow.created_by),
+        employeeCount: requestRow._count.employees,
+        employeePreview: employeeNames.join(", "),
+        totalDays: requestRow.total_days ?? null,
+        approvalMode: requestRow.requires_approval ? "pending" : "direct",
+        canEdit,
+        canDelete: canEdit,
+        canDecide,
+      } satisfies DepartmentRequestRow;
+    }),
+  };
+}
+
+export async function action({ request, context }: Route.ActionArgs) {
+  const session = await requireRequestAdminSession(request, context);
+  const formData = await request.formData();
+  const intent = String(formData.get("intent") || "").trim();
+  const currentView = normalizeRequestListView(formData.get("current_view"));
+
+  if (!["delete", "approve", "reject"].includes(intent)) {
+    throw new Response("BAD_REQUEST", { status: 400 });
+  }
+
+  const requestId = String(formData.get("request_id") || "").trim();
+  if (!requestId) {
+    throw new Response("REQUEST_ID_REQUIRED", { status: 400 });
+  }
+
+  const managedRequest = await prisma.request.findFirst({
+    where: {
+      id: requestId,
+      ...(session.canReviewAll ? {} : { department_id: session.departmentId ?? -1 }),
+    },
+    include: {
+      attachments: true,
+    },
+  });
+
+  if (!managedRequest) {
+    throw new Response("REQUEST_NOT_FOUND", { status: 404 });
+  }
+
+  const requestStatus = managedRequest.status as RequestStatus;
+  const canEdit = canEditDepartmentRequest(requestStatus, managedRequest.created_by_id, session.emp_id, session.roleKey);
+  const canDecide = canDecideDepartmentRequest(requestStatus, managedRequest.requires_approval, session.role);
+
+  if (intent === "delete") {
+    if (!canEdit) {
+      return redirect(`/admin/requests?view=${currentView}&error=request_locked`);
+    }
+
+    const attachmentsToDelete: UploadedRequestAttachment[] = managedRequest.attachments.map((attachment) => ({
+      fileName: attachment.file_name,
+      fileUrl: attachment.file_url,
+      fileSize: attachment.file_size,
+      mimeType: attachment.mime_type,
+      publicId: attachment.file_public_id,
+      resourceType: attachment.file_resource_type,
+    }));
+
+    await prisma.request.delete({
+      where: { id: managedRequest.id },
+    });
+
+    await deleteUploadedRequestAttachments(attachmentsToDelete, context).catch((error) => {
+      console.error("delete request attachments failed:", error);
+    });
+
+    return redirect(`/admin/requests?view=${currentView}&deleted=1&type=${encodeURIComponent(managedRequest.request_type)}`);
+  }
+
+  if (!canDecide) {
+    return redirect(`/admin/requests?view=${currentView}&error=request_locked`);
+  }
+
+  const rejectionReason = String(formData.get("rejection_reason") || "").trim();
+
+  await prisma.request.update({
+    where: { id: managedRequest.id },
+    data:
+      intent === "approve"
+        ? {
+            status: "APPROVED",
+            approved_by_id: session.emp_id,
+            approved_at: new Date(),
+            rejection_reason: null,
+          }
+        : {
+            status: "REJECTED",
+            approved_by_id: session.emp_id,
+            approved_at: new Date(),
+            rejection_reason: rejectionReason || null,
+          },
+  });
+
+  return redirect(
+    `/admin/requests?view=${intent === "approve" ? "approved" : "rejected"}&${intent === "approve" ? "approved=1" : "rejected=1"}&type=${encodeURIComponent(managedRequest.request_type)}`,
+  );
 }
 
 export default function AdminRequestsPage({ loaderData }: Route.ComponentProps) {
-  const { session, rows } = loaderData;
-  const [activeType, setActiveType] = useState<"all" | "leave" | "ot" | "time_correction">("all");
-  const [activeStatus, setActiveStatus] = useState<"all" | "pending" | "approved" | "rejected">("all");
-  const [rejectId, setRejectId] = useState<{ id: string; type: string } | null>(null);
-  const [rejectReason, setRejectReason] = useState("");
-  const [busy, setBusy] = useState<string | null>(null);
+  const { t } = useRequestTranslation(loaderData.messages);
 
-  const filtered = rows.filter(r =>
-    (activeType === "all" || r.request_type === activeType) &&
-    (activeStatus === "all" || r.status === activeStatus)
-  );
+  const flashConfig = useMemo(() => {
+    if (!loaderData.flash) return null;
 
-  async function doApprove(row: RequestRow) {
-    if (!row.request_type) return;
-    setBusy(row.id);
-    try {
-      const res = await fetch(apiPathForType(row.request_type, row.id), {
-        method: "PUT", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "approve" }),
-      });
-      if (res.ok) window.location.reload();
-      else { const d = await res.json() as Record<string,unknown>; alert(String(d.error || "Approve failed")); }
-    } catch { alert("Network error"); }
-    finally { setBusy(null); }
-  }
+    if (loaderData.flash.kind === "created") {
+      return {
+        className: "mb-4 rounded-xl border border-[#cfe8d8] bg-[#f2fbf5] px-4 py-3 text-sm text-[#245b39]",
+        message: t("success_message", {
+          type: t(`types.${loaderData.flash.type}`),
+          count: loaderData.flash.count,
+        }),
+      };
+    }
 
-  async function doReject() {
-    if (!rejectId) return;
-    setBusy(rejectId.id);
-    try {
-      const res = await fetch(apiPathForType(rejectId.type, rejectId.id), {
-        method: "PUT", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "reject", reason: rejectReason }),
-      });
-      if (res.ok) { setRejectId(null); setRejectReason(""); window.location.reload(); }
-      else { const d = await res.json() as Record<string,unknown>; alert(String(d.error || "Reject failed")); }
-    } catch { alert("Network error"); }
-    finally { setBusy(null); }
-  }
+    if (loaderData.flash.kind === "updated") {
+      return {
+        className: "mb-4 rounded-xl border border-[#cfe8d8] bg-[#f2fbf5] px-4 py-3 text-sm text-[#245b39]",
+        message: t("updated_message", {
+          type: t(`types.${loaderData.flash.type}`),
+        }),
+      };
+    }
 
-  const typeFilters = [
-    { key: "all", label: "All Types" },
-    { key: "leave", label: "Leave" },
-    { key: "ot", label: "OT" },
-    { key: "time_correction", label: "Time Correction" },
-  ] as const;
+    if (loaderData.flash.kind === "deleted") {
+      return {
+        className: "mb-4 rounded-xl border border-[#cfe8d8] bg-[#f2fbf5] px-4 py-3 text-sm text-[#245b39]",
+        message: t("deleted_message", {
+          type: t(`types.${loaderData.flash.type}`),
+        }),
+      };
+    }
 
-  const statusFilters = [
-    { key: "all", label: "All Status" },
-    { key: "pending", label: "Pending" },
-    { key: "approved", label: "Approved" },
-    { key: "rejected", label: "Rejected" },
-  ] as const;
+    if (loaderData.flash.kind === "approved") {
+      return {
+        className: "mb-4 rounded-xl border border-[#cfe8d8] bg-[#f2fbf5] px-4 py-3 text-sm text-[#245b39]",
+        message: t("approved_message", {
+          type: t(`types.${loaderData.flash.type}`),
+        }),
+      };
+    }
+
+    if (loaderData.flash.kind === "rejected") {
+      return {
+        className: "mb-4 rounded-xl border border-[#cfe8d8] bg-[#f2fbf5] px-4 py-3 text-sm text-[#245b39]",
+        message: t("rejected_message", {
+          type: t(`types.${loaderData.flash.type}`),
+        }),
+      };
+    }
+
+    return {
+      className: "mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800",
+      message: t("request_locked_message"),
+    };
+  }, [loaderData.flash, t]);
+
+  const viewConfig = useMemo(() => {
+    if (loaderData.activeView === "approved") {
+      return {
+        title: t("approved_requests"),
+        emptyMessage: t("no_approved_requests"),
+      };
+    }
+
+    if (loaderData.activeView === "rejected") {
+      return {
+        title: t("rejected_requests"),
+        emptyMessage: t("no_rejected_requests"),
+      };
+    }
+
+    return {
+      title: t("pending_requests"),
+      emptyMessage: t("no_pending_requests"),
+    };
+  }, [loaderData.activeView, t]);
+
+  const statusTabs = [
+    { view: "pending" as const, label: t("tab_pending"), count: loaderData.statusCounts.pending },
+    { view: "approved" as const, label: t("tab_approved"), count: loaderData.statusCounts.approved },
+    { view: "rejected" as const, label: t("tab_rejected"), count: loaderData.statusCounts.rejected },
+  ];
 
   return (
-    <AdminShell title="Requests" session={session}>
-      {/* Filters */}
-      <div className="mb-4 flex flex-wrap gap-2">
-        {typeFilters.map(f => (
-          <button key={f.key} onClick={() => setActiveType(f.key)}
-            className={`rounded-full px-3 py-1 text-xs font-medium ${activeType === f.key ? "bg-[#2563eb] text-white" : "bg-[#f0f4fa] text-[#5b6d85] hover:bg-[#e2eaf4]"}`}>
-            {f.label}
-          </button>
-        ))}
-        <span className="mx-1 text-[#d8dee8]">|</span>
-        {statusFilters.map(f => (
-          <button key={f.key} onClick={() => setActiveStatus(f.key)}
-            className={`rounded-full px-3 py-1 text-xs font-medium ${activeStatus === f.key ? "bg-[#2563eb] text-white" : "bg-[#f0f4fa] text-[#5b6d85] hover:bg-[#e2eaf4]"}`}>
-            {f.label}
-          </button>
-        ))}
+    <AdminShell title="Requests" session={loaderData.session}>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold text-[#1b2738]">{t("list_title")}</h2>
+          <p className="mt-1 text-sm text-[#6b7a90]">{t("list_description")}</p>
+        </div>
+        <Link
+          to="/admin/requests/new"
+          className="rounded-xl bg-[#1d4ed8] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1e40af]"
+        >
+          {t("create_request")}
+        </Link>
       </div>
+
+      {flashConfig ? (
+        <section className={flashConfig.className}>
+          {flashConfig.message}
+        </section>
+      ) : null}
+
+      <section className="mb-4 flex flex-wrap gap-2">
+        {statusTabs.map((tab) => {
+          const active = loaderData.activeView === tab.view;
+          return (
+            <Link
+              key={tab.view}
+              to={`/admin/requests?view=${tab.view}`}
+              className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition ${
+                active
+                  ? "border-[#1d4ed8] bg-[#1d4ed8] text-white"
+                  : "border-[#d8dee8] bg-white text-[#334155] hover:bg-[#f7f9fc]"
+              }`}
+            >
+              <span>{tab.label}</span>
+              <span className={`rounded-full px-2 py-0.5 text-xs ${active ? "bg-white/20 text-white" : "bg-[#eef2ff] text-[#1d4ed8]"}`}>
+                {tab.count}
+              </span>
+            </Link>
+          );
+        })}
+      </section>
 
       <section className="overflow-hidden rounded-xl border border-[#d8dee8] bg-white shadow-sm">
         <div className="border-b border-[#e6ebf2] px-4 py-3">
-          <h2 className="text-sm font-semibold text-[#1b2738]">Requests ({filtered.length})</h2>
+          <h3 className="text-sm font-semibold text-[#1b2738]">{viewConfig.title} ({loaderData.departmentRequests.length})</h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-sm">
+          <table className="w-full min-w-[760px] text-sm">
             <thead className="bg-[#f7f9fc] text-[#7c8ba1]">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold">EMP</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold">TYPE</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold">DETAILS</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold">STATUS</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold">DATE</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold">ACTIONS</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold">{t("request_type")}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold">{t("employees_label")}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold">{t("created_by")}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold">{t("days_label")}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold">{t("submitted_at")}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold">{t("status_label")}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold">{t("actions_label")}</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((row) => (
-                <tr key={`${row.request_type}-${row.id}`} className="border-t border-[#edf1f7]">
-                  <td className="px-4 py-3 font-medium">{row.emp_code || row.emp_id || "-"}</td>
-                  <td className="px-4 py-3">{TYPE_LABELS[row.request_type ?? ""] ?? (row.request_type || "-")}</td>
-                  <td className="px-4 py-3 text-[#5b6d85]">
-                    {row.request_type === "leave" && (row.leave_type || (row.start_date ? `${row.start_date} → ${row.end_date}` : "-"))}
-                    {row.request_type === "ot" && (row.ot_hours ? `${row.ot_hours}h` : "-")}
-                    {row.request_type === "time_correction" && (row.correction_date || "-")}
-                    {!["leave", "ot", "time_correction"].includes(row.request_type ?? "") && (row.reason || "-")}
+              {loaderData.departmentRequests.map((row) => (
+                <tr key={row.id} className="border-t border-[#edf1f7]">
+                  <td className="px-4 py-3 font-medium text-[#1b2738]">{t(`types.${row.requestType}`)}</td>
+                  <td className="px-4 py-3 text-[#475569]">
+                    <div className="font-medium">{t("selected_count", { count: row.employeeCount })}</div>
+                    <div className="mt-1 text-xs text-[#7c8ba1]">{row.employeePreview || "-"}</div>
+                  </td>
+                  <td className="px-4 py-3 text-[#475569]">{row.createdBy}</td>
+                  <td className="px-4 py-3 text-[#475569]">{row.totalDays ?? "-"}</td>
+                  <td className="px-4 py-3 text-[#7c8ba1]">{new Date(row.createdAt).toLocaleString()}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap gap-2">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
+                          REQUEST_STATUS_CLASSNAMES[row.status]
+                        }`}
+                      >
+                        {t(`statuses.${row.status}`)}
+                      </span>
+                      <span
+                        className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
+                          row.approvalMode === "direct" ? "bg-emerald-100 text-emerald-800" : "bg-sky-100 text-sky-800"
+                        }`}
+                      >
+                        {row.approvalMode === "direct" ? t("badge_no_approval") : t("badge_pending_approval")}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[row.status ?? ""] ?? "bg-gray-100 text-gray-600"}`}>
-                      {row.status || "-"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-[#8a97ac]">{row.created_at ? new Date(row.created_at).toLocaleDateString("th-TH") : "-"}</td>
-                  <td className="px-4 py-3">
-                    {row.status === "pending" && (
-                      <div className="flex gap-2">
-                        <button onClick={() => doApprove(row)} disabled={busy === row.id}
-                          className="rounded bg-green-600 px-2 py-1 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50">
-                          {busy === row.id ? "…" : "Approve"}
-                        </button>
-                        <button onClick={() => { setRejectId({ id: row.id, type: row.request_type! }); setRejectReason(""); }}
-                          className="rounded bg-red-600 px-2 py-1 text-xs font-semibold text-white hover:bg-red-700">
-                          Reject
-                        </button>
+                    {row.canEdit || row.canDelete || row.canDecide ? (
+                      <div className="flex flex-wrap gap-2">
+                        {row.canDecide ? (
+                          <>
+                            <Form
+                              method="post"
+                              onSubmit={(event) => {
+                                if (!window.confirm(t("approve_confirm"))) {
+                                  event.preventDefault();
+                                }
+                              }}
+                            >
+                              <input type="hidden" name="current_view" value={loaderData.activeView} />
+                              <input type="hidden" name="intent" value="approve" />
+                              <input type="hidden" name="request_id" value={row.id} />
+                              <button
+                                type="submit"
+                                className="rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+                              >
+                                {t("approve_request")}
+                              </button>
+                            </Form>
+                            <Form
+                              method="post"
+                              onSubmit={(event) => {
+                                if (!window.confirm(t("reject_confirm"))) {
+                                  event.preventDefault();
+                                  return;
+                                }
+
+                                const reason = window.prompt(t("reject_prompt"));
+                                if (reason === null) {
+                                  event.preventDefault();
+                                  return;
+                                }
+
+                                const reasonInput = event.currentTarget.elements.namedItem("rejection_reason");
+                                if (reasonInput instanceof HTMLInputElement) {
+                                  reasonInput.value = reason.trim();
+                                }
+                              }}
+                            >
+                              <input type="hidden" name="current_view" value={loaderData.activeView} />
+                              <input type="hidden" name="intent" value="reject" />
+                              <input type="hidden" name="request_id" value={row.id} />
+                              <input type="hidden" name="rejection_reason" value="" />
+                              <button
+                                type="submit"
+                                className="rounded-lg border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-50"
+                              >
+                                {t("reject_request")}
+                              </button>
+                            </Form>
+                          </>
+                        ) : null}
+                        {row.canEdit ? (
+                          <Link
+                            to={`/admin/requests/new?edit=${encodeURIComponent(row.id)}`}
+                            className="rounded-lg border border-[#d8dee8] px-3 py-1.5 text-xs font-semibold text-[#1d2b40] hover:bg-[#f7f9fc]"
+                          >
+                            {t("edit_request")}
+                          </Link>
+                        ) : null}
+                        {row.canDelete ? (
+                          <Form
+                            method="post"
+                            onSubmit={(event) => {
+                              if (!window.confirm(t("delete_confirm"))) {
+                                event.preventDefault();
+                              }
+                            }}
+                          >
+                            <input type="hidden" name="current_view" value={loaderData.activeView} />
+                            <input type="hidden" name="intent" value="delete" />
+                            <input type="hidden" name="request_id" value={row.id} />
+                            <button
+                              type="submit"
+                              className="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50"
+                            >
+                              {t("delete_request")}
+                            </button>
+                          </Form>
+                        ) : null}
                       </div>
+                    ) : (
+                      <span className="text-xs text-[#8a97ac]">-</span>
                     )}
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-6 text-center text-[#8a97ac]">No requests found</td></tr>
-              )}
+              {loaderData.departmentRequests.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-6 text-center text-[#8a97ac]">
+                    {viewConfig.emptyMessage}
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>
       </section>
-
-      {rejectId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
-            <h3 className="mb-3 text-base font-semibold text-[#1b2738]">Reject Request</h3>
-            <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} rows={3}
-              className="w-full rounded-lg border border-[#d8dee8] px-3 py-2 text-sm" placeholder="Rejection reason (optional)" />
-            <div className="mt-4 flex justify-end gap-2">
-              <button onClick={() => setRejectId(null)} className="rounded-lg border border-[#d8dee8] px-4 py-2 text-sm text-[#5b6d85] hover:bg-[#f7f9fc]">Cancel</button>
-              <button onClick={doReject} disabled={Boolean(busy)} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50">
-                {busy ? "Rejecting…" : "Confirm Reject"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </AdminShell>
   );
 }

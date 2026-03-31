@@ -36,6 +36,7 @@ model Department {
   createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updated_at  DateTime   @default(now()) @db.Timestamptz(6)
   employees   Employee[]
+  requests    Request[]
 
   @@map("departments")
 }
@@ -133,6 +134,9 @@ model Employee {
   department          Department?   @relation(fields: [department_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_employees_department")
   level               levels?       @relation(fields: [level_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_employees_level")
   mine_sites          mine_sites?   @relation(fields: [mine_site_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_employees_mine_site")
+  request_assignments RequestEmployee[]
+  requests_approved   Request[]     @relation("RequestApprovedBy")
+  requests_created    Request[]     @relation("RequestCreatedBy")
   work_locations      WorkLocation? @relation(fields: [work_location_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_employees_work_location")
 
   @@index([company_id], map: "idx_employees_company_id")
@@ -759,6 +763,69 @@ model LeaveRequest {
   updated_at                DateTime  @default(now()) @updatedAt
 
   @@map("leave_requests")
+}
+
+model Request {
+  id               String              @id @default(uuid()) @db.Uuid
+  request_type     String              @db.VarChar(50)
+  status           String              @default("PENDING") @db.VarChar(20)
+  start_date       DateTime?           @db.Date
+  end_date         DateTime?           @db.Date
+  half_day         String?             @db.VarChar(2)
+  total_days       Float?
+  work_dates       Json?
+  work_hours       Float?
+  last_working_day DateTime?           @db.Date
+  reason           String?
+  is_twins         Boolean             @default(false)
+  created_by_id    String              @db.VarChar(50)
+  department_id    Int
+  approved_by_id   String?             @db.VarChar(50)
+  approved_at      DateTime?
+  rejection_reason String?
+  requires_approval Boolean            @default(true)
+  created_at       DateTime            @default(now())
+  updated_at       DateTime            @default(now()) @updatedAt
+  approved_by      Employee?           @relation("RequestApprovedBy", fields: [approved_by_id], references: [employee_id], onDelete: NoAction, onUpdate: NoAction)
+  attachments      RequestAttachment[]
+  created_by       Employee            @relation("RequestCreatedBy", fields: [created_by_id], references: [employee_id], onDelete: NoAction, onUpdate: NoAction)
+  department       Department          @relation(fields: [department_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees        RequestEmployee[]
+
+  @@index([approved_by_id], map: "idx_requests_approved_by_id")
+  @@index([created_by_id], map: "idx_requests_created_by_id")
+  @@index([department_id], map: "idx_requests_department_id")
+  @@index([request_type], map: "idx_requests_request_type")
+  @@index([status], map: "idx_requests_status")
+  @@map("requests")
+}
+
+model RequestEmployee {
+  id          String  @id @default(uuid()) @db.Uuid
+  request_id  String  @db.Uuid
+  employee_id String  @db.VarChar(50)
+  employee    Employee @relation(fields: [employee_id], references: [employee_id], onDelete: NoAction, onUpdate: NoAction)
+  request     Request @relation(fields: [request_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([employee_id], map: "idx_request_employees_employee_id")
+  @@unique([request_id, employee_id], map: "request_employees_request_id_employee_id_key")
+  @@map("request_employees")
+}
+
+model RequestAttachment {
+  id                 String   @id @default(uuid()) @db.Uuid
+  request_id         String   @db.Uuid
+  file_name          String
+  file_url           String
+  file_size          Int
+  mime_type          String
+  file_public_id     String?
+  file_resource_type String?
+  uploaded_at        DateTime @default(now())
+  request            Request  @relation(fields: [request_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([request_id], map: "idx_request_attachments_request_id")
+  @@map("request_attachments")
 }
 
 model TimeCorrectionRequest {

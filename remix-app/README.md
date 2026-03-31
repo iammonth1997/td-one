@@ -9,6 +9,23 @@ npm install
 npm run dev
 ```
 
+### Safer local test modes
+
+Use a dedicated local test environment when you want localhost to exercise the real end-to-end flow without writing into the same database that `.dev.vars` uses.
+
+1. Copy `.dev.vars.local-test.example` to `.dev.vars.local-test`
+2. Point `DATABASE_URL` and `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB` to a test database
+3. Point Cloudinary keys to a test account or folder
+4. Run `npm run dev:local-test`
+
+For a full production-like smoke test against the default `.dev.vars` target, run:
+
+```bash
+npm run dev:production-like
+```
+
+`npm run dev:local-test` refuses to start if `.dev.vars.local-test` is missing required keys or still points at the same `DATABASE_URL` as `.dev.vars`.
+
 ## Validate Before Deploy
 
 ```bash

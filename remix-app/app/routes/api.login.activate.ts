@@ -117,9 +117,9 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   // ─── Look up employee ─────────────────────────────────────────────────────
-  const emp = await prisma.employee.findFirst({
-    where: { employee_code: empId },
-    select: { id: true, status: true },
+  const emp = await prisma.employee.findUnique({
+    where: { employee_id: empId },
+    select: { employee_id: true, status: true },
   });
 
   if (!emp || emp.status !== "active") {
@@ -158,10 +158,10 @@ export async function action({ request }: ActionFunctionArgs) {
   // ─── Register device ──────────────────────────────────────────────────────
   if (deviceId) {
     void prisma.authEmployeeDevice.upsert({
-      where: { employee_id_device_id: { employee_id: emp.id, device_id: deviceId } },
+      where: { employee_id_device_id: { employee_id: emp.employee_id, device_id: deviceId } },
       update: { last_active_at: new Date(), is_active: true },
       create: {
-        employee_id: emp.id,
+        employee_id: emp.employee_id,
         device_id: deviceId,
         device_name: deviceName,
         platform,

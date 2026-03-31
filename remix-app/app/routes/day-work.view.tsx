@@ -82,26 +82,26 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const work = workRows[0] ?? null;
 
   // Fetch employee with related position, department and work_site via Prisma relations
-  const emp = await prisma.employee.findFirst({
-    where: { employee_code: session.emp_id },
+  const emp = await prisma.employee.findUnique({
+    where: { employee_id: session.emp_id },
     select: {
-      employee_code: true,
+      employee_id: true,
       first_name: true,
       last_name: true,
-      position: { select: { name: true } },
+      position: true,
       department: { select: { name: true } },
-      workSite: { select: { name: true } },
+      work_locations: { select: { name: true } },
     },
   });
 
   const employee = emp
     ? {
-        employeeCode: emp.employee_code,
+        employeeCode: emp.employee_id,
         firstName: emp.first_name,
         lastName: emp.last_name,
-        positionName: emp.position?.name ?? null,
+        positionName: emp.position ?? null,
         departmentName: emp.department?.name ?? null,
-        workSiteName: emp.workSite?.name ?? null,
+        workSiteName: emp.work_locations?.name ?? null,
       }
     : null;
 

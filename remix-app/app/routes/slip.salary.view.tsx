@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import type { Route } from "./+types/slip.salary.view";
+import { useI18n } from "~/lib/i18n";
 import { requireSession } from "~/lib/require-session.server";
 
 type LangCode = "th" | "en" | "lo";
@@ -87,7 +88,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
 export default function SalarySlipViewPage() {
   const [searchParams] = useSearchParams();
-  const [lang, setLang] = useState<LangCode>("th");
+  const { lang } = useI18n();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [data, setData] = useState<SlipData | null>(null);
@@ -96,13 +97,6 @@ export default function SalarySlipViewPage() {
   const month = Number(searchParams.get("month") || new Date().getMonth() + 1);
   const day = Number(searchParams.get("day") || 1);
   const shouldPrint = searchParams.get("print") === "1";
-
-  useEffect(() => {
-    const saved = localStorage.getItem("tdone_lang");
-    if (saved === "th" || saved === "en" || saved === "lo") {
-      setLang(saved);
-    }
-  }, []);
 
   useEffect(() => {
     let cancelled = false;

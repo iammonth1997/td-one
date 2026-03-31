@@ -8,8 +8,11 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-export function loader() {
-  throw redirect("/login");
+export function loader({ request }: Route.LoaderArgs) {
+  const { hostname } = new URL(request.url);
+  const isLocalTest = hostname === "localhost" || hostname === "127.0.0.1";
+
+  throw redirect(isLocalTest ? "/admin-login" : "/login");
 }
 
 export default function Home() {

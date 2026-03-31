@@ -5,6 +5,8 @@
     "app/**/*",
     "app/**/.server/**/*",
     "app/**/.client/**/*",
+    "../lib/useGPSCollection.ts",
+    "../lib/gpsSpoofingDetection.ts",
     "workers/**/*",
     "worker-configuration.d.ts"
   ],

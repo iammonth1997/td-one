@@ -1,19 +1,19 @@
 import { useEffect, useState } from "react";
 import { Form, Link, redirect } from "react-router";
 import type { Route } from "./+types/dashboard";
+import { getConnectionString, withPgClient } from "~/lib/pg.server";
+import { useI18n } from "~/lib/i18n";
 import { canManagePinReset } from "~/lib/role-access.server";
 import { sessionTokenCookie } from "~/lib/session-cookie.server";
 import { validateSession } from "~/lib/session-validation.server";
-import prisma from "~/lib/prisma.server";
 
-type LangCode = "th" | "en" | "lo";
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 };
 
 const DASHBOARD_I18N: Record<
-  LangCode,
+  "th" | "en" | "lo",
   {
     forgotPasswordHr: string;
     installApp: string;
@@ -44,19 +44,53 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     throw redirect(`/login?auth_error=${reason}`);
   }
 
-  const user = await prisma.loginUser.findFirst({
-    where: { emp_id: session.emp_id },
-    select: { force_pin_change: true, must_change_password: true },
-  });
+  const connectionString = getConnectionString(context);
+  let user: { force_pin_change: boolean | null; must_change_password: boolean | null } | null = null;
+  let emp: { first_name: string | null; last_name: string | null } | null = null;
+
+  if (connectionString) {
+    try {
+      [user, emp] = await Promise.all([
+        withPgClient(
+          connectionString,
+          async (client) => {
+            const result = await client.query<{
+              force_pin_change: boolean | null;
+              must_change_password: boolean | null;
+            }>(
+              `SELECT force_pin_change, must_change_password
+               FROM login_users
+               WHERE emp_id = $1
+               LIMIT 1`,
+              [session.emp_id],
+            );
+            return result.rows[0] || null;
+          },
+          1,
+        ),
+        withPgClient(
+          connectionString,
+          async (client) => {
+            const result = await client.query<{ first_name: string | null; last_name: string | null }>(
+              `SELECT first_name, last_name
+               FROM employees
+               WHERE employee_id = $1
+               LIMIT 1`,
+              [session.emp_id],
+            );
+            return result.rows[0] || null;
+          },
+          1,
+        ),
+      ]);
+    } catch (dbError) {
+      console.error("dashboard loader DB error:", dbError);
+    }
+  }
 
   if (user?.force_pin_change || user?.must_change_password) {
     throw redirect("/change-password");
   }
-
-  const emp = await prisma.employee.findFirst({
-    where: { employee_code: session.emp_id },
-    select: { employee_code: true, first_name: true, last_name: true },
-  });
 
   return {
     emp_id: session.emp_id,
@@ -86,19 +120,12 @@ function ChevronRight({ className }: { className?: string }) {
 }
 
 export default function DashboardPage({ loaderData }: Route.ComponentProps) {
-  const [lang, setLang] = useState<LangCode>("th");
+  const { lang } = useI18n();
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [installing, setInstalling] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [ppeAlertOpen, setPpeAlertOpen] = useState(true);
   const T = DASHBOARD_I18N[lang];
-
-  useEffect(() => {
-    const saved = localStorage.getItem("tdone_lang");
-    if (saved === "th" || saved === "en" || saved === "lo") {
-      setLang(saved);
-    }
-  }, []);
 
   useEffect(() => {
     const onBeforeInstallPrompt = (event: Event) => {

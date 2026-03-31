@@ -1,8 +1,102 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
+
 import { ensureDeviceIdCookie, getOrCreateDeviceId } from "~/lib/device-id";
+import { useI18n } from "~/lib/i18n";
+import type { LangCode } from "~/lib/i18n.shared";
+
+const ADMIN_LOGIN_I18N: Record<
+  LangCode,
+  {
+    title: string;
+    subtitle: string;
+    email: string;
+    password: string;
+    showPassword: string;
+    hidePassword: string;
+    login: string;
+    loggingIn: string;
+    missingCredentials: string;
+    invalidCredentials: string;
+    forbidden: string;
+    employeeNotFound: string;
+    accountBlocked: (reason: string) => string;
+    missingDevice: string;
+    dbError: (detail: string) => string;
+    sessionFailed: string;
+    loginFailed: (detail: string) => string;
+    genericFailed: string;
+    networkError: string;
+  }
+> = {
+  th: {
+    title: "ระบบฝ่ายบริหาร",
+    subtitle: "TD One Admin Portal",
+    email: "อีเมล",
+    password: "รหัสผ่าน",
+    showPassword: "แสดงรหัสผ่าน",
+    hidePassword: "ซ่อนรหัสผ่าน",
+    login: "เข้าสู่ระบบ",
+    loggingIn: "กำลังเข้าสู่ระบบ...",
+    missingCredentials: "กรุณากรอกอีเมลและรหัสผ่าน",
+    invalidCredentials: "อีเมลหรือรหัสผ่านไม่ถูกต้อง",
+    forbidden: "บัญชีนี้ไม่มีสิทธิ์เข้าระบบบริหาร",
+    employeeNotFound: "ไม่พบข้อมูลพนักงาน",
+    accountBlocked: (reason) => `บัญชีถูกระงับ (${reason})`,
+    missingDevice: "ไม่พบ Device ID กรุณารีเฟรชหน้า",
+    dbError: (detail) => `เชื่อมต่อฐานข้อมูลไม่ได้: ${detail}`,
+    sessionFailed: "สร้าง Session ไม่สำเร็จ กรุณาลองใหม่",
+    loginFailed: (detail) => `เกิดข้อผิดพลาด: ${detail}`,
+    genericFailed: "เข้าสู่ระบบไม่สำเร็จ",
+    networkError: "เครือข่ายมีปัญหา กรุณาลองใหม่",
+  },
+  en: {
+    title: "Administration",
+    subtitle: "TD One Admin Portal",
+    email: "Email",
+    password: "Password",
+    showPassword: "Show password",
+    hidePassword: "Hide password",
+    login: "Sign in",
+    loggingIn: "Signing in...",
+    missingCredentials: "Please enter email and password.",
+    invalidCredentials: "Email or password is incorrect.",
+    forbidden: "This account does not have admin access.",
+    employeeNotFound: "Employee record not found.",
+    accountBlocked: (reason) => `Account blocked (${reason})`,
+    missingDevice: "Device ID is missing. Please refresh the page.",
+    dbError: (detail) => `Database connection failed: ${detail}`,
+    sessionFailed: "Unable to create a session. Please try again.",
+    loginFailed: (detail) => `Login failed: ${detail}`,
+    genericFailed: "Unable to sign in.",
+    networkError: "Network error. Please try again.",
+  },
+  lo: {
+    title: "ລະບົບຝ່າຍບໍລິຫານ",
+    subtitle: "TD One Admin Portal",
+    email: "ອີເມວ",
+    password: "ລະຫັດຜ່ານ",
+    showPassword: "ສະແດງລະຫັດຜ່ານ",
+    hidePassword: "ຊ່ອນລະຫັດຜ່ານ",
+    login: "ເຂົ້າລະບົບ",
+    loggingIn: "ກຳລັງເຂົ້າລະບົບ...",
+    missingCredentials: "ກະລຸນາໃສ່ອີເມວແລະລະຫັດຜ່ານ",
+    invalidCredentials: "ອີເມວ ຫຼື ລະຫັດຜ່ານບໍ່ຖືກຕ້ອງ",
+    forbidden: "ບັນຊີນີ້ບໍ່ມີສິດເຂົ້າລະບົບບໍລິຫານ",
+    employeeNotFound: "ບໍ່ພົບຂໍ້ມູນພະນັກງານ",
+    accountBlocked: (reason) => `ບັນຊີຖືກລະງັບ (${reason})`,
+    missingDevice: "ບໍ່ພົບ Device ID ກະລຸນາ refresh ໜ້າ",
+    dbError: (detail) => `ເຊື່ອມຕໍ່ຖານຂໍ້ມູນບໍ່ໄດ້: ${detail}`,
+    sessionFailed: "ສ້າງ Session ບໍ່ສຳເລັດ ກະລຸນາລອງໃໝ່",
+    loginFailed: (detail) => `ເກີດຂໍ້ຜິດພາດ: ${detail}`,
+    genericFailed: "ເຂົ້າລະບົບບໍ່ສຳເລັດ",
+    networkError: "ເຄືອຂ່າຍມີບັນຫາ ກະລຸນາລອງໃໝ່",
+  },
+};
 
 export default function AdminLoginPage() {
+  const { lang } = useI18n();
+  const T = ADMIN_LOGIN_I18N[lang];
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -19,7 +113,7 @@ export default function AdminLoginPage() {
     setError("");
 
     if (!email.trim() || !password.trim()) {
-      setError("กรุณากรอกอีเมลและรหัสผ่าน");
+      setError(T.missingCredentials);
       return;
     }
 
@@ -38,42 +132,41 @@ export default function AdminLoginPage() {
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await res.json().catch(() => ({} as Record<string, unknown>)) as {
+      const data = (await res.json().catch(() => ({} as Record<string, unknown>))) as {
         error?: string;
         message?: string;
         reason?: string;
         detail?: string;
-        success?: boolean;
       };
 
       if (!res.ok) {
         if (data.error === "INVALID_INPUT") {
-          setError("กรุณากรอกอีเมลและรหัสผ่าน");
+          setError(T.missingCredentials);
         } else if (data.error === "INVALID_CREDENTIALS") {
-          setError("อีเมลหรือรหัสผ่านไม่ถูกต้อง");
+          setError(T.invalidCredentials);
         } else if (data.error === "FORBIDDEN") {
-          setError("บัญชีนี้ไม่มีสิทธิ์เข้าระบบบริหาร");
+          setError(T.forbidden);
         } else if (data.error === "EMPLOYEE_NOT_FOUND") {
-          setError("ไม่พบข้อมูลพนักงาน");
+          setError(T.employeeNotFound);
         } else if (data.error === "ACCOUNT_BLOCKED") {
-          setError(`บัญชีถูกระงับ (${data.reason || "unknown"})`);
+          setError(T.accountBlocked(String(data.reason || "unknown")));
         } else if (data.error === "MISSING_DEVICE_ID") {
-          setError("ไม่พบ Device ID กรุณารีเฟรชหน้า");
+          setError(T.missingDevice);
         } else if (data.error === "DB_QUERY_FAILED") {
-          setError(`เชื่อมต่อฐานข้อมูลไม่ได้: ${String(data.detail ?? "unknown")}`);
+          setError(T.dbError(String(data.detail ?? "unknown")));
         } else if (data.error === "SESSION_CREATE_FAILED") {
-          setError("สร้าง Session ไม่สำเร็จ กรุณาลองใหม่");
+          setError(T.sessionFailed);
         } else if (data.error === "ADMIN_LOGIN_FAILED") {
-          setError(`เกิดข้อผิดพลาด: ${String(data.detail ?? "unknown")}`);
+          setError(T.loginFailed(String(data.detail ?? "unknown")));
         } else {
-          setError(data.message || data.error || "เข้าสู่ระบบไม่สำเร็จ");
+          setError(String(data.message || data.error || T.genericFailed));
         }
         return;
       }
 
       navigate("/admin/dashboard");
     } catch {
-      setError("เครือข่ายมีปัญหา กรุณาลองใหม่");
+      setError(T.networkError);
     } finally {
       setLoading(false);
     }
@@ -105,10 +198,10 @@ export default function AdminLoginPage() {
           </div>
         </div>
 
-        <h1 className="mb-1 text-center text-2xl font-bold" style={{ color: "#ffffff" }}>ระบบฝ่ายบริหาร</h1>
-        <p className="mb-6 text-center text-sm" style={{ color: "#94a3b8" }}>TD One Admin Portal</p>
+        <h1 className="mb-1 text-center text-2xl font-bold" style={{ color: "#ffffff" }}>{T.title}</h1>
+        <p className="mb-6 text-center text-sm" style={{ color: "#94a3b8" }}>{T.subtitle}</p>
 
-        <label className="text-sm font-medium" style={{ color: "#94a3b8" }}>อีเมล</label>
+        <label className="text-sm font-medium" style={{ color: "#94a3b8" }}>{T.email}</label>
         <input
           type="email"
           value={email}
@@ -121,7 +214,7 @@ export default function AdminLoginPage() {
           disabled={loading}
         />
 
-        <label className="text-sm font-medium" style={{ color: "#94a3b8" }}>รหัสผ่าน</label>
+        <label className="text-sm font-medium" style={{ color: "#94a3b8" }}>{T.password}</label>
         <div className="relative mb-4 mt-1">
           <input
             type={showPassword ? "text" : "password"}
@@ -140,17 +233,15 @@ export default function AdminLoginPage() {
             className="absolute right-3 top-1/2 -translate-y-1/2"
             style={{ color: "#64748b" }}
             tabIndex={-1}
-            aria-label={showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+            aria-label={showPassword ? T.hidePassword : T.showPassword}
           >
             {showPassword ? (
-              /* eye-off */
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
                 <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
                 <line x1="1" y1="1" x2="23" y2="23"/>
               </svg>
             ) : (
-              /* eye */
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                 <circle cx="12" cy="12" r="3"/>
@@ -170,7 +261,7 @@ export default function AdminLoginPage() {
           onMouseEnter={(e) => { if (!loading) e.currentTarget.style.backgroundColor = "#991B1B"; }}
           onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "#DC2626"; }}
         >
-          {loading ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
+          {loading ? T.loggingIn : T.login}
         </button>
       </div>
     </div>

@@ -64,9 +64,9 @@ export async function action({ request, context }: ActionFunctionArgs) {
   }
 
   // Verify employee exists
-  const emp = await prisma.employee.findFirst({
-    where: { employee_code: targetEmpId },
-    select: { id: true, status: true },
+  const emp = await prisma.employee.findUnique({
+    where: { employee_id: targetEmpId },
+    select: { status: true },
   });
 
   if (!emp) {

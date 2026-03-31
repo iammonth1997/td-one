@@ -37,7 +37,7 @@ type CaseDetail = {
 type LoaderData = {
   session: {
     emp_id: string;
-    role: string;
+    role: string | null;
   };
   rows: CaseRow[];
   stats: {

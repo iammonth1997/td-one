@@ -8,6 +8,8 @@
     "cf:setup": "npm run cf:setup:sh",
     "cf:setup:ps": "powershell -ExecutionPolicy Bypass -File ./scripts/setup-cloudflare.ps1",
     "cf:setup:sh": "bash ./scripts/setup-cloudflare.sh",
+    "dev:local-test": "node ./scripts/run-dev-env.mjs local-test",
+    "dev:production-like": "node ./scripts/run-dev-env.mjs production-like",
     "deploy": "npm run build && wrangler deploy",
     "dev": "react-router dev",
     "postinstall": "npm run cf-typegen",

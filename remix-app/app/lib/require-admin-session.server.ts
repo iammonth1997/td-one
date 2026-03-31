@@ -1,8 +1,16 @@
-import { requireSession } from "~/lib/require-session.server";
+import { redirectToAdminLogin } from "~/lib/admin-login-redirect.server";
 import { canManagePinReset } from "~/lib/role-access.server";
+import { validateSession } from "~/lib/session-validation.server";
 
 export async function requireAdminSession(request: Request, context: unknown) {
-  const session = await requireSession(request, context);
+  const { session, error, status } = await validateSession(request, context);
+  if (error || !session) {
+    if ((status ?? 500) >= 500) {
+      throw new Response(error || "SESSION_VALIDATION_FAILED", { status: status || 500 });
+    }
+    throw redirectToAdminLogin(request);
+  }
+
   const isAdmin = canManagePinReset(session.role) || session.login_context === "admin_portal";
 
   if (!isAdmin) {

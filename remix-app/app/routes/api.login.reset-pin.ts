@@ -67,8 +67,8 @@ export async function action({ request, context }: ActionFunctionArgs) {
 
   const empId = payload.emp_id;
 
-  const emp = await prisma.employee.findFirst({
-    where: { employee_code: empId },
+  const emp = await prisma.employee.findUnique({
+    where: { employee_id: empId },
     select: { status: true },
   });
 

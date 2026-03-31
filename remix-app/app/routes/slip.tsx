@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link, redirect, useSearchParams } from "react-router";
 import type { Route } from "./+types/slip";
+import { useI18n } from "~/lib/i18n";
+import { getMonthNames } from "~/lib/i18n.shared";
 import { validateSession } from "~/lib/session-validation.server";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -149,7 +151,7 @@ type SlipData = {
 export default function SlipPage(_props: Route.ComponentProps) {
   const now = new Date();
   const [searchParams] = useSearchParams();
-  const [lang, setLang] = useState<LangCode>("th");
+  const { lang, setLang } = useI18n();
   const [tab, setTab] = useState<"salary" | "ot">("salary");
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -160,13 +162,6 @@ export default function SlipPage(_props: Route.ComponentProps) {
   const years = useMemo(() => {
     const y = now.getFullYear();
     return [y - 1, y, y + 1, y + 2];
-  }, []);
-
-  useEffect(() => {
-    const saved = localStorage.getItem("tdone_lang");
-    if (saved === "th" || saved === "en" || saved === "lo") {
-      setLang(saved);
-    }
   }, []);
 
   useEffect(() => {
@@ -186,11 +181,6 @@ export default function SlipPage(_props: Route.ComponentProps) {
       setMonth(monthQuery);
     }
   }, [searchParams]);
-
-  function changeLanguage(next: LangCode) {
-    setLang(next);
-    localStorage.setItem("tdone_lang", next);
-  }
 
   async function loadSlip() {
     setSlipLoading(true);
@@ -222,7 +212,7 @@ export default function SlipPage(_props: Route.ComponentProps) {
   };
 
   const T = SLIP_I18N[lang];
-  const monthNames = MONTHS_BY_LANG[lang] || MONTHS;
+  const monthNames = getMonthNames(lang);
 
   return (
     <main className="min-h-screen bg-white px-4 py-6 text-[#111111] sm:px-6 sm:py-10">
@@ -234,7 +224,7 @@ export default function SlipPage(_props: Route.ComponentProps) {
               <button
                 key={code}
                 type="button"
-                onClick={() => changeLanguage(code)}
+                onClick={() => setLang(code)}
                 className={`rounded-full border px-2 py-1 text-[10px] font-bold transition ${
                   lang === code
                     ? "border-[#DC2626] bg-[#DC2626] text-white"

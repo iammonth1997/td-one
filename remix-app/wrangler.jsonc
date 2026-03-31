@@ -23,5 +23,39 @@
     "ATTENDANCE_DEFAULT_RADIUS_METERS": "200",
     "OT_MAX_HOURS_PER_DAY": "4",
     "OT_MAX_PAST_DAYS": "7"
+  },
+  "env": {
+    "local-test": {
+      "name": "tdone-remix-local-test",
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE",
+          "id": "ab3148bf6f654345aedefc6a792d12bd"
+        }
+      ],
+      "vars": {
+        "ATTENDANCE_MIN_RADIUS_METERS": "100",
+        "ATTENDANCE_MAX_RADIUS_METERS": "500",
+        "ATTENDANCE_DEFAULT_RADIUS_METERS": "200",
+        "OT_MAX_HOURS_PER_DAY": "4",
+        "OT_MAX_PAST_DAYS": "7"
+      }
+    },
+    "production-like": {
+      "name": "tdone-remix-production-like",
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE",
+          "id": "ab3148bf6f654345aedefc6a792d12bd"
+        }
+      ],
+      "vars": {
+        "ATTENDANCE_MIN_RADIUS_METERS": "100",
+        "ATTENDANCE_MAX_RADIUS_METERS": "500",
+        "ATTENDANCE_DEFAULT_RADIUS_METERS": "200",
+        "OT_MAX_HOURS_PER_DAY": "4",
+        "OT_MAX_PAST_DAYS": "7"
+      }
+    }
   }
 }

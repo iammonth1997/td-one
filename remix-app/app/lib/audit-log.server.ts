@@ -12,6 +12,7 @@
  *  - Repeated out-of-bounds scan attempts
  */
 
+import { Prisma } from "@prisma/client";
 import prisma from "~/lib/prisma.server";
 
 // ─── Event Type Constants ────────────────────────────────────────────────────
@@ -63,7 +64,7 @@ interface AuditLogEntry {
   ip_address?: string | null;
   latitude?: number | null;
   longitude?: number | null;
-  metadata?: Record<string, unknown>;
+  metadata?: Prisma.InputJsonValue;
   is_alert?: boolean;
 }
 
@@ -85,7 +86,7 @@ export async function writeAuditLog(
         ip_address: entry.ip_address ?? null,
         latitude: entry.latitude ?? null,
         longitude: entry.longitude ?? null,
-        metadata: entry.metadata ?? null,
+        metadata: entry.metadata ?? Prisma.DbNull,
         is_alert: entry.is_alert ?? false,
       },
     });

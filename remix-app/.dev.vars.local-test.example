@@ -1,0 +1,16 @@
+# Copy this file to `.dev.vars.local-test` before running `npm run dev:local-test`.
+# Keep this file self-contained so local-test never falls back to `.dev.vars`.
+
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+RESET_PIN_SECRET=your_random_secret_here
+NEXT_PUBLIC_APP_BASE_URL=http://localhost:5173
+NEXT_PUBLIC_LIFF_ID=your_liff_id_here
+LINE_LOGIN_CHANNEL_ID=your_line_login_channel_id_here
+ATTENDANCE_ALLOW_DEV_WITHOUT_LIFF=true
+NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your_test_cloudinary_cloud_name
+CLOUDINARY_API_KEY=your_test_cloudinary_api_key
+CLOUDINARY_API_SECRET=your_test_cloudinary_api_secret
+CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB=postgres://user:password@localhost:5432/tdone_test?sslmode=disable
+DATABASE_URL=postgres://user:password@localhost:5432/tdone_test?sslmode=disable
