@@ -258,10 +258,11 @@ function BottomNav() {
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const loaderData = useLoaderData<typeof loader>();
+  const loaderData = useLoaderData<typeof loader>() as { lang?: LangCode } | undefined;
+  const lang = loaderData?.lang ?? "th";
 
   return (
-    <html lang={loaderData.lang}>
+    <html lang={lang}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -318,8 +319,10 @@ function AppFrame() {
 }
 
 export default function App({ loaderData }: Route.ComponentProps) {
+  const lang = loaderData?.lang ?? "th";
+
   return (
-    <I18nProvider initialLang={loaderData.lang}>
+    <I18nProvider initialLang={lang}>
       <AppFrame />
     </I18nProvider>
   );
