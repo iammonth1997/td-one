@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { Client } from "pg";
+import postgres from "postgres";
 import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
 import { hasAnyPermission } from "@/lib/rbac/access";
 import { ADMIN_PORTAL } from "@/lib/sessionContext";
@@ -65,7 +65,9 @@ function isRetryableDbError(error) {
 
 function getConnectionString(context) {
   const env = context?.cloudflare?.env ?? {};
-  return env.HYPERDRIVE?.connectionString || env.DATABASE_URL || process.env.DATABASE_URL || null;
+  const hyperdriveUrl = env.HYPERDRIVE?.connectionString || null;
+  const directUrl = env.DATABASE_URL || process.env.DATABASE_URL || null;
+  return hyperdriveUrl || directUrl;
 }
 
 function getCookieValue(cookieHeader, name) {
@@ -78,19 +80,45 @@ function getCookieValue(cookieHeader, name) {
   return null;
 }
 
+function normalizeConnectionString(connectionString) {
+  if (!connectionString) return connectionString;
+
+  try {
+    const url = new URL(connectionString);
+    url.searchParams.delete("uselibpqcompat");
+    return url.toString();
+  } catch {
+    return connectionString.replace(/[?&]uselibpqcompat=[^&]*/g, "").replace(/\?$/, "").replace(/&$/, "");
+  }
+}
+
 async function withPgClient(connectionString, fn, retries = 1) {
   let lastError = null;
+  const normalizedConnectionString = normalizeConnectionString(connectionString);
 
   for (let attempt = 0; attempt <= retries; attempt += 1) {
-    const client = new Client({ connectionString });
+    const requiresSsl = /[?&]sslmode=require\b/i.test(normalizedConnectionString);
+    const sql = postgres(normalizedConnectionString, {
+      fetch_types: false,
+      prepare: false,
+      max: 1,
+      connect_timeout: 10,
+      ...(requiresSsl ? { ssl: "require" } : {}),
+    });
+    const client = {
+      query: async (query, params = []) => {
+        const rows = await sql.unsafe(query, params);
+        return { rows };
+      },
+    };
+
     try {
-      await client.connect();
       const result = await fn(client);
-      await client.end().catch(() => {});
+      await sql.end({ timeout: 0 }).catch(() => {});
       return result;
     } catch (error) {
       lastError = error;
-      await client.end().catch(() => {});
+      await sql.end({ timeout: 0 }).catch(() => {});
       if (!isRetryableDbError(error) || attempt === retries) break;
       await new Promise((resolve) => setTimeout(resolve, 150));
     }
