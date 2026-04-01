@@ -64,10 +64,7 @@ function isRetryableDbError(error) {
 }
 
 function getConnectionString(context) {
-  const env = context?.cloudflare?.env ?? {};
-  const hyperdriveUrl = env.HYPERDRIVE?.connectionString || null;
-  const directUrl = env.DATABASE_URL || process.env.DATABASE_URL || null;
-  return hyperdriveUrl || directUrl;
+  return context?.cloudflare?.env?.HYPERDRIVE?.connectionString || null;
 }
 
 function getCookieValue(cookieHeader, name) {
@@ -98,11 +95,16 @@ async function withPgClient(connectionString, fn, retries = 1) {
 
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     const requiresSsl = /[?&]sslmode=require\b/i.test(normalizedConnectionString);
+    console.log("[login] PG-A: before postgres()", {
+      attempt,
+      requiresSsl,
+    });
     const sql = postgres(normalizedConnectionString, {
       fetch_types: false,
       prepare: false,
       max: 1,
-      connect_timeout: 10,
+      connect_timeout: 5,
+      idle_timeout: 5,
       ...(requiresSsl ? { ssl: "require" } : {}),
     });
     const client = {
@@ -113,11 +115,24 @@ async function withPgClient(connectionString, fn, retries = 1) {
     };
 
     try {
+      console.log("[login] PG-B: postgres() returned client", { attempt });
+      console.log("[login] PG-C: before fn(client)", { attempt });
       const result = await fn(client);
+      console.log("[login] PG-D: fn(client) completed", {
+        attempt,
+        hasResult: result != null,
+      });
+      console.log("[login] PG-E: before sql.end()", { attempt });
       await sql.end({ timeout: 0 }).catch(() => {});
       return result;
     } catch (error) {
       lastError = error;
+      console.log("[login] PG-ERR:", String(error?.message || error), String(error?.code || ""));
+      console.log("[login] PG-X: catch block", {
+        attempt,
+        message: String(error?.message || error),
+      });
+      console.log("[login] PG-Y: before sql.end() in catch", { attempt });
       await sql.end({ timeout: 0 }).catch(() => {});
       if (!isRetryableDbError(error) || attempt === retries) break;
       await new Promise((resolve) => setTimeout(resolve, 150));
@@ -129,24 +144,30 @@ async function withPgClient(connectionString, fn, retries = 1) {
 
 export async function POST(req, context) {
   try {
+    console.log("[login] A: handler entered");
     const connectionString = getConnectionString(context);
     if (!connectionString) {
+      console.log("[login] A1: missing connection string");
       return Response.json({ error: "DB_QUERY_FAILED" }, { status: 500 });
     }
 
     const { email, password } = await req.json();
+    console.log("[login] B: body parsed", { email });
     const normalizedEmail = String(email || "").trim().toLowerCase();
     const rawPassword = String(password || "").trim();
 
     if (!normalizedEmail || !rawPassword) {
+      console.log("[login] B1: invalid input");
       return Response.json({ error: "INVALID_INPUT" }, { status: 400 });
     }
 
     let userRow = null;
     try {
+      console.log("[login] C: before DB", { email: normalizedEmail });
       userRow = await withPgClient(
         connectionString,
         async (client) => {
+          console.log("[login] D: inside withPgClient, before query", { email: normalizedEmail });
           const result = await client.query(
             `SELECT emp_id, role, admin_email, admin_password_hash
              FROM login_users
@@ -154,11 +175,16 @@ export async function POST(req, context) {
              LIMIT 1`,
             [normalizedEmail],
           );
+          console.log("[login] E: query returned", { count: result.rows.length });
           return result.rows[0] || null;
         },
         1,
       );
+      console.log("[login] F: after DB", { foundUser: Boolean(userRow) });
     } catch (dbError) {
+      console.log("[login] F1: DB catch", {
+        message: String(dbError?.message || dbError),
+      });
       return Response.json(
         {
           error: "DB_QUERY_FAILED",
@@ -169,26 +195,31 @@ export async function POST(req, context) {
     }
 
     if (!userRow) {
+      console.log("[login] G: about to return invalid credentials");
       return Response.json({ error: "INVALID_CREDENTIALS" }, { status: 401 });
     }
 
     if (!userRow.admin_password_hash) {
+      console.log("[login] G1: missing password hash");
       return Response.json({ error: "INVALID_CREDENTIALS" }, { status: 401 });
     }
 
     const passwordMatched = await bcrypt.compare(rawPassword, userRow.admin_password_hash);
     if (!passwordMatched) {
+      console.log("[login] G2: password mismatch");
       return Response.json({ error: "INVALID_CREDENTIALS" }, { status: 401 });
     }
 
     const accessProfile = buildSessionAccessProfile({ role: userRow.role });
     if (!canAccessAdminPortal(userRow.role, accessProfile)) {
+      console.log("[login] G3: forbidden");
       return Response.json({ error: "FORBIDDEN" }, { status: 403 });
     }
 
     const deviceId =
       getCookieValue(req.headers.get("cookie"), "tdone_device_id") || req.headers.get("x-device-id")?.trim();
     if (!deviceId) {
+      console.log("[login] G4: missing device id");
       return Response.json({ error: "MISSING_DEVICE_ID" }, { status: 401 });
     }
 
@@ -230,9 +261,11 @@ export async function POST(req, context) {
     ).catch(() => false);
 
     if (!inserted) {
+      console.log("[login] G5: session create failed");
       return Response.json({ error: "SESSION_CREATE_FAILED" }, { status: 500 });
     }
 
+    console.log("[login] G6: about to return success");
     return Response.json({
       success: true,
       emp_id: userRow.emp_id,
@@ -243,6 +276,9 @@ export async function POST(req, context) {
       must_change_pin: false,
     });
   } catch (error) {
+    console.log("[login] Z: outer catch", {
+      message: String(error?.message || error),
+    });
     return Response.json({ error: "ADMIN_LOGIN_FAILED", detail: String(error?.message || error) }, { status: 500 });
   }
 }

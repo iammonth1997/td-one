@@ -23,15 +23,10 @@ export default {
     const hyperdriveUrl = hyperdrive?.connectionString;
     console.log("[worker] HYPERDRIVE binding:", hyperdrive ? "present" : "MISSING");
 
-    // In local dev, Hyperdrive creates a .hyperdrive.local proxy that pg cannot connect to
-    // (pg uses Node.js TCP while Workers runtime uses Cloudflare TCP API).
-    // Detect this and fall back to the direct DATABASE_URL var instead.
     const isLocalProxy = hyperdriveUrl?.includes('.hyperdrive.local');
-    const connectionString = isLocalProxy
-      ? ((env as any).DATABASE_URL ?? hyperdriveUrl)
-      : (hyperdriveUrl ?? (env as any).DATABASE_URL);
+    const connectionString = hyperdriveUrl ?? null;
 
-    console.log("[worker] local proxy:", isLocalProxy ? "yes (using DATABASE_URL)" : "no (using Hyperdrive)");
+    console.log("[worker] local proxy:", isLocalProxy ? "yes (using Hyperdrive)" : "no");
     console.log("[worker] connectionString:", connectionString ? connectionString.replace(/:[^@]+@/, ":***@") : "MISSING");
     if (connectionString) {
       process.env.DATABASE_URL = connectionString;
