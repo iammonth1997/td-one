@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { mockPrismaModule } from './prisma-test-helper.js';
 
 function makeApproveSession() {
   return { is_admin: true, emp_id: "ADMIN01", role: "admin" };
@@ -27,12 +28,10 @@ describe("request approval flows", () => {
     vi.doMock("@/lib/rbac/access", () => ({
       hasAnyPermission: vi.fn(() => true),
     }));
-    vi.doMock("@/lib/prisma", () => ({
-      default: {
-        leaveRequest: {
-          findUnique: vi.fn(async () => existing),
-          update: vi.fn(async ({ data }) => { capture.patch = data; return updated; }),
-        },
+    vi.doMock("@/lib/prisma", () => mockPrismaModule({
+      leaveRequest: {
+        findUnique: vi.fn(async () => existing),
+        update: vi.fn(async ({ data }) => { capture.patch = data; return updated; }),
       },
     }));
 
@@ -66,12 +65,10 @@ describe("request approval flows", () => {
     vi.doMock("@/lib/rbac/access", () => ({
       hasAnyPermission: vi.fn(() => true),
     }));
-    vi.doMock("@/lib/prisma", () => ({
-      default: {
-        otRequest: {
-          findUnique: vi.fn(async () => existing),
-          update: vi.fn(async ({ data }) => { capture.patch = data; return updated; }),
-        },
+    vi.doMock("@/lib/prisma", () => mockPrismaModule({
+      otRequest: {
+        findUnique: vi.fn(async () => existing),
+        update: vi.fn(async ({ data }) => { capture.patch = data; return updated; }),
       },
     }));
 
@@ -103,12 +100,10 @@ describe("request approval flows", () => {
       buildSessionAccessProfile: vi.fn(() => ({ role: "admin" })),
       canManageAdminActions: vi.fn(() => true),
     }));
-    vi.doMock("@/lib/prisma", () => ({
-      default: {
-        timeCorrectionRequest: {
-          findUnique: vi.fn(async () => existing),
-          update: vi.fn(async ({ data }) => { capture.patch = data; return updated; }),
-        },
+    vi.doMock("@/lib/prisma", () => mockPrismaModule({
+      timeCorrectionRequest: {
+        findUnique: vi.fn(async () => existing),
+        update: vi.fn(async ({ data }) => { capture.patch = data; return updated; }),
       },
     }));
 

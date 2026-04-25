@@ -17,8 +17,32 @@ function currentMonth() {
   return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
-async function resolveEmployeeIdByCode(employeeCode) {
+async function resolveEmployeeIdByCode(prisma, employeeCode) {
   try {
+    if (typeof prisma.$queryRaw === 'function') {
+      const rows = await prisma.$queryRaw`
+        SELECT
+          e.employee_id AS employee_code,
+          COALESCE(ps.employee_id, eps.employee_id) AS employee_uuid
+        FROM employees e
+        LEFT JOIN payroll_settings ps
+          ON ps.emp_code = e.employee_id
+        LEFT JOIN employee_payroll_settings eps
+          ON eps.emp_code = e.employee_id
+        WHERE UPPER(e.employee_id) = ${employeeCode}
+        LIMIT 1
+      `;
+      const row = Array.isArray(rows) ? rows[0] : null;
+      if (!row) return { employee: null, error: null };
+      return {
+        employee: {
+          id: row.employee_uuid || null,
+          employee_code: row.employee_code || employeeCode,
+        },
+        error: null,
+      };
+    }
+
     const employee = await prisma.employee.findFirst({
       where: { employee_code: employeeCode },
       select: { id: true, employee_code: true },
@@ -46,9 +70,12 @@ export async function GET(req) {
   if (caseType) where.case_type = caseType;
 
   if (employeeCode) {
-    const { employee, error } = await resolveEmployeeIdByCode(employeeCode);
+    const { employee, error } = await resolveEmployeeIdByCode(prisma, employeeCode);
     if (error) return Response.json({ error: 'EMPLOYEE_QUERY_FAILED', detail: error.message }, { status: 500 });
     if (!employee) return Response.json({ success: true, rows: [] });
+    if (!employee.id) {
+      return Response.json({ error: 'EMPLOYEE_UUID_NOT_FOUND', detail: 'Employee exists but UUID mapping is unavailable' }, { status: 409 });
+    }
     where.employee_id = employee.id;
   }
 
@@ -106,9 +133,12 @@ export async function POST(req) {
       return Response.json({ error: 'INVALID_CASE_TYPE' }, { status: 400 });
     }
 
-    const { employee, error: employeeError } = await resolveEmployeeIdByCode(employeeCode);
+    const { employee, error: employeeError } = await resolveEmployeeIdByCode(prisma, employeeCode);
     if (employeeError) return Response.json({ error: 'EMPLOYEE_QUERY_FAILED', detail: employeeError.message }, { status: 500 });
     if (!employee) return Response.json({ error: 'EMPLOYEE_NOT_FOUND' }, { status: 404 });
+    if (!employee.id) {
+      return Response.json({ error: 'EMPLOYEE_UUID_NOT_FOUND', detail: 'Employee exists but UUID mapping is unavailable' }, { status: 409 });
+    }
 
     try {
       const data = await prisma.hrErCase.create({
@@ -201,9 +231,12 @@ export async function POST(req) {
     let employeeId = null;
 
     if (employeeCode) {
-      const { employee, error: employeeError } = await resolveEmployeeIdByCode(employeeCode);
+      const { employee, error: employeeError } = await resolveEmployeeIdByCode(prisma, employeeCode);
       if (employeeError) return Response.json({ error: 'EMPLOYEE_QUERY_FAILED', detail: employeeError.message }, { status: 500 });
       if (!employee) return Response.json({ error: 'EMPLOYEE_NOT_FOUND' }, { status: 404 });
+      if (!employee.id) {
+        return Response.json({ error: 'EMPLOYEE_UUID_NOT_FOUND', detail: 'Employee exists but UUID mapping is unavailable' }, { status: 409 });
+      }
       employeeId = employee.id;
     }
 

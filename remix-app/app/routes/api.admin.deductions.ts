@@ -3,7 +3,7 @@ import type { LoaderFunctionArgs } from "react-router";
 import * as legacy from "../../../server/api/admin/deductions/route.js";
 import { proxyLegacyApi } from "~/lib/legacy-api-bridge.server";
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  return proxyLegacyApi(request, legacy);
+export async function loader({ request, context }: LoaderFunctionArgs) {
+  return proxyLegacyApi(request, legacy, context);
 }
 

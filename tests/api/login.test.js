@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { mockPrismaModule } from './prisma-test-helper.js';
 
 describe('login API handler', () => {
   let POST;
@@ -13,12 +14,10 @@ describe('login API handler', () => {
         clearFailedAttempts: vi.fn(async () => {}),
       }));
 
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          loginUser: { findFirst: vi.fn(async () => null) },
-          employee: { findFirst: vi.fn(async () => null) },
-          authSession: { create: vi.fn(async () => ({})) },
-        },
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        loginUser: { findFirst: vi.fn(async () => null) },
+        employee: { findUnique: vi.fn(async () => null) },
+        authSession: { create: vi.fn(async () => ({})) },
       }));
 
       const route = await import('../../server/api/login/route.js');
@@ -64,23 +63,21 @@ describe('login API handler', () => {
         clearFailedAttempts: vi.fn(async () => {}),
       }));
 
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          loginUser: {
-            findFirst: vi.fn(async () => ({
-              pin_hash: '$2b$10$hash',
-              role: 'employee',
-              device_id_hash: null,
-              force_pin_change: false,
-              temp_pin_expires_at: null,
-            })),
-          },
-          employee: {
-            findFirst: vi.fn(async () => ({ status: 'active' })),
-          },
-          authSession: {
-            create: vi.fn(async () => ({})),
-          },
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        loginUser: {
+          findFirst: vi.fn(async () => ({
+            pin_hash: '$2b$10$hash',
+            role: 'employee',
+            device_id_hash: null,
+            force_pin_change: false,
+            temp_pin_expires_at: null,
+          })),
+        },
+        employee: {
+          findUnique: vi.fn(async () => ({ status: 'active' })),
+        },
+        authSession: {
+          create: vi.fn(async () => ({})),
         },
       }));
 

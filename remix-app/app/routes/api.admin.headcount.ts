@@ -3,10 +3,10 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router';
 import * as legacy from '../../../server/api/admin/headcount/route.js';
 import { proxyLegacyApi } from '~/lib/legacy-api-bridge.server';
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  return proxyLegacyApi(request, legacy);
+export async function loader({ request, context }: LoaderFunctionArgs) {
+  return proxyLegacyApi(request, legacy, context);
 }
 
-export async function action({ request }: ActionFunctionArgs) {
-  return proxyLegacyApi(request, legacy);
+export async function action({ request, context }: ActionFunctionArgs) {
+  return proxyLegacyApi(request, legacy, context);
 }

@@ -1,55 +1,99 @@
 import { Link, redirect } from "react-router";
 import type { Route } from "./+types/day-work.view";
+import { loadEmployeeDashboardSnapshot } from "~/lib/employee-dashboard.server";
+import { getConnectionString, withPgClient } from "~/lib/pg.server";
 import { validateSession } from "~/lib/session-validation.server";
-import prisma from "~/lib/prisma.server";
 
-function parseDates(value: unknown) {
-  return String(value || "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
+type EmployeeProfile = {
+  employeeCode: string;
+  firstName: string | null;
+  lastName: string | null;
+  positionName: string | null;
+  departmentName: string | null;
+  workSiteName: string | null;
+  employeeUuid: string | null;
+};
+
+type DayWorkSummary = {
+  workDays: number;
+  absentDays: number;
+  totalHours: number;
+  approvedLeaveDays: number;
+  approvedOtHours: number;
+  nightShiftDays: number;
+};
+
+type EmployeeProfileRow = {
+  employee_code: string;
+  first_name: string | null;
+  last_name: string | null;
+  position_name: string | null;
+  department_name: string | null;
+  work_location_name: string | null;
+};
+
+type MonthlySummaryRow = {
+  work_days: number | null;
+  absent_days: number | null;
+  total_hours: number | null;
+};
+
+type NumberRow = {
+  value: number | null;
+};
+
+const EMPTY_SUMMARY: DayWorkSummary = {
+  workDays: 0,
+  absentDays: 0,
+  totalHours: 0,
+  approvedLeaveDays: 0,
+  approvedOtHours: 0,
+  nightShiftDays: 0,
+};
+
+function getBangkokMonthContext(now = new Date()) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = formatter.formatToParts(now);
+  const lookup = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const year = Number(lookup.year);
+  const month = Number(lookup.month);
+  const startOfMonthIso = `${lookup.year}-${lookup.month}-01`;
+  const endOfMonthIso = new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+  const monthKey = `${lookup.year}-${lookup.month}`;
+
+  return { year, month, startOfMonthIso, endOfMonthIso, monthKey };
 }
 
-function DayCard({ title, value, tone, dates }: { title: string; value: number | string; tone: string; dates?: string[] }) {
+function formatMetricValue(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function DayCard({
+  title,
+  value,
+  tone,
+  suffix,
+}: {
+  title: string;
+  value: number;
+  tone: string;
+  suffix?: string;
+}) {
   return (
     <div className="rounded-[1rem] border border-[#FECACA] bg-white p-4 text-center shadow-[0_4px_16px_rgba(220,38,38,0.08)]">
-      <div className={`text-2xl font-bold ${tone}`}>{value}</div>
+      <div className={`text-2xl font-bold ${tone}`}>
+        {formatMetricValue(value)}
+        {suffix ? <span className="ml-1 text-sm font-semibold">{suffix}</span> : null}
+      </div>
       <div className="mt-1 text-xs text-[#555555]">{title}</div>
-      {dates && dates.length > 0 && (
-        <div className="mt-2 text-[10px] leading-relaxed text-[#555555]">{dates.join(", ")}</div>
-      )}
     </div>
   );
 }
-
-// Raw type for attendance_monthly rows (not in Prisma schema)
-type AttendanceMonthlyRow = {
-  id: string;
-  emp_id: string;
-  month: number;
-  year: number;
-  work_days: number | null;
-  sl_days: number | null;
-  sl_date: string | null;
-  pl_days: number | null;
-  pl_date: string | null;
-  vl_days: number | null;
-  vl_date: string | null;
-  opl_days: number | null;
-  opl_date: string | null;
-  no_scan: number | null;
-  noscan_date: string | null;
-  rt_days: number | null;
-  rt_date: string | null;
-  off_days: number | null;
-  off_date: string | null;
-  night_shift_count: number | null;
-  night_shift_dates: string | null;
-  attendance_rate: number | null;
-  total_leave: number | null;
-  total_unpaid: number | null;
-  total_paid_days: number | null;
-};
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const { session, error } = await validateSession(request, context);
@@ -58,61 +102,133 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   }
 
   const url = new URL(request.url);
-  const year = Number(url.searchParams.get("year"));
-  const month = Number(url.searchParams.get("month"));
+  const bangkokNow = getBangkokMonthContext();
+  const yearParam = Number(url.searchParams.get("year"));
+  const monthParam = Number(url.searchParams.get("month"));
+  const year = Number.isInteger(yearParam) ? yearParam : bangkokNow.year;
+  const month = Number.isInteger(monthParam) && monthParam >= 1 && monthParam <= 12 ? monthParam : bangkokNow.month;
 
-  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
-    return { error: "Invalid year/month parameter.", year: null, month: null, employee: null, daywork: null };
+  if (month < 1 || month > 12 || year < 2000 || year > 2100) {
+    return { error: "Invalid year/month parameter.", year: null, month: null, employee: null, summary: EMPTY_SUMMARY };
   }
 
-  // attendance_monthly is not in the Prisma schema — use raw SQL
-  let workRows: AttendanceMonthlyRow[] = [];
-  try {
-    workRows = await prisma.$queryRaw<AttendanceMonthlyRow[]>`
-      SELECT *
-      FROM attendance_monthly
-      WHERE emp_id = ${session.emp_id}
-        AND month  = ${month}::int
-        AND year   = ${year}::int
-      LIMIT 1
-    `;
-  } catch {
-    // Treat query failure the same as no data
-  }
-  const work = workRows[0] ?? null;
+  const startOfMonthIso = `${year}-${String(month).padStart(2, "0")}-01`;
+  const endOfMonthIso = new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+  const monthKey = `${year}-${String(month).padStart(2, "0")}`;
+  const connectionString = getConnectionString(context);
+  const dashboardSnapshot = await loadEmployeeDashboardSnapshot(connectionString, session.emp_id);
 
-  // Fetch employee with related position, department and work_site via Prisma relations
-  const emp = await prisma.employee.findUnique({
-    where: { employee_id: session.emp_id },
-    select: {
-      employee_id: true,
-      first_name: true,
-      last_name: true,
-      position: true,
-      department: { select: { name: true } },
-      work_locations: { select: { name: true } },
-    },
-  });
+  const employee: EmployeeProfile = {
+    employeeCode: dashboardSnapshot.employeeCode || session.emp_id,
+    firstName: dashboardSnapshot.firstName || null,
+    lastName: dashboardSnapshot.lastName || null,
+    positionName: null,
+    departmentName: null,
+    workSiteName: null,
+    employeeUuid: dashboardSnapshot.employeeUuid,
+  };
 
-  const employee = emp
-    ? {
-        employeeCode: emp.employee_id,
-        firstName: emp.first_name,
-        lastName: emp.last_name,
-        positionName: emp.position ?? null,
-        departmentName: emp.department?.name ?? null,
-        workSiteName: emp.work_locations?.name ?? null,
-      }
-    : null;
+  const summary: DayWorkSummary = { ...EMPTY_SUMMARY };
 
-  if (!work) {
-    return {
-      error: null,
-      year,
-      month,
-      employee,
-      daywork: null,
-    };
+  if (connectionString) {
+    try {
+      await withPgClient(
+        connectionString,
+        async (client) => {
+          const employeeResult = await client.query<EmployeeProfileRow>(
+            `SELECT
+               e.employee_id AS employee_code,
+               e.first_name,
+               e.last_name,
+               e.position AS position_name,
+               d.name AS department_name,
+               wl.name AS work_location_name
+             FROM employees e
+             LEFT JOIN departments d
+               ON d.id = e.department_id
+             LEFT JOIN work_locations wl
+               ON wl.id = e.work_location_id
+             WHERE UPPER(e.employee_id) = UPPER($1)
+             LIMIT 1`,
+            [session.emp_id],
+          );
+
+          const profile = employeeResult.rows[0];
+          if (profile) {
+            employee.employeeCode = profile.employee_code;
+            employee.firstName = employee.firstName || profile.first_name;
+            employee.lastName = employee.lastName || profile.last_name;
+            employee.positionName = profile.position_name;
+            employee.departmentName = profile.department_name;
+            employee.workSiteName = profile.work_location_name;
+          }
+
+          if (!employee.employeeUuid) {
+            return;
+          }
+
+          const monthlySummaryResult = await client.query<MonthlySummaryRow>(
+            `SELECT work_days, absent_days, total_hours
+             FROM monthly_daywork_summary
+             WHERE employee_id = $1
+               AND month = $2
+             LIMIT 1`,
+            [employee.employeeUuid, monthKey],
+          );
+
+          const attendanceCountResult = await client.query<NumberRow>(
+            `SELECT COUNT(*)::int AS value
+             FROM attendance
+             WHERE employee_id = $1
+               AND work_date BETWEEN $2 AND $3
+               AND LOWER(COALESCE(status, '')) = 'present'`,
+            [employee.employeeUuid, startOfMonthIso, endOfMonthIso],
+          );
+
+          const leaveDaysResult = await client.query<NumberRow>(
+            `SELECT COALESCE(SUM(total_days), 0)::float8 AS value
+             FROM leave_requests
+             WHERE employee_id = $1
+               AND LOWER(COALESCE(status, '')) = 'approved'
+               AND start_date >= $2
+               AND end_date <= $3`,
+            [employee.employeeUuid, startOfMonthIso, endOfMonthIso],
+          );
+
+          const otHoursResult = await client.query<NumberRow>(
+            `SELECT COALESCE(SUM(total_hours), 0)::float8 AS value
+             FROM ot_requests
+             WHERE employee_id = $1
+               AND LOWER(COALESCE(status, '')) = 'approved'
+               AND date BETWEEN $2 AND $3`,
+            [employee.employeeUuid, startOfMonthIso, endOfMonthIso],
+          );
+
+          const nightShiftResult = await client.query<NumberRow>(
+            `SELECT COUNT(*)::int AS value
+             FROM attendance
+             WHERE employee_id = $1
+               AND work_date BETWEEN $2 AND $3
+               AND scan_in_time IS NOT NULL
+               AND scan_out_time IS NOT NULL
+               AND scan_out_time < scan_in_time`,
+            [employee.employeeUuid, startOfMonthIso, endOfMonthIso],
+          );
+
+          const monthlySummary = monthlySummaryResult.rows[0];
+          summary.workDays =
+            monthlySummary?.work_days ?? attendanceCountResult.rows[0]?.value ?? 0;
+          summary.absentDays = monthlySummary?.absent_days ?? 0;
+          summary.totalHours = monthlySummary?.total_hours ?? 0;
+          summary.approvedLeaveDays = leaveDaysResult.rows[0]?.value ?? 0;
+          summary.approvedOtHours = otHoursResult.rows[0]?.value ?? 0;
+          summary.nightShiftDays = nightShiftResult.rows[0]?.value ?? 0;
+        },
+        1,
+      );
+    } catch (dbError) {
+      console.error("day-work.view loader DB error:", dbError);
+    }
   }
 
   return {
@@ -120,7 +236,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     year,
     month,
     employee,
-    daywork: work,
+    summary,
   };
 }
 
@@ -159,36 +275,6 @@ export default function DayWorkViewPage({ loaderData }: Route.ComponentProps) {
     );
   }
 
-  if (!loaderData.daywork) {
-    return (
-      <main className="min-h-screen bg-white px-4 py-6 sm:px-6 sm:py-10">
-        <section className="mx-auto w-full max-w-xl rounded-[1rem] border border-[#FECACA] bg-white p-6 shadow-[0_4px_24px_rgba(220,38,38,0.15)]">
-          <h2 className="text-xl font-bold text-[#DC2626]">No data found</h2>
-          <p className="mt-2 text-[#555555]">
-            Employee: {loaderData.employee?.employeeCode || "-"}, Year: {loaderData.year || "-"}, Month: {loaderData.month || "-"}
-          </p>
-          <div className="mt-6 flex items-center justify-between">
-            <Link
-              to="/day-work"
-              className="inline-block rounded-xl border border-[#DC2626] bg-white px-4 py-2 font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
-            >
-              Back
-            </Link>
-            <button
-              type="button"
-              onClick={goHome}
-              className="inline-block rounded-xl border border-[#DC2626] bg-white px-4 py-2 font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
-            >
-              Home
-            </button>
-          </div>
-        </section>
-      </main>
-    );
-  }
-
-  const daywork = loaderData.daywork;
-
   return (
     <main className="min-h-screen bg-white px-4 py-6 sm:px-6 sm:py-10">
       <section className="mx-auto w-full max-w-4xl rounded-[1rem] border border-[#FECACA] bg-white p-5 shadow-[0_4px_24px_rgba(220,38,38,0.15)] sm:p-7">
@@ -218,44 +304,25 @@ export default function DayWorkViewPage({ loaderData }: Route.ComponentProps) {
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <DayCard title="Work days" value={daywork.work_days ?? "-"} tone="text-[#DC2626]" />
-          <DayCard title="Sick leave" value={daywork.sl_days ?? 0} tone="text-[#EF4444]" dates={parseDates(daywork.sl_date)} />
-          <DayCard title="Personal leave" value={daywork.pl_days ?? 0} tone="text-[#3B82F6]" dates={parseDates(daywork.pl_date)} />
-          <DayCard title="Annual leave" value={daywork.vl_days ?? 0} tone="text-[#F59E0B]" dates={parseDates(daywork.vl_date)} />
-          <DayCard title="Unpaid leave" value={daywork.opl_days ?? 0} tone="text-red-500" dates={parseDates(daywork.opl_date)} />
-          <DayCard title="No scan" value={daywork.no_scan ?? 0} tone="text-[#555555]" dates={parseDates(daywork.noscan_date)} />
-          <DayCard title="Rest days" value={daywork.rt_days ?? 0} tone="text-[#A855F7]" dates={parseDates(daywork.rt_date)} />
-          <DayCard title="Official off" value={daywork.off_days ?? 0} tone="text-[#F97316]" dates={parseDates(daywork.off_date)} />
-          <DayCard
-            title="Night shift"
-            value={daywork.night_shift_count ?? 0}
-            tone="text-[#22C55E]"
-            dates={parseDates(daywork.night_shift_dates)}
-          />
+          <DayCard title="Work days" value={loaderData.summary.workDays} tone="text-[#DC2626]" suffix="days" />
+          <DayCard title="Absent days" value={loaderData.summary.absentDays} tone="text-[#F59E0B]" suffix="days" />
+          <DayCard title="Total hours" value={loaderData.summary.totalHours} tone="text-[#2563EB]" suffix="hrs" />
+          <DayCard title="Approved leave" value={loaderData.summary.approvedLeaveDays} tone="text-[#7C3AED]" suffix="days" />
+          <DayCard title="Approved OT" value={loaderData.summary.approvedOtHours} tone="text-[#16A34A]" suffix="hrs" />
+          <DayCard title="Night shifts" value={loaderData.summary.nightShiftDays} tone="text-[#4338CA]" suffix="days" />
         </div>
 
         <div className="mt-6 rounded-[1rem] border border-[#FECACA] bg-[#FEF2F2] p-4">
-          <h3 className="text-sm font-semibold text-[#DC2626]">Attendance metrics</h3>
-          <div className="mt-3 grid grid-cols-2 gap-3">
-            <div>
-              <div className="text-sm text-[#555555]">Attendance rate</div>
-              <div className="text-lg font-bold text-[#DC2626]">
-                {daywork.attendance_rate != null ? Math.round(parseFloat(String(daywork.attendance_rate)) * 100) : 0}%
-              </div>
-            </div>
-            <div>
-              <div className="text-sm text-[#555555]">Total leave</div>
-              <div className="text-lg font-bold text-[#F59E0B]">{daywork.total_leave ?? 0}</div>
-            </div>
-            <div>
-              <div className="text-sm text-[#555555]">Total unpaid</div>
-              <div className="text-lg font-bold text-red-500">{daywork.total_unpaid ?? 0}</div>
-            </div>
-            <div>
-              <div className="text-sm text-[#555555]">Total paid days</div>
-              <div className="text-lg font-bold text-[#16A34A]">{daywork.total_paid_days ?? 0}</div>
-            </div>
-          </div>
+          <h3 className="text-sm font-semibold text-[#DC2626]">Month Summary</h3>
+          <p className="mt-2 text-sm text-[#555555]">
+            This page now reads from `monthly_daywork_summary`, `attendance`, `leave_requests`, and `ot_requests`
+            for the selected month.
+          </p>
+          {!loaderData.employee?.employeeUuid ? (
+            <p className="mt-2 text-sm text-[#B45309]">
+              Employee UUID mapping is not available yet, so some monthly metrics may remain at 0 until payroll or attendance mappings are populated.
+            </p>
+          ) : null}
         </div>
 
         <div className="mt-6 flex items-center justify-between">

@@ -12,8 +12,8 @@
  */
 
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { getPrisma } from "@/lib/prisma";
 import { validateSession } from "~/lib/session-validation.server";
-import prisma from "~/lib/prisma.server";
 import { writeAuditLog, AuditEvent } from "~/lib/audit-log.server";
 
 const ADMIN_ROLES = new Set(["admin", "super_admin", "hr_manager", "hr_payroll", "hr-payroll"]);
@@ -32,7 +32,18 @@ function isAdminRole(role: unknown): boolean {
   return ADMIN_ROLES.has(String(role || "").toLowerCase());
 }
 
+async function resolveEmployeeUuid(prisma: ReturnType<typeof getPrisma>, employeeCode: string) {
+  const rows = await prisma.$queryRaw<Array<{ employee_uuid: string }>>`
+    SELECT employee_uuid
+    FROM employee_uuid_mappings
+    WHERE employee_code = ${employeeCode}
+    LIMIT 1
+  `;
+  return rows[0]?.employee_uuid || null;
+}
+
 export async function loader({ request, context }: LoaderFunctionArgs) {
+  const prisma = getPrisma(context.cloudflare?.env ?? {});
   const { session, error: authError, status: authStatus } = await validateSession(request, context);
   if (authError || !session) {
     return json({ error: authError || "UNAUTHORIZED" }, { status: authStatus || 401 });
@@ -56,10 +67,15 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
     return json({ error: "EMPLOYEE_NOT_FOUND" }, { status: 404 });
   }
 
+  const employeeUuid = await resolveEmployeeUuid(prisma, empRow.employee_id);
+  if (!employeeUuid) {
+    return json({ error: "EMPLOYEE_UUID_NOT_FOUND" }, { status: 409 });
+  }
+
   let devices;
   try {
     devices = await prisma.authEmployeeDevice.findMany({
-      where: { employee_id: empRow.employee_id },
+      where: { employee_id: employeeUuid },
       orderBy: { registered_at: "desc" },
       select: {
         id: true,
@@ -81,6 +97,7 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
 }
 
 export async function action({ request, context }: ActionFunctionArgs) {
+  const prisma = getPrisma(context.cloudflare?.env ?? {});
   const { session, error: authError, status: authStatus } = await validateSession(request, context);
   if (authError || !session) {
     return json({ error: authError || "UNAUTHORIZED" }, { status: authStatus || 401 });
@@ -113,6 +130,11 @@ export async function action({ request, context }: ActionFunctionArgs) {
     return json({ error: "EMPLOYEE_NOT_FOUND" }, { status: 404 });
   }
 
+  const employeeUuid = await resolveEmployeeUuid(prisma, empRow.employee_id);
+  if (!employeeUuid) {
+    return json({ error: "EMPLOYEE_UUID_NOT_FOUND" }, { status: 409 });
+  }
+
   if (body.action === "deactivate") {
     // ─── Deactivate specific device ───────────────────────────────────────
     const deviceId = String(body.device_id || "").trim();
@@ -123,7 +145,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
     // a) Mark device inactive
     try {
       await prisma.authEmployeeDevice.updateMany({
-        where: { employee_id: empRow.employee_id, device_id: deviceId },
+        where: { employee_id: employeeUuid, device_id: deviceId },
         data: { is_active: false },
       });
     } catch (deviceErr) {
@@ -158,7 +180,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
     // ─── Emergency wipe: deactivate ALL devices ────────────────────────────
     try {
       await prisma.authEmployeeDevice.updateMany({
-        where: { employee_id: empRow.employee_id, is_active: true },
+        where: { employee_id: employeeUuid, is_active: true },
         data: { is_active: false },
       });
     } catch (devErr) {

@@ -71,8 +71,8 @@ export async function POST(req) {
   const empId = payload.emp_id;
 
   // Verify employee is still active
-  const emp = await prisma.employee.findFirst({
-    where: { employee_code: empId },
+  const emp = await prisma.employee.findUnique({
+    where: { employee_id: empId },
     select: { status: true },
   });
 

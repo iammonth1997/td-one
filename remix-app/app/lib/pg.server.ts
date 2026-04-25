@@ -8,6 +8,21 @@ type CloudflareContext = {
   };
 };
 
+export function normalizeConnectionString(connectionString: string) {
+  try {
+    const url = new URL(connectionString);
+    url.searchParams.delete("sslmode");
+    url.searchParams.delete("uselibpqcompat");
+    return url.toString();
+  } catch {
+    return connectionString
+      .replace(/[?&]sslmode=[^&]*/g, "")
+      .replace(/[?&]uselibpqcompat=[^&]*/g, "")
+      .replace(/\?$/, "")
+      .replace(/&$/, "");
+  }
+}
+
 export function isRetryableDbError(error: unknown) {
   const code = String((error as { code?: string })?.code || "");
   const message = String((error as { message?: string })?.message || "").toLowerCase();
@@ -22,9 +37,12 @@ export function isRetryableDbError(error: unknown) {
 export function getConnectionString(context?: unknown) {
   const env = (context as CloudflareContext | undefined)?.cloudflare?.env ?? {};
   const processEnv = typeof process !== "undefined" ? process.env : undefined;
+  const hyperdriveConnectionString = (env.HYPERDRIVE as { connectionString?: string } | undefined)?.connectionString;
+  const directDatabaseUrl = typeof env.DATABASE_URL === "string" ? env.DATABASE_URL : null;
+
   return (
-    ((env.HYPERDRIVE as { connectionString?: string } | undefined)?.connectionString) ||
-    (typeof env.DATABASE_URL === "string" ? env.DATABASE_URL : null) ||
+    hyperdriveConnectionString ||
+    directDatabaseUrl ||
     processEnv?.DATABASE_URL ||
     null
   );
@@ -36,9 +54,14 @@ export async function withPgClient<T>(
   retries = 1,
 ): Promise<T> {
   let lastError: unknown = null;
+  const sslDisabled = /[?&]sslmode=disable/.test(connectionString);
+  const normalizedConnectionString = normalizeConnectionString(connectionString);
 
   for (let attempt = 0; attempt <= retries; attempt += 1) {
-    const client = new Client({ connectionString });
+    const client = new Client({
+      connectionString: normalizedConnectionString,
+      ssl: sslDisabled ? false : { rejectUnauthorized: false },
+    });
     try {
       await client.connect();
       const result = await fn(client);

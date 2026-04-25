@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { mockPrismaModule } from './prisma-test-helper.js';
 
 describe('manpower API handler', () => {
   beforeEach(() => { vi.resetModules(); });
@@ -20,7 +21,7 @@ describe('manpower API handler', () => {
   describe('GET /api/admin/manpower', () => {
     it('returns FORBIDDEN for non-admin', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeNonAdminMock() }));
-      vi.doMock('@/lib/prisma', () => ({ default: { manpowerPlan: { findMany: vi.fn(), create: vi.fn() } } }));
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({ manpowerPlan: { findMany: vi.fn(), create: vi.fn() } }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
 
       const { GET } = await import('../../server/api/admin/manpower/route.js');
@@ -33,10 +34,8 @@ describe('manpower API handler', () => {
     it('returns list of manpower plans for admin', async () => {
       const rows = [{ id: 'p1', plan_year: 2026, plan_name: 'Annual Plan 2026', status: 'draft' }];
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          manpowerPlan: { findMany: vi.fn(async () => rows), create: vi.fn() },
-        },
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        manpowerPlan: { findMany: vi.fn(async () => rows), create: vi.fn() },
       }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
 
@@ -53,10 +52,8 @@ describe('manpower API handler', () => {
     it('creates a manpower plan successfully', async () => {
       const newPlan = { id: 'p2', plan_year: 2026, plan_name: '2026 Expansion Plan', status: 'draft' };
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          manpowerPlan: { findMany: vi.fn(), create: vi.fn(async () => newPlan) },
-        },
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        manpowerPlan: { findMany: vi.fn(), create: vi.fn(async () => newPlan) },
       }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
 
@@ -76,7 +73,7 @@ describe('manpower API handler', () => {
 
     it('returns MISSING_REQUIRED_FIELDS when plan_year omitted', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
-      vi.doMock('@/lib/prisma', () => ({ default: { manpowerPlan: { findMany: vi.fn(), create: vi.fn() } } }));
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({ manpowerPlan: { findMany: vi.fn(), create: vi.fn() } }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
 
       const { POST } = await import('../../server/api/admin/manpower/route.js');
@@ -94,7 +91,7 @@ describe('manpower API handler', () => {
 
     it('returns FORBIDDEN when non-admin tries to approve a plan', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeNonAdminMock() }));
-      vi.doMock('@/lib/prisma', () => ({ default: { manpowerPlan: { findMany: vi.fn(), create: vi.fn() } } }));
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({ manpowerPlan: { findMany: vi.fn(), create: vi.fn() } }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
 
       const { POST } = await import('../../server/api/admin/manpower/route.js');

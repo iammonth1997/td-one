@@ -14,7 +14,7 @@
 
 import type { ActionFunctionArgs } from "react-router";
 import { validateSession } from "~/lib/session-validation.server";
-import prisma from "~/lib/prisma.server";
+import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog, AuditEvent } from "~/lib/audit-log.server";
 import bcrypt from "bcryptjs";
 
@@ -49,6 +49,7 @@ function generateActivationCode(): string {
 }
 
 export async function action({ request, context }: ActionFunctionArgs) {
+  const prisma = getPrisma(context.cloudflare?.env ?? {});
   const { session, error: authError, status: authStatus } = await validateSession(request, context);
   if (authError || !session) {
     return json({ error: authError || "UNAUTHORIZED" }, { status: authStatus || 401 });

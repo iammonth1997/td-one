@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { mockPrismaModule } from './prisma-test-helper.js';
 
 describe('admin deductions API handler', () => {
   let GET;
@@ -16,11 +17,9 @@ describe('admin deductions API handler', () => {
       })),
     }));
 
-    vi.doMock('@/lib/prisma', () => ({
-      default: {
-        deductionTemplate: { findMany: vi.fn(async () => []) },
-        employeeDeduction: { count: vi.fn(async () => 0) },
-      },
+    vi.doMock('@/lib/prisma', () => mockPrismaModule({
+      deductionTemplate: { findMany: vi.fn(async () => []) },
+      employeeDeduction: { count: vi.fn(async () => 0) },
     }));
 
     const route = await import('../../server/api/admin/deductions/route.js');
@@ -47,11 +46,9 @@ describe('admin deductions API handler', () => {
       })),
     }));
 
-    vi.doMock('@/lib/prisma', () => ({
-      default: {
-        deductionTemplate: { findMany: vi.fn(async () => templates) },
-        employeeDeduction: { count: vi.fn(async () => 5) },
-      },
+    vi.doMock('@/lib/prisma', () => mockPrismaModule({
+      deductionTemplate: { findMany: vi.fn(async () => templates) },
+      employeeDeduction: { count: vi.fn(async () => 5) },
     }));
 
     const route = await import('../../server/api/admin/deductions/route.js');

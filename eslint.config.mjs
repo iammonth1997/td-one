@@ -7,6 +7,7 @@ export default defineConfig([
     "build/**",
     "dist/**",
     "coverage/**",
+    "remix-app/build/**",
     "remix-app/.react-router/**",
   ]),
 ]);

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { mockPrismaModule } from './prisma-test-helper.js';
 
 describe('recruitment API handler', () => {
   let GET, POST;
@@ -18,11 +19,9 @@ describe('recruitment API handler', () => {
   describe('GET /api/recruitment', () => {
     it('returns FORBIDDEN when not admin', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeNonAdminMock() }));
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          recruitmentRequisition: { findMany: vi.fn(), create: vi.fn() },
-          recruitmentCandidate: { findMany: vi.fn(), create: vi.fn() },
-        },
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        recruitmentRequisition: { findMany: vi.fn(), create: vi.fn() },
+        recruitmentCandidate: { findMany: vi.fn(), create: vi.fn() },
       }));
 
       const route = await import('../../server/api/recruitment/route.js');
@@ -40,11 +39,9 @@ describe('recruitment API handler', () => {
       ];
 
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          recruitmentRequisition: { findMany: vi.fn(async () => rows), create: vi.fn() },
-          recruitmentCandidate: { findMany: vi.fn(), create: vi.fn() },
-        },
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        recruitmentRequisition: { findMany: vi.fn(async () => rows), create: vi.fn() },
+        recruitmentCandidate: { findMany: vi.fn(), create: vi.fn() },
       }));
 
       const route = await import('../../server/api/recruitment/route.js');
@@ -63,11 +60,9 @@ describe('recruitment API handler', () => {
       ];
 
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          recruitmentRequisition: { findMany: vi.fn(), create: vi.fn() },
-          recruitmentCandidate: { findMany: vi.fn(async () => candidates), create: vi.fn() },
-        },
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        recruitmentRequisition: { findMany: vi.fn(), create: vi.fn() },
+        recruitmentCandidate: { findMany: vi.fn(async () => candidates), create: vi.fn() },
       }));
 
       const route = await import('../../server/api/recruitment/route.js');
@@ -84,11 +79,9 @@ describe('recruitment API handler', () => {
   describe('POST /api/recruitment', () => {
     it('returns FORBIDDEN when not admin', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeNonAdminMock() }));
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          recruitmentRequisition: { findMany: vi.fn(), create: vi.fn() },
-          recruitmentCandidate: { findMany: vi.fn(), create: vi.fn() },
-        },
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        recruitmentRequisition: { findMany: vi.fn(), create: vi.fn() },
+        recruitmentCandidate: { findMany: vi.fn(), create: vi.fn() },
       }));
 
       const route = await import('../../server/api/recruitment/route.js');
@@ -105,11 +98,9 @@ describe('recruitment API handler', () => {
 
     it('returns MISSING_REQUIRED_FIELDS when job_code is missing', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          recruitmentRequisition: { findMany: vi.fn(), create: vi.fn() },
-          recruitmentCandidate: { findMany: vi.fn(), create: vi.fn() },
-        },
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        recruitmentRequisition: { findMany: vi.fn(), create: vi.fn() },
+        recruitmentCandidate: { findMany: vi.fn(), create: vi.fn() },
       }));
 
       const route = await import('../../server/api/recruitment/route.js');
@@ -128,11 +119,9 @@ describe('recruitment API handler', () => {
 
     it('returns UNKNOWN_ACTION for unrecognised action', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          recruitmentRequisition: { findMany: vi.fn(), create: vi.fn() },
-          recruitmentCandidate: { findMany: vi.fn(), create: vi.fn() },
-        },
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        recruitmentRequisition: { findMany: vi.fn(), create: vi.fn() },
+        recruitmentCandidate: { findMany: vi.fn(), create: vi.fn() },
       }));
 
       const route = await import('../../server/api/recruitment/route.js');

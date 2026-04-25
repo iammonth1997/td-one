@@ -2,6 +2,9 @@
   "name": "td-one",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22 <23"
+  },
   "scripts": {
     "dev": "npm --prefix remix-app run dev",
     "dev:turbo": "npm --prefix remix-app run dev",

@@ -126,6 +126,25 @@ export async function action({ request }: ActionFunctionArgs) {
     return json({ error: emp ? "ACCOUNT_BLOCKED" : "EMPLOYEE_NOT_FOUND" }, { status: 403 });
   }
 
+  let employeeUuid: string | null = null;
+  try {
+    const mappingRows = await prisma.$queryRaw<Array<{ employee_uuid: string }>>`
+      INSERT INTO employee_uuid_mappings (employee_code)
+      VALUES (${empId})
+      ON CONFLICT (employee_code) DO UPDATE
+      SET updated_at = now()
+      RETURNING employee_uuid
+    `;
+    employeeUuid = mappingRows[0]?.employee_uuid || null;
+  } catch (mappingErr) {
+    console.error("activate: employee_uuid mapping error:", mappingErr);
+    return json({ error: "EMPLOYEE_UUID_MAPPING_FAILED" }, { status: 500 });
+  }
+
+  if (!employeeUuid) {
+    return json({ error: "EMPLOYEE_UUID_MAPPING_FAILED" }, { status: 500 });
+  }
+
   // ─── Set password ─────────────────────────────────────────────────────────
   const passwordHash = await hashPassword(rawPassword);
 
@@ -158,10 +177,10 @@ export async function action({ request }: ActionFunctionArgs) {
   // ─── Register device ──────────────────────────────────────────────────────
   if (deviceId) {
     void prisma.authEmployeeDevice.upsert({
-      where: { employee_id_device_id: { employee_id: emp.employee_id, device_id: deviceId } },
+      where: { employee_id_device_id: { employee_id: employeeUuid, device_id: deviceId } },
       update: { last_active_at: new Date(), is_active: true },
       create: {
-        employee_id: emp.employee_id,
+        employee_id: employeeUuid,
         device_id: deviceId,
         device_name: deviceName,
         platform,

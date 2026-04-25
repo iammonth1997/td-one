@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import postgres from "postgres";
+import { Client } from "pg";
 import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
 import { hasAnyPermission } from "@/lib/rbac/access";
 import { ADMIN_PORTAL } from "@/lib/sessionContext";
@@ -64,7 +64,8 @@ function isRetryableDbError(error) {
 }
 
 function getConnectionString(context) {
-  return context?.cloudflare?.env?.HYPERDRIVE?.connectionString || null;
+  const hyperdriveConnectionString = context?.cloudflare?.env?.HYPERDRIVE?.connectionString || null;
+  return hyperdriveConnectionString || context?.cloudflare?.env?.DATABASE_URL || null;
 }
 
 function getCookieValue(cookieHeader, name) {
@@ -94,36 +95,22 @@ async function withPgClient(connectionString, fn, retries = 1) {
   const normalizedConnectionString = normalizeConnectionString(connectionString);
 
   for (let attempt = 0; attempt <= retries; attempt += 1) {
-    const requiresSsl = /[?&]sslmode=require\b/i.test(normalizedConnectionString);
-    console.log("[login] PG-A: before postgres()", {
+    console.log("[login] PG-A: before client.connect()", {
       attempt,
-      requiresSsl,
     });
-    const sql = postgres(normalizedConnectionString, {
-      fetch_types: false,
-      prepare: false,
-      max: 1,
-      connect_timeout: 5,
-      idle_timeout: 5,
-      ...(requiresSsl ? { ssl: "require" } : {}),
-    });
-    const client = {
-      query: async (query, params = []) => {
-        const rows = await sql.unsafe(query, params);
-        return { rows };
-      },
-    };
+    const client = new Client({ connectionString: normalizedConnectionString });
 
     try {
-      console.log("[login] PG-B: postgres() returned client", { attempt });
+      await client.connect();
+      console.log("[login] PG-B: client connected", { attempt });
       console.log("[login] PG-C: before fn(client)", { attempt });
       const result = await fn(client);
       console.log("[login] PG-D: fn(client) completed", {
         attempt,
         hasResult: result != null,
       });
-      console.log("[login] PG-E: before sql.end()", { attempt });
-      await sql.end({ timeout: 0 }).catch(() => {});
+      console.log("[login] PG-E: before client.end()", { attempt });
+      await client.end().catch(() => {});
       return result;
     } catch (error) {
       lastError = error;
@@ -132,8 +119,8 @@ async function withPgClient(connectionString, fn, retries = 1) {
         attempt,
         message: String(error?.message || error),
       });
-      console.log("[login] PG-Y: before sql.end() in catch", { attempt });
-      await sql.end({ timeout: 0 }).catch(() => {});
+      console.log("[login] PG-Y: before client.end() in catch", { attempt });
+      await client.end().catch(() => {});
       if (!isRetryableDbError(error) || attempt === retries) break;
       await new Promise((resolve) => setTimeout(resolve, 150));
     }

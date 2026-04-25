@@ -63,7 +63,7 @@ export async function POST(req) {
     empRows = await prisma.$queryRaw`
       SELECT date_of_birth, start_date, status
       FROM employees
-      WHERE employee_code = ${empId}
+      WHERE employee_id = ${empId}
       LIMIT 1
     `;
   } catch (err) {

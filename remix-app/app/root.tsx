@@ -14,13 +14,27 @@ import type { Route } from "./+types/root";
 import { LanguageSwitcher } from "./components/language-switcher";
 import { PwaInstallPrompt } from "./components/pwa-install-prompt";
 import { PwaRegister } from "./components/pwa-register";
+import { loadEmployeeDashboardSnapshot } from "./lib/employee-dashboard.server";
+import { getConnectionString } from "./lib/pg.server";
 import { I18nProvider, useI18n } from "./lib/i18n";
 import { getLangFromRequest } from "./lib/i18n.server";
 import type { LangCode } from "./lib/i18n.shared";
+import { validateSession } from "./lib/session-validation.server";
 import "./app.css";
 
-export async function loader({ request }: Route.LoaderArgs) {
-  return { lang: await getLangFromRequest(request) };
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const lang = await getLangFromRequest(request);
+  const pathname = new URL(request.url).pathname;
+  let shellData = null;
+
+  if (showEmployeeShell(pathname)) {
+    const { session, error } = await validateSession(request, context);
+    if (!error && session) {
+      shellData = await loadEmployeeDashboardSnapshot(getConnectionString(context), session.emp_id);
+    }
+  }
+
+  return { lang, shellData };
 }
 
 export const links: Route.LinksFunction = () => [
@@ -54,7 +68,7 @@ const EMPLOYEE_SHELL_COPY: Record<
   }
 > = {
   th: {
-    avatar: "ผ",
+    avatar: "TDLao",
     title: "พนักงาน",
     subtitle: "employee_portal",
     stats: [
@@ -167,6 +181,30 @@ function IconProfile({ className }: { className?: string }) {
 function AppHeader() {
   const { lang } = useI18n();
   const copy = EMPLOYEE_SHELL_COPY[lang];
+  const loaderData = useLoaderData<typeof loader>();
+  const shellData = loaderData.shellData;
+
+  const daysUnit = lang === "en" ? "days" : lang === "lo" ? "ມື້" : "วัน";
+  const hoursUnit = lang === "en" ? "hrs" : lang === "lo" ? "ຊມ." : "ชม.";
+  const formatMetricValue = (value: number) => (Number.isInteger(value) ? String(value) : value.toFixed(1));
+  const stats = [
+    {
+      ...copy.stats[0],
+      value: shellData?.todayCheckInTime || "--:--",
+    },
+    {
+      ...copy.stats[1],
+      value: `${formatMetricValue(shellData?.workedDaysThisMonth ?? 0)} ${daysUnit}`,
+    },
+    {
+      ...copy.stats[2],
+      value: `${formatMetricValue(shellData?.nightShiftDaysThisMonth ?? 0)} ${daysUnit}`,
+    },
+    {
+      ...copy.stats[3],
+      value: `${formatMetricValue(shellData?.otHoursTotal ?? 0)} ${hoursUnit}`,
+    },
+  ];
 
   return (
     <header className="relative shrink-0 overflow-hidden bg-[linear-gradient(160deg,#4A0010_0%,#B00030_55%,#E8193A_100%)] px-5 pb-[18px] pt-[calc(14px+env(safe-area-inset-top,0px))]">
@@ -197,7 +235,7 @@ function AppHeader() {
         <LanguageSwitcher />
       </div>
       <div className="relative mt-3.5 flex gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {copy.stats.map((item) => (
+        {stats.map((item) => (
           <div
             key={item.label}
             className={`flex min-w-[80px] shrink-0 flex-col rounded-xl px-3 py-2 backdrop-blur-[8px] ${

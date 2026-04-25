@@ -153,7 +153,7 @@ export default function ChangePasswordPage({ loaderData }: Route.ComponentProps)
                 <path d="M7 11V7a5 5 0 0 1 10 0v4" />
               </svg>
             </span>
-            <span className="flex-1 text-[14px] font-semibold text-[#0D0D0D]">เปลี่ยน PIN</span>
+            <span className="flex-1 text-[14px] font-semibold text-[#0D0D0D]">เปลี่ยนรหัสผ่าน</span>
             <svg className="shrink-0 text-[#9898AA]" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M9 18l6-6-6-6" />
             </svg>
@@ -180,9 +180,9 @@ export default function ChangePasswordPage({ loaderData }: Route.ComponentProps)
       </div>
 
       <div id="change-pin-form" className="mb-5 rounded-[16px] border border-black/[0.07] bg-white p-4 shadow-sm">
-        <h2 className="mb-2 text-base font-bold text-[#0D0D0D]">เปลี่ยน PIN</h2>
+        <h2 className="mb-2 text-base font-bold text-[#0D0D0D]">เปลี่ยนรหัสผ่าน</h2>
         <p className="mb-4 text-sm text-[#9898AA]">
-          {loaderData.mustChangePassword ? "กรุณาตั้งค่า PIN ใหม่ของคุณตอนนี้" : "กรอก PIN ปัจจุบันและ PIN ใหม่"}
+          {loaderData.mustChangePassword ? "กรุณาตั้งค่ารหัสผ่านใหม่ของคุณตอนนี้" : "กรอกรหัสผ่านปัจจุบันและรหัสผ่านใหม่"}
         </p>
 
         {!loaderData.mustChangePassword ? (

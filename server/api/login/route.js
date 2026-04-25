@@ -66,7 +66,7 @@ export async function POST(req) {
       .then((result) => { stamp("login_user_loaded"); return result; });
 
     const employeeLookupPromise = prisma.employee
-      .findFirst({ where: { employee_code: empId }, select: { status: true } })
+      .findUnique({ where: { employee_id: empId }, select: { status: true } })
       .then((result) => { stamp("employee_loaded"); return result; });
 
     [user, emp] = await Promise.all([userLookupPromise, employeeLookupPromise]);

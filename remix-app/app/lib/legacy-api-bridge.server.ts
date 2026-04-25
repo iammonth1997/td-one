@@ -1,4 +1,5 @@
 import { sessionTokenCookie } from "~/lib/session-cookie.server";
+import { bindRequestCloudflareEnv } from "@/lib/requestContext";
 
 type LegacyHandler = (request: Request, context?: unknown) => Promise<Response> | Response;
 
@@ -92,7 +93,10 @@ export async function proxyLegacyApi(request: Request, mod: LegacyModule, contex
     });
   }
 
-  const adaptedRequest = await withAuthorizationHeaderFromCookie(request);
+  const adaptedRequest = bindRequestCloudflareEnv(
+    await withAuthorizationHeaderFromCookie(request),
+    context,
+  );
   const restoreEnv = hydrateProcessEnvFromContext(context);
   try {
     return await handler(adaptedRequest, context);

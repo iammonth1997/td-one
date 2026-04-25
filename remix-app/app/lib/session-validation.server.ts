@@ -82,14 +82,14 @@ export async function validateSession(request: Request, context: unknown) {
   if (!data.device_id) {
     try {
       const employeeId = await withPgClient(connectionString, async (client) => {
-        const employeeResult = await client.query<{ id: string }>(
-          `SELECT id
-           FROM employees
-           WHERE employee_id = $1
+        const employeeResult = await client.query<{ employee_uuid: string }>(
+          `SELECT employee_uuid
+           FROM employee_uuid_mappings
+           WHERE employee_code = $1
            LIMIT 1`,
           [data!.emp_id],
         );
-        return employeeResult.rows[0]?.id || null;
+        return employeeResult.rows[0]?.employee_uuid || null;
       });
       if (!employeeId) {
         return { session: null, error: "EMPLOYEE_NOT_FOUND", status: 404 };

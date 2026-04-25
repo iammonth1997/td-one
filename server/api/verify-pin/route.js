@@ -53,8 +53,8 @@ export async function POST(req) {
 
     let emp;
     try {
-      emp = await prisma.employee.findFirst({
-        where: { employee_code: empId },
+      emp = await prisma.employee.findUnique({
+        where: { employee_id: empId },
         select: { status: true },
       });
     } catch (err) {

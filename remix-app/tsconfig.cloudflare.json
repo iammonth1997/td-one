@@ -5,6 +5,8 @@
     "app/**/*",
     "app/**/.server/**/*",
     "app/**/.client/**/*",
+    "../lib/prisma.ts",
+    "../lib/requestContext.ts",
     "../lib/useGPSCollection.ts",
     "../lib/gpsSpoofingDetection.ts",
     "workers/**/*",

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { mockPrismaModule } from './prisma-test-helper.js';
 
 describe('hr-er API handler', () => {
   let GET, POST;
@@ -18,12 +19,10 @@ describe('hr-er API handler', () => {
   describe('GET /api/hr-er', () => {
     it('returns FORBIDDEN when not admin', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeNonAdminMock() }));
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          hrErCase: { findMany: vi.fn(), create: vi.fn() },
-          employee: { findFirst: vi.fn() },
-          employeeDeduction: { create: vi.fn() },
-        },
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        hrErCase: { findMany: vi.fn(), create: vi.fn() },
+        employee: { findFirst: vi.fn() },
+        employeeDeduction: { create: vi.fn() },
       }));
 
       const route = await import('../../server/api/hr-er/route.js');
@@ -41,12 +40,10 @@ describe('hr-er API handler', () => {
       ];
 
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          hrErCase: { findMany: vi.fn(async () => rows), create: vi.fn() },
-          employee: { findFirst: vi.fn() },
-          employeeDeduction: { create: vi.fn() },
-        },
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        hrErCase: { findMany: vi.fn(async () => rows), create: vi.fn() },
+        employee: { findFirst: vi.fn() },
+        employeeDeduction: { create: vi.fn() },
       }));
 
       const route = await import('../../server/api/hr-er/route.js');
@@ -63,12 +60,10 @@ describe('hr-er API handler', () => {
   describe('POST /api/hr-er', () => {
     it('returns FORBIDDEN when not admin', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeNonAdminMock() }));
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          hrErCase: { findMany: vi.fn(), create: vi.fn() },
-          employee: { findFirst: vi.fn() },
-          employeeDeduction: { create: vi.fn() },
-        },
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        hrErCase: { findMany: vi.fn(), create: vi.fn() },
+        employee: { findFirst: vi.fn() },
+        employeeDeduction: { create: vi.fn() },
       }));
 
       const route = await import('../../server/api/hr-er/route.js');
@@ -85,12 +80,10 @@ describe('hr-er API handler', () => {
 
     it('returns MISSING_REQUIRED_FIELDS when title is missing', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          hrErCase: { findMany: vi.fn(), create: vi.fn() },
-          employee: { findFirst: vi.fn() },
-          employeeDeduction: { create: vi.fn() },
-        },
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        hrErCase: { findMany: vi.fn(), create: vi.fn() },
+        employee: { findFirst: vi.fn() },
+        employeeDeduction: { create: vi.fn() },
       }));
 
       const route = await import('../../server/api/hr-er/route.js');
@@ -109,12 +102,10 @@ describe('hr-er API handler', () => {
 
     it('returns INVALID_CASE_TYPE for invalid case_type', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          hrErCase: { findMany: vi.fn(), create: vi.fn() },
-          employee: { findFirst: vi.fn() },
-          employeeDeduction: { create: vi.fn() },
-        },
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        hrErCase: { findMany: vi.fn(), create: vi.fn() },
+        employee: { findFirst: vi.fn() },
+        employeeDeduction: { create: vi.fn() },
       }));
 
       const route = await import('../../server/api/hr-er/route.js');
@@ -133,12 +124,10 @@ describe('hr-er API handler', () => {
 
     it('apply_deduction uses employee_deductions table — rejects invalid deduction_kind', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          hrErCase: { findMany: vi.fn(), create: vi.fn() },
-          employee: { findFirst: vi.fn() },
-          employeeDeduction: { create: vi.fn() },
-        },
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        hrErCase: { findMany: vi.fn(), create: vi.fn() },
+        employee: { findFirst: vi.fn() },
+        employeeDeduction: { create: vi.fn() },
       }));
 
       const route = await import('../../server/api/hr-er/route.js');
@@ -157,12 +146,10 @@ describe('hr-er API handler', () => {
 
     it('apply_deduction rejects zero or negative amount', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          hrErCase: { findMany: vi.fn(), create: vi.fn() },
-          employee: { findFirst: vi.fn() },
-          employeeDeduction: { create: vi.fn() },
-        },
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        hrErCase: { findMany: vi.fn(), create: vi.fn() },
+        employee: { findFirst: vi.fn() },
+        employeeDeduction: { create: vi.fn() },
       }));
 
       const route = await import('../../server/api/hr-er/route.js');
@@ -190,12 +177,10 @@ describe('hr-er API handler', () => {
       };
 
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          hrErCase: { findMany: vi.fn(), create: vi.fn() },
-          employee: { findFirst: vi.fn(async () => ({ id: 'emp-uuid-1', employee_code: 'EMP01' })) },
-          employeeDeduction: { create: vi.fn(async () => insertedDeduction) },
-        },
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        hrErCase: { findMany: vi.fn(), create: vi.fn() },
+        employee: { findFirst: vi.fn(async () => ({ id: 'emp-uuid-1', employee_code: 'EMP01' })) },
+        employeeDeduction: { create: vi.fn(async () => insertedDeduction) },
       }));
 
       const route = await import('../../server/api/hr-er/route.js');
@@ -220,14 +205,35 @@ describe('hr-er API handler', () => {
       expect(body.row.custom_name).toBe('Welfare Deduction');
     });
 
+    it('returns EMPLOYEE_UUID_NOT_FOUND when employee exists but UUID mapping is unavailable', async () => {
+      vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        $queryRaw: vi.fn(async () => [{ employee_code: 'EMP01', employee_uuid: null }]),
+        hrErCase: { findMany: vi.fn(), create: vi.fn() },
+        employee: { findFirst: vi.fn() },
+        employeeDeduction: { create: vi.fn() },
+      }));
+
+      const route = await import('../../server/api/hr-er/route.js');
+      POST = route.POST;
+
+      const req = new Request('http://localhost/api/hr-er', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'create_case', employee_code: 'EMP01', case_type: 'grievance', title: 'Test' }),
+      });
+      const res = await POST(req);
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      expect(body.error).toBe('EMPLOYEE_UUID_NOT_FOUND');
+    });
+
     it('returns UNKNOWN_ACTION for unrecognised action', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          hrErCase: { findMany: vi.fn(), create: vi.fn() },
-          employee: { findFirst: vi.fn() },
-          employeeDeduction: { create: vi.fn() },
-        },
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        hrErCase: { findMany: vi.fn(), create: vi.fn() },
+        employee: { findFirst: vi.fn() },
+        employeeDeduction: { create: vi.fn() },
       }));
 
       const route = await import('../../server/api/hr-er/route.js');

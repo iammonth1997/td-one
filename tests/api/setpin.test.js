@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { mockPrismaModule } from './prisma-test-helper.js';
 
 let POST;
 
@@ -13,11 +14,9 @@ describe('set-pin API handler', () => {
         clearFailedAttempts: vi.fn(async () => {}),
       }));
 
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          employee: { findFirst: vi.fn(async () => null) },
-          $executeRaw: vi.fn(async () => 1),
-        },
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        employee: { findUnique: vi.fn(async () => null) },
+        $executeRaw: vi.fn(async () => 1),
       }));
 
       const route = await import('../../server/api/login/set-pin/route.js');
@@ -66,16 +65,14 @@ describe('set-pin API handler', () => {
         clearFailedAttempts: vi.fn(async () => {}),
       }));
 
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          employee: {
-            findFirst: vi.fn(async () => ({
-              date_of_birth: new Date('2000-01-01'),
-              status: 'active',
-            })),
-          },
-          $executeRaw: vi.fn(async () => 1),
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        employee: {
+          findUnique: vi.fn(async () => ({
+            date_of_birth: new Date('2000-01-01'),
+            status: 'active',
+          })),
         },
+        $executeRaw: vi.fn(async () => 1),
       }));
 
       const route = await import('../../server/api/login/set-pin/route.js');

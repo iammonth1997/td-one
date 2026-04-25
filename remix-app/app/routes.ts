@@ -96,6 +96,7 @@ export default [
 	route("api/time-correction-request", "routes/api.time-correction-request.ts"),
 	route("api/time-correction-request/:id", "routes/api.time-correction-request.$id.ts"),
 	route("api/request-history", "routes/api.request-history.ts"),
+	route("api/debug/db", "routes/api.debug.db.ts"),
 	route("api/recruitment", "routes/api.recruitment.ts"),
 	route("api/recruitment/:id", "routes/api.recruitment.$id.ts"),
 	route("api/hr-er", "routes/api.hr-er.ts"),

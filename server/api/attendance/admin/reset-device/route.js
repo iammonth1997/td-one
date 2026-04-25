@@ -54,15 +54,25 @@ export async function POST(req) {
 
   let employee = null;
   try {
-    employee = await prisma.employee.findFirst({
-      where: { employee_code: empCode },
-      select: { id: true, employee_code: true },
-    });
+    const rows = await prisma.$queryRaw`
+      SELECT
+        e.employee_id AS employee_code,
+        m.employee_uuid AS employee_uuid
+      FROM employees e
+      LEFT JOIN employee_uuid_mappings m
+        ON m.employee_code = e.employee_id
+      WHERE UPPER(e.employee_id) = ${empCode}
+      LIMIT 1
+    `;
+    const row = Array.isArray(rows) ? rows[0] : null;
+    employee = row
+      ? { id: row.employee_uuid || null, employee_code: row.employee_code || empCode }
+      : null;
   } catch (err) {
     return Response.json({ error: "EMPLOYEE_QUERY_FAILED", detail: err.message }, { status: 500 });
   }
 
-  if (!employee) {
+  if (!employee || !employee.id) {
     return Response.json({ error: "EMPLOYEE_NOT_FOUND" }, { status: 400 });
   }
 

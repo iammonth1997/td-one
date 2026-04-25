@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { mockPrismaModule } from './prisma-test-helper.js';
 
 describe('medical-check API handler', () => {
   beforeEach(() => { vi.resetModules(); });
@@ -20,12 +21,10 @@ describe('medical-check API handler', () => {
     it('returns FORBIDDEN for non-admin', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeNonAdminMock() }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          medicalCheckType: { findMany: vi.fn(), create: vi.fn() },
-          medicalCheck: { findMany: vi.fn(), create: vi.fn() },
-          employee: { findFirst: vi.fn() },
-        },
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        medicalCheckType: { findMany: vi.fn(), create: vi.fn() },
+        medicalCheck: { findMany: vi.fn(), create: vi.fn() },
+        employee: { findFirst: vi.fn() },
       }));
 
       const { GET } = await import('../../server/api/admin/medical-check/route.js');
@@ -37,12 +36,10 @@ describe('medical-check API handler', () => {
       const types = [{ id: 't1', check_name: 'Blood Test', is_mandatory_pre_employment: true }];
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          medicalCheckType: { findMany: vi.fn(async () => types), create: vi.fn() },
-          medicalCheck: { findMany: vi.fn(), create: vi.fn() },
-          employee: { findFirst: vi.fn() },
-        },
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        medicalCheckType: { findMany: vi.fn(async () => types), create: vi.fn() },
+        medicalCheck: { findMany: vi.fn(), create: vi.fn() },
+        employee: { findFirst: vi.fn() },
       }));
 
       const { GET } = await import('../../server/api/admin/medical-check/route.js');
@@ -58,12 +55,10 @@ describe('medical-check API handler', () => {
       const checks = [{ id: 'mc1', person_type: 'employee', result: 'fit', check_date: '2026-01-15' }];
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          medicalCheckType: { findMany: vi.fn(), create: vi.fn() },
-          medicalCheck: { findMany: vi.fn(async () => checks), create: vi.fn() },
-          employee: { findFirst: vi.fn(async () => ({ id: 'emp-uuid-1' })) },
-        },
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        medicalCheckType: { findMany: vi.fn(), create: vi.fn() },
+        medicalCheck: { findMany: vi.fn(async () => checks), create: vi.fn() },
+        employee: { findFirst: vi.fn(async () => ({ id: 'emp-uuid-1' })) },
       }));
 
       const { GET } = await import('../../server/api/admin/medical-check/route.js');
@@ -79,12 +74,10 @@ describe('medical-check API handler', () => {
       const newCheck = { id: 'mc2', person_type: 'candidate', result: 'fit', check_date: '2026-03-10', hospital_name: 'City Hospital' };
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          medicalCheckType: { findMany: vi.fn(), create: vi.fn() },
-          medicalCheck: { findMany: vi.fn(), create: vi.fn(async () => newCheck) },
-          employee: { findFirst: vi.fn() },
-        },
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        medicalCheckType: { findMany: vi.fn(), create: vi.fn() },
+        medicalCheck: { findMany: vi.fn(), create: vi.fn(async () => newCheck) },
+        employee: { findFirst: vi.fn() },
       }));
 
       const { POST } = await import('../../server/api/admin/medical-check/route.js');
@@ -111,12 +104,10 @@ describe('medical-check API handler', () => {
     it('returns INVALID_RESULT for unknown result value', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          medicalCheckType: { findMany: vi.fn(), create: vi.fn() },
-          medicalCheck: { findMany: vi.fn(), create: vi.fn() },
-          employee: { findFirst: vi.fn() },
-        },
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        medicalCheckType: { findMany: vi.fn(), create: vi.fn() },
+        medicalCheck: { findMany: vi.fn(), create: vi.fn() },
+        employee: { findFirst: vi.fn() },
       }));
 
       const { POST } = await import('../../server/api/admin/medical-check/route.js');
@@ -142,12 +133,10 @@ describe('medical-check API handler', () => {
     it('returns MISSING_REQUIRED_FIELDS when check_date absent', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          medicalCheckType: { findMany: vi.fn(), create: vi.fn() },
-          medicalCheck: { findMany: vi.fn(), create: vi.fn() },
-          employee: { findFirst: vi.fn() },
-        },
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        medicalCheckType: { findMany: vi.fn(), create: vi.fn() },
+        medicalCheck: { findMany: vi.fn(), create: vi.fn() },
+        employee: { findFirst: vi.fn() },
       }));
 
       const { POST } = await import('../../server/api/admin/medical-check/route.js');

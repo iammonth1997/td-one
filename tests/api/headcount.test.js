@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { mockPrismaModule } from './prisma-test-helper.js';
 
 describe('headcount request API handler', () => {
   beforeEach(() => { vi.resetModules(); });
@@ -31,10 +32,8 @@ describe('headcount request API handler', () => {
 
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeSupervisorMock() }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          headcountRequest: { create: vi.fn(async () => newReq) },
-        },
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        headcountRequest: { create: vi.fn(async () => newReq) },
       }));
 
       const { POST } = await import('../../server/api/requests/headcount/route.js');
@@ -61,7 +60,7 @@ describe('headcount request API handler', () => {
     it('returns FORBIDDEN when regular employee tries to submit', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeEmployeeMock() }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
-      vi.doMock('@/lib/prisma', () => ({ default: { headcountRequest: { create: vi.fn() } } }));
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({ headcountRequest: { create: vi.fn() } }));
 
       const { POST } = await import('../../server/api/requests/headcount/route.js');
       const req = new Request('http://localhost/api/requests/headcount', {
@@ -77,7 +76,7 @@ describe('headcount request API handler', () => {
     it('returns MISSING_REQUIRED_FIELDS when justification is absent', async () => {
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeSupervisorMock() }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
-      vi.doMock('@/lib/prisma', () => ({ default: { headcountRequest: { create: vi.fn() } } }));
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({ headcountRequest: { create: vi.fn() } }));
 
       const { POST } = await import('../../server/api/requests/headcount/route.js');
       const req = new Request('http://localhost/api/requests/headcount', {
@@ -100,15 +99,13 @@ describe('headcount request API handler', () => {
 
       vi.doMock('@/lib/validateSession', () => ({ validateSession: makeAdminMock() }));
       vi.doMock('@/lib/recruitmentExpandedUtils', () => makeUtils());
-      vi.doMock('@/lib/prisma', () => ({
-        default: {
-          headcountRequest: {
-            findUnique: vi.fn(async () => hcRequest),
-            update: vi.fn(async () => afterApprove),
-          },
-          headcountApprovalAction: {
-            create: vi.fn(async () => ({})),
-          },
+      vi.doMock('@/lib/prisma', () => mockPrismaModule({
+        headcountRequest: {
+          findUnique: vi.fn(async () => hcRequest),
+          update: vi.fn(async () => afterApprove),
+        },
+        headcountApprovalAction: {
+          create: vi.fn(async () => ({})),
         },
       }));
 

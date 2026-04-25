@@ -40,6 +40,24 @@ function getPoolOptions() {
   };
 }
 
+function normalizeConnectionString(connectionString: string) {
+  try {
+    const url = new URL(connectionString);
+
+    if (!url.searchParams.has('connection_limit')) {
+      url.searchParams.set('connection_limit', String(readPositiveInt('PRISMA_CONNECTION_LIMIT', 3)));
+    }
+
+    if (!url.searchParams.has('pool_timeout')) {
+      url.searchParams.set('pool_timeout', String(readPositiveInt('PRISMA_POOL_TIMEOUT', 10)));
+    }
+
+    return url.toString();
+  } catch {
+    return connectionString;
+  }
+}
+
 function shouldUseEphemeralPrismaClient() {
   return String(readEnv('NODE_ENV') || '').trim().toLowerCase() === 'production';
 }
@@ -68,8 +86,9 @@ function createPrismaClient(options: CreatePrismaClientOptions = {}) {
     return new PrismaClient();
   }
 
-  const sslDisabled = /[?&]sslmode=disable/.test(connectionString);
-  const cleanUrl = connectionString.replace(/[?&](sslmode|uselibpqcompat)=[^&]*/g, '').replace(/\?$/, '').replace(/&$/, '');
+  const normalizedUrl = normalizeConnectionString(connectionString);
+  const sslDisabled = /[?&]sslmode=disable/.test(normalizedUrl);
+  const cleanUrl = normalizedUrl.replace(/[?&](sslmode|uselibpqcompat)=[^&]*/g, '').replace(/\?$/, '').replace(/&$/, '');
   const pool =
     (useGlobalPoolCache ? prismaGlobal.prismaPool : undefined) ||
     new Pool({
@@ -98,63 +117,14 @@ function createPrismaClient(options: CreatePrismaClientOptions = {}) {
 }
 
 const globalForPrisma = globalThis as unknown as PrismaGlobal;
+const prisma =
+  shouldUseEphemeralPrismaClient()
+    ? createPrismaClient({ useGlobalPoolCache: false })
+    : globalForPrisma.prisma ?? createPrismaClient();
 
-function withAutoDisconnect<T extends object>(client: PrismaClient, target: T): T {
-  return new Proxy(target, {
-    get(currentTarget, currentProp, receiver) {
-      const value = Reflect.get(currentTarget, currentProp, receiver);
-      if (typeof value !== 'function') {
-        return value;
-      }
-
-      return (...args: unknown[]) => {
-        const result = Reflect.apply(value, currentTarget, args);
-        if (result && typeof (result as Promise<unknown>).finally === 'function') {
-          return (result as Promise<unknown>).finally(async () => {
-            await client.$disconnect().catch(() => {});
-          });
-        }
-
-        void client.$disconnect().catch(() => {});
-        return result;
-      };
-    },
-  }) as T;
+if (!shouldUseEphemeralPrismaClient()) {
+  globalForPrisma.prisma = prisma;
 }
 
-// Lazy initialization keeps Prisma from connecting during module import.
-const prisma: PrismaClient = new Proxy({} as PrismaClient, {
-  get(_target, prop) {
-    if (shouldUseEphemeralPrismaClient()) {
-      const ephemeralClient = createPrismaClient({ useGlobalPoolCache: false });
-      const value = Reflect.get(ephemeralClient, prop);
-
-      if (typeof value === 'function') {
-        return (...args: unknown[]) => {
-          const result = Reflect.apply(value, ephemeralClient, args);
-          if (result && typeof (result as Promise<unknown>).finally === 'function') {
-            return (result as Promise<unknown>).finally(async () => {
-              await ephemeralClient.$disconnect().catch(() => {});
-            });
-          }
-
-          void ephemeralClient.$disconnect().catch(() => {});
-          return result;
-        };
-      }
-
-      if (value && typeof value === 'object') {
-        return withAutoDisconnect(ephemeralClient, value as object);
-      }
-
-      return value;
-    }
-
-    if (!globalForPrisma.prisma) {
-      globalForPrisma.prisma = createPrismaClient();
-    }
-    return Reflect.get(globalForPrisma.prisma, prop);
-  },
-});
-
+export { prisma };
 export default prisma;
