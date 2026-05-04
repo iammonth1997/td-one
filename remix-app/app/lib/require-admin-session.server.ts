@@ -1,5 +1,5 @@
 import { redirectToAdminLogin } from "~/lib/admin-login-redirect.server";
-import { canManagePinReset } from "~/lib/role-access.server";
+import { canAccessAdminPath, canAccessAdminPortal } from "~/lib/role-access.server";
 import { validateSession } from "~/lib/session-validation.server";
 
 export async function requireAdminSession(request: Request, context: unknown) {
@@ -11,9 +11,14 @@ export async function requireAdminSession(request: Request, context: unknown) {
     throw redirectToAdminLogin(request);
   }
 
-  const isAdmin = canManagePinReset(session.role) || session.login_context === "admin_portal";
+  const pathname = new URL(request.url).pathname;
+  const isAdmin = canAccessAdminPortal(session.role, session.login_context);
 
   if (!isAdmin) {
+    throw new Response("FORBIDDEN", { status: 403 });
+  }
+
+  if (!canAccessAdminPath(session.role, pathname, session.login_context)) {
     throw new Response("FORBIDDEN", { status: 403 });
   }
 

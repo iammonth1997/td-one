@@ -69,6 +69,9 @@ export default function ResetPasswordPage() {
         } else if (data.error === "PASSWORD_CONTAINS_EMP_ID") {
           setError("Password must not contain employee ID.");
         } else if (data.error === "FORBIDDEN") setError("You don't have permission to reset password.");
+        else if (data.error === "ACCOUNT_BLOCKED") setError("Employee account is blocked.");
+        else if (data.error === "TOKEN_ISSUER_MISMATCH") setError("This reset link was issued by another admin session.");
+        else if (data.error === "SERVER_CONFIG_MISSING") setError("Reset password service is not configured.");
         else setError("Unable to reset password. Please try again.");
         return;
       }

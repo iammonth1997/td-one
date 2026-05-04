@@ -1,16 +1,8 @@
 import { getDeviceIdFromRequest } from "~/lib/device-cookie.server";
 import { getConnectionString, withPgClient } from "~/lib/pg.server";
+import { canAccessAdminPortal } from "~/lib/role-access.server";
 import { getSessionTokenFromRequest } from "~/lib/session-cookie.server";
-import { ADMIN_PORTAL, normalizeLoginContext } from "~/lib/session-context";
-
-const ADMIN_ROLES = new Set([
-  "admin",
-  "super_admin",
-  "hr_payroll",
-  "hr-payroll",
-  "hr payroll",
-  "hrpayroll",
-]);
+import { normalizeLoginContext } from "~/lib/session-context";
 
 type SessionRow = {
   id: string;
@@ -42,9 +34,16 @@ export async function validateSession(request: Request, context: unknown) {
   try {
     data = await withPgClient(connectionString, async (client) => {
       const result = await client.query<SessionRow>(
-        `SELECT id, emp_id, role, device_id, expires_at, login_context
-         FROM auth_sessions
-         WHERE session_token = $1 AND is_active = true
+        `SELECT
+            s.id,
+            s.emp_id,
+            COALESCE(u.role, s.role) AS role,
+            s.device_id,
+            s.expires_at,
+            s.login_context
+         FROM auth_sessions s
+         LEFT JOIN login_users u ON u.emp_id = s.emp_id
+         WHERE s.session_token = $1 AND s.is_active = true
          LIMIT 1`,
         [token],
       );
@@ -126,7 +125,6 @@ export async function validateSession(request: Request, context: unknown) {
   }
 
   const loginContext = normalizeLoginContext(data.login_context);
-  const normalizedRole = String(data.role || "").trim().toLowerCase();
 
   return {
     session: {
@@ -134,7 +132,7 @@ export async function validateSession(request: Request, context: unknown) {
       emp_id: data.emp_id,
       role: data.role,
       login_context: loginContext,
-      is_admin: loginContext === ADMIN_PORTAL || ADMIN_ROLES.has(normalizedRole),
+      is_admin: canAccessAdminPortal(data.role, loginContext),
     },
     error: null,
     status: 200,

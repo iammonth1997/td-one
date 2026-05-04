@@ -1,6 +1,7 @@
 import type { Route } from "./+types/admin.audit";
 import AdminShell from "~/components/admin-shell";
 import { requireAdminSession } from "~/lib/require-admin-session.server";
+import { formatBangkokDateTime } from "~/lib/date-time";
 
 type AuditRow = {
   id?: string;
@@ -55,7 +56,7 @@ export default function AdminAuditPage({ loaderData }: Route.ComponentProps) {
                   <td className="px-4 py-3">{row.emp_id || "-"}</td>
                   <td className="px-4 py-3">{row.event_type || "-"}</td>
                   <td className="px-4 py-3">{row.action || "-"}</td>
-                  <td className="px-4 py-3">{row.created_at ? new Date(row.created_at).toLocaleString("th-TH") : "-"}</td>
+                  <td className="px-4 py-3">{formatBangkokDateTime(row.created_at)}</td>
                 </tr>
               ))}
               {loaderData.rows.length === 0 && (

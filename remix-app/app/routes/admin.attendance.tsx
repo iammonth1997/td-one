@@ -1,6 +1,7 @@
 import type { Route } from "./+types/admin.attendance";
 import { requireAdminSession } from "~/lib/require-admin-session.server";
 import AdminShell from "~/components/admin-shell";
+import { formatBangkokDateTime } from "~/lib/date-time";
 
 type AttendanceRow = {
   id: string;
@@ -61,8 +62,8 @@ export default function AdminAttendancePage({ loaderData }: Route.ComponentProps
               {rows.map((row) => (
                 <tr key={row.id} className="border-t border-[#edf1f7]">
                   <td className="px-4 py-3">{row.emp_id || "-"}</td>
-                  <td className="px-4 py-3">{row.check_in_at ? new Date(row.check_in_at).toLocaleString("th-TH") : "-"}</td>
-                  <td className="px-4 py-3">{row.check_out_at ? new Date(row.check_out_at).toLocaleString("th-TH") : "-"}</td>
+                  <td className="px-4 py-3">{formatBangkokDateTime(row.check_in_at)}</td>
+                  <td className="px-4 py-3">{formatBangkokDateTime(row.check_out_at)}</td>
                   <td className="px-4 py-3">{row.status || "-"}</td>
                 </tr>
               ))}

@@ -2,6 +2,7 @@ import type { FormEvent } from "react";
 import { Form, useActionData, useNavigation } from "react-router";
 import type { Route } from "./+types/admin.devices";
 import AdminShell from "~/components/admin-shell";
+import { formatBangkokDateTime } from "~/lib/date-time";
 import { requireAdminSession } from "~/lib/require-admin-session.server";
 
 type DeviceRow = {
@@ -178,7 +179,7 @@ export default function AdminDevicesPage({ loaderData }: Route.ComponentProps) {
                   <td className="px-4 py-3">{row.device_name || "-"}</td>
                   <td className="px-4 py-3">{row.platform || "-"}</td>
                   <td className="px-4 py-3">{row.is_active ? "Active" : "Inactive"}</td>
-                  <td className="px-4 py-3">{row.last_active_at ? new Date(row.last_active_at).toLocaleString("th-TH") : "-"}</td>
+                  <td className="px-4 py-3">{formatBangkokDateTime(row.last_active_at)}</td>
                   <td className="px-4 py-3">
                     {row.is_active ? (
                       <Form method="post" className="flex items-center gap-2">

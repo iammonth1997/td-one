@@ -73,6 +73,12 @@ function formatMetricValue(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
+function parseYearMonthParam(value: string | null, fallback: number) {
+  if (!value) return fallback;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) ? parsed : fallback;
+}
+
 function DayCard({
   title,
   value,
@@ -103,10 +109,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   const url = new URL(request.url);
   const bangkokNow = getBangkokMonthContext();
-  const yearParam = Number(url.searchParams.get("year"));
-  const monthParam = Number(url.searchParams.get("month"));
-  const year = Number.isInteger(yearParam) ? yearParam : bangkokNow.year;
-  const month = Number.isInteger(monthParam) && monthParam >= 1 && monthParam <= 12 ? monthParam : bangkokNow.month;
+  const year = parseYearMonthParam(url.searchParams.get("year"), bangkokNow.year);
+  const month = parseYearMonthParam(url.searchParams.get("month"), bangkokNow.month);
 
   if (month < 1 || month > 12 || year < 2000 || year > 2100) {
     return { error: "Invalid year/month parameter.", year: null, month: null, employee: null, summary: EMPTY_SUMMARY };
@@ -241,14 +245,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 }
 
 export default function DayWorkViewPage({ loaderData }: Route.ComponentProps) {
-  const goHome = () => {
-    if (typeof navigator !== "undefined" && !navigator.onLine) {
-      window.location.href = "/offline.html";
-      return;
-    }
-    window.location.href = "/dashboard";
-  };
-
   if (loaderData.error) {
     return (
       <main className="min-h-screen bg-white px-4 py-6 sm:px-6 sm:py-10">
@@ -257,18 +253,17 @@ export default function DayWorkViewPage({ loaderData }: Route.ComponentProps) {
           <p className="mt-2 text-[#555555]">{loaderData.error}</p>
           <div className="mt-6 flex items-center justify-between">
             <Link
-              to="/day-work"
+              to="/dashboard"
               className="inline-block rounded-xl border border-[#DC2626] bg-white px-4 py-2 font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
             >
               Back
             </Link>
-            <button
-              type="button"
-              onClick={goHome}
+            <Link
+              to="/dashboard"
               className="inline-block rounded-xl border border-[#DC2626] bg-white px-4 py-2 font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
             >
               Home
-            </button>
+            </Link>
           </div>
         </section>
       </main>
@@ -327,18 +322,17 @@ export default function DayWorkViewPage({ loaderData }: Route.ComponentProps) {
 
         <div className="mt-6 flex items-center justify-between">
           <Link
-            to="/day-work"
+            to="/dashboard"
             className="inline-block rounded-xl border border-[#DC2626] bg-white px-4 py-2 font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
           >
             Back
           </Link>
-          <button
-            type="button"
-            onClick={goHome}
+          <Link
+            to="/dashboard"
             className="inline-block rounded-xl border border-[#DC2626] bg-white px-4 py-2 font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
           >
             Home
-          </button>
+          </Link>
         </div>
       </section>
     </main>

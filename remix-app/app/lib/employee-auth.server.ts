@@ -10,6 +10,7 @@ export type EmployeeAuthRecord = {
 const ACTIVE_EMPLOYEE_STATUSES = new Set([
   "active",
   "employee",
+  "\u0e1e\u0e19\u0e31\u0e01\u0e07\u0e32\u0e19",
   "พนักงาน",
 ]);
 

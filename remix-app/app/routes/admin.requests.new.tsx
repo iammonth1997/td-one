@@ -6,6 +6,7 @@ import { EmployeeSelector } from "~/components/requests/EmployeeSelector";
 import { FileUpload } from "~/components/requests/FileUpload";
 import { RequestTypeFields } from "~/components/requests/RequestTypeFields";
 import AdminShell from "~/components/admin-shell";
+import { formatBangkokDateTime } from "~/lib/date-time";
 import { requireRequestAdminSession } from "~/lib/request-admin-session.server";
 import {
   deleteUploadedRequestAttachments,
@@ -563,6 +564,7 @@ export default function AdminNewRequestPage({ loaderData }: Route.ComponentProps
   const actionData = useActionData<typeof action>() as ActionData | undefined;
   const navigation = useNavigation();
   const { t } = useRequestTranslation(loaderData.messages);
+  const requestFormId = "admin-request-form";
   const isEditMode = loaderData.mode === "edit";
   const isSubmitting = navigation.state === "submitting";
   const formResetKey = `${loaderData.mode}:${loaderData.editingRequest?.id ?? "create"}`;
@@ -594,8 +596,8 @@ export default function AdminNewRequestPage({ loaderData }: Route.ComponentProps
   const currentConfig = selectedType ? REQUEST_TYPE_CONFIG[selectedType] : null;
   const pageTitle = isEditMode ? t("edit_page_title") : t("page_title");
   const pageDescription = isEditMode ? t("edit_page_description") : t("page_description");
-  const submitLabel = isEditMode ? t("save_changes") : t("submit");
-  const submittingLabel = isEditMode ? t("saving") : t("submitting");
+  const submitLabel = isEditMode ? t("save_changes") || "Save changes" : t("submit") || "Submit request";
+  const submittingLabel = isEditMode ? t("saving") || "Saving..." : t("submitting") || "Submitting...";
 
   function updateFormState(patch: Partial<RequestFormState>) {
     setFormState((current) => {
@@ -636,7 +638,7 @@ export default function AdminNewRequestPage({ loaderData }: Route.ComponentProps
 
   return (
     <AdminShell title={isEditMode ? "Edit request" : "Create request"} session={loaderData.session}>
-      <section className="mx-auto max-w-4xl space-y-4">
+      <section className="mx-auto max-w-4xl space-y-4 pb-28">
         <div className="rounded-2xl border border-[#d8dee8] bg-white p-5 shadow-sm">
           <p className="text-sm text-[#7c8ba1]">{loaderData.currentUser.employeeId}</p>
           <h1 className="mt-1 text-2xl font-semibold text-[#1b2738]">{pageTitle}</h1>
@@ -665,7 +667,7 @@ export default function AdminNewRequestPage({ loaderData }: Route.ComponentProps
           <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{formError}</div>
         ) : null}
 
-        <Form method="post" encType="multipart/form-data" className="space-y-4">
+        <Form id={requestFormId} method="post" encType="multipart/form-data" className="space-y-4">
           {formState.selectedEmployeeIds.map((employeeId) => (
             <input key={employeeId} type="hidden" name="employee_ids" value={employeeId} />
           ))}
@@ -744,7 +746,7 @@ export default function AdminNewRequestPage({ loaderData }: Route.ComponentProps
                             >
                               {attachment.fileName}
                             </a>
-                            <span className="text-xs text-[#7c8ba1]">{new Date(attachment.uploadedAt).toLocaleString()}</span>
+                            <span className="text-xs text-[#7c8ba1]">{formatBangkokDateTime(attachment.uploadedAt)}</span>
                           </li>
                         ))}
                       </ul>
@@ -767,22 +769,26 @@ export default function AdminNewRequestPage({ loaderData }: Route.ComponentProps
             </>
           ) : null}
 
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#d8dee8] bg-white p-4 shadow-sm">
+        </Form>
+
+        <div className="fixed bottom-0 right-0 z-40 border-t border-[#d8dee8] bg-white/95 px-4 py-3 shadow-[0_-12px_28px_rgba(15,23,42,0.10)] backdrop-blur" style={{ left: 240 }}>
+          <div className="mx-auto flex max-w-4xl items-center justify-between gap-3">
             <Link
               to={loaderData.returnToListUrl}
-              className="rounded-xl border border-[#d8dee8] px-4 py-2 text-sm font-semibold text-[#5b6d85] hover:bg-[#f7f9fc]"
+              className="shrink-0 rounded-xl border border-[#d8dee8] px-4 py-2 text-sm font-semibold text-[#5b6d85] hover:bg-[#f7f9fc]"
             >
               {t("cancel")}
             </Link>
             <button
               type="submit"
+              form={requestFormId}
               disabled={isSubmitting || !selectedType || loaderData.departmentId == null}
-              className="rounded-xl bg-[#1d4ed8] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1e40af] disabled:opacity-60"
+              className="inline-flex min-w-[150px] shrink-0 items-center justify-center rounded-xl bg-[#1d4ed8] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#1e40af] disabled:opacity-60"
             >
               {isSubmitting ? submittingLabel : submitLabel}
             </button>
           </div>
-        </Form>
+        </div>
       </section>
     </AdminShell>
   );

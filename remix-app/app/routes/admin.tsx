@@ -1,13 +1,13 @@
 import { Link, redirect } from "react-router";
 import type { Route } from "./+types/admin";
 import { requireSession } from "~/lib/require-session.server";
-import { canManagePinReset } from "~/lib/role-access.server";
+import { canAccessAdminPortal, getFirstAccessibleAdminPath } from "~/lib/role-access.server";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const session = await requireSession(request, context);
-  const isAdmin = canManagePinReset(session.role) || session.login_context === "admin_portal";
+  const isAdmin = canAccessAdminPortal(session.role, session.login_context);
   if (isAdmin) {
-    throw redirect("/admin/dashboard");
+    throw redirect(getFirstAccessibleAdminPath(session.role, session.login_context) ?? "/dashboard");
   }
   return { isAdmin: false, role: session.role };
 }

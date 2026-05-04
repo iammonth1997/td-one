@@ -1,7 +1,9 @@
 import type { Client } from "pg";
 
 import type { UploadedRequestAttachment } from "~/lib/request-attachments.server";
+import { appendLeaveToSheet, deleteLeaveFromSheet } from "./google-sheets.server";
 import { getConnectionString, withPgClient } from "~/lib/pg.server";
+import { normalizeRequestType, requiresApproval } from "~/lib/request-types";
 
 export type RequestAccessScope = {
   canReviewAll: boolean;
@@ -93,6 +95,61 @@ export type UpsertRequestInput = {
   employeeIds: string[];
   attachments: UploadedRequestAttachment[];
 };
+
+type CloudflareWaitUntilContext = {
+  cloudflare?: {
+    ctx?: {
+      waitUntil?: (promise: Promise<unknown>) => void;
+    };
+  };
+};
+
+type ApprovedRequestSheetRecordRow = RequestRecordRow & {
+  submitted_by_name: string | null;
+};
+
+type LeaveApprovalSheetEmployeeRow = {
+  employee_id: string;
+  employee_name: string | null;
+  employee_position: string | null;
+  employee_department: string | null;
+  employee_site: string | null;
+};
+
+function scheduleAdminApprovalSheetsSync(
+  context: unknown,
+  updatedRecord: ApprovedRequestSheetRecordRow,
+  employees: LeaveApprovalSheetEmployeeRow[],
+) {
+  const syncs = employees.map((employee) =>
+    appendLeaveToSheet(
+      {
+        id: updatedRecord.id,
+        employee_id: employee.employee_id,
+        leave_type_code: updatedRecord.request_type,
+        start_date: String(updatedRecord.start_date ?? ""),
+        end_date: String(updatedRecord.end_date ?? ""),
+        total_days: updatedRecord.total_days ?? 0,
+        reason: updatedRecord.reason ?? "",
+        status: "APPROVED",
+        approved_by: updatedRecord.approved_by_id ?? null,
+        approved_at: updatedRecord.approved_at ?? new Date(),
+        rejected_reason: null,
+        created_at: updatedRecord.created_at ?? new Date(),
+        employee_name: employee.employee_name ?? undefined,
+        employee_position: employee.employee_position ?? undefined,
+        employee_department: employee.employee_department ?? undefined,
+        employee_site: employee.employee_site ?? undefined,
+        submitted_by_id: updatedRecord.created_by_id,
+        submitted_by_name: updatedRecord.submitted_by_name ?? undefined,
+      },
+      context,
+    ).catch((err) => console.error("Sheets sync (approve) failed:", err)),
+  );
+
+  const sync = Promise.all(syncs).then(() => undefined);
+  (context as CloudflareWaitUntilContext | undefined)?.cloudflare?.ctx?.waitUntil?.(sync);
+}
 
 function getRequestConnectionString(context: unknown) {
   const connectionString = getConnectionString(context);
@@ -452,6 +509,80 @@ export async function createRequestRecord(context: unknown, input: UpsertRequest
       }
     });
 
+    const requestType = normalizeRequestType(input.requestType);
+    console.log("[DirectSync] requestType:", input.requestType);
+    console.log("[DirectSync] normalized:", requestType);
+    console.log("[DirectSync] requiresApproval:", requestType ? requiresApproval(requestType) : null);
+    console.log("[DirectSync] employeeIds:", input.employeeIds);
+    if (requestType && !requiresApproval(requestType)) {
+      const [employeesResult, submitterResult] = await Promise.all([
+        client.query<LeaveApprovalSheetEmployeeRow>(
+          `SELECT
+             e.employee_id,
+             COALESCE(
+               NULLIF(TRIM(CONCAT_WS(' ', e.first_name, e.last_name)), ''),
+               NULLIF(e.full_name_lo, ''),
+               NULLIF(e.full_name_en, '')
+             ) AS employee_name,
+             e.position AS employee_position,
+             d.name AS employee_department,
+             COALESCE(
+               NULLIF(wl.name, ''),
+               NULLIF(ms.name, '')
+             ) AS employee_site
+           FROM employees e
+           LEFT JOIN departments d ON d.id = e.department_id
+           LEFT JOIN work_locations wl ON wl.id = e.work_location_id
+           LEFT JOIN mine_sites ms ON ms.id = e.mine_site_id
+           WHERE e.employee_id = ANY($1::varchar[])`,
+          [input.employeeIds],
+        ),
+        client.query<{ submitted_by_name: string | null }>(
+          `SELECT
+             COALESCE(
+               NULLIF(TRIM(CONCAT_WS(' ', creator.first_name, creator.last_name)), ''),
+               NULLIF(creator.full_name_lo, ''),
+               NULLIF(creator.full_name_en, '')
+             ) AS submitted_by_name
+           FROM employees creator
+           WHERE creator.employee_id = $1
+           LIMIT 1`,
+          [input.createdById],
+        ),
+      ]);
+      const employeesById = new Map(employeesResult.rows.map((employee) => [employee.employee_id, employee]));
+      const submittedByName = submitterResult.rows[0]?.submitted_by_name ?? undefined;
+      const sheetsData = {
+        id: requestId,
+        leave_type_code: input.requestType,
+        start_date: input.startDate ?? "",
+        end_date: input.endDate ?? "",
+        total_days: input.totalDays ?? 0,
+        reason: input.reason ?? "",
+        status: "SUBMITTED",
+        approved_by: null,
+        approved_at: null,
+        rejected_reason: null,
+        created_at: new Date(),
+        submitted_by_id: input.createdById,
+        submitted_by_name: submittedByName,
+      };
+
+      for (const employeeId of input.employeeIds) {
+        const employee = employeesById.get(employeeId);
+        appendLeaveToSheet({
+          ...sheetsData,
+          employee_id: employeeId,
+          employee_name: employee?.employee_name ?? undefined,
+          employee_position: employee?.employee_position ?? undefined,
+          employee_department: employee?.employee_department ?? undefined,
+          employee_site: employee?.employee_site ?? undefined,
+        }, context).catch((err) =>
+          console.error("Sheets sync (direct) failed:", err),
+        );
+      }
+    }
+
     return requestId;
   });
 }
@@ -539,6 +670,9 @@ export async function updateRequestRecord(context: unknown, input: UpsertRequest
 export async function deleteRequestRecord(context: unknown, requestId: string) {
   return withRequestDbClient(context, async (client) => {
     await client.query(`DELETE FROM requests WHERE id = $1`, [requestId]);
+    deleteLeaveFromSheet(requestId, context).catch((err) =>
+      console.error("Sheets delete sync failed:", err),
+    );
   });
 }
 
@@ -561,5 +695,74 @@ export async function updateRequestDecision(
        WHERE id = $1`,
       [requestId, nextStatus, approvedById, rejectionReason],
     );
+
+    if (nextStatus === "APPROVED") {
+      const [recordResult, employeesResult] = await Promise.all([
+        client.query<ApprovedRequestSheetRecordRow>(
+          `SELECT
+             r.id,
+             r.request_type,
+             r.status,
+             r.start_date,
+             r.end_date,
+             r.half_day,
+             r.total_days,
+             r.work_dates,
+             r.work_hours,
+             r.last_working_day,
+             r.reason,
+             r.is_twins,
+             r.created_by_id,
+             r.department_id,
+             r.approved_by_id,
+             r.approved_at,
+             r.rejection_reason,
+             r.requires_approval,
+             r.created_at,
+             r.updated_at,
+             COALESCE(
+               NULLIF(TRIM(CONCAT_WS(' ', creator.first_name, creator.last_name)), ''),
+               NULLIF(creator.full_name_lo, ''),
+               NULLIF(creator.full_name_en, '')
+             ) AS submitted_by_name
+           FROM requests r
+           LEFT JOIN employees creator ON creator.employee_id = r.created_by_id
+           WHERE r.id = $1
+           LIMIT 1`,
+          [requestId],
+        ),
+        client.query<LeaveApprovalSheetEmployeeRow>(
+          `SELECT
+             re.employee_id,
+             COALESCE(
+               NULLIF(TRIM(CONCAT_WS(' ', e.first_name, e.last_name)), ''),
+               NULLIF(e.full_name_lo, ''),
+               NULLIF(e.full_name_en, '')
+             ) AS employee_name,
+             e.position AS employee_position,
+             d.name AS employee_department,
+             COALESCE(
+               NULLIF(wl.name, ''),
+               NULLIF(ms.name, '')
+             ) AS employee_site
+           FROM request_employees re
+           LEFT JOIN employees e ON e.employee_id = re.employee_id
+           LEFT JOIN departments d ON d.id = e.department_id
+           LEFT JOIN work_locations wl ON wl.id = e.work_location_id
+           LEFT JOIN mine_sites ms ON ms.id = e.mine_site_id
+           WHERE re.request_id = $1
+           ORDER BY re.employee_id ASC`,
+          [requestId],
+        ),
+      ]);
+      const updatedRecord = recordResult.rows[0];
+      if (updatedRecord) {
+        scheduleAdminApprovalSheetsSync(
+          context,
+          updatedRecord,
+          employeesResult.rows,
+        );
+      }
+    }
   });
 }

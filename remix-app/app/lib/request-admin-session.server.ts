@@ -1,7 +1,8 @@
 import { redirectToAdminLogin } from "~/lib/admin-login-redirect.server";
 import { getConnectionString, withPgClient } from "~/lib/pg.server";
+import { canAccessAdminPath } from "~/lib/role-access.server";
 import { validateSession } from "~/lib/session-validation.server";
-import { canAccessRequestAdmin, canReviewAllRequests, normalizeRoleKey } from "~/lib/request-types";
+import { canReviewAllRequests, normalizeRoleKey } from "~/lib/request-types";
 
 export type RequestAdminSession = {
   emp_id: string;
@@ -25,7 +26,8 @@ export async function requireRequestAdminSession(request: Request, context: unkn
     throw redirectToAdminLogin(request);
   }
 
-  if (!canAccessRequestAdmin(session.role, session.login_context)) {
+  const pathname = new URL(request.url).pathname;
+  if (!canAccessAdminPath(session.role, pathname, session.login_context)) {
     throw new Response("FORBIDDEN", { status: 403 });
   }
 

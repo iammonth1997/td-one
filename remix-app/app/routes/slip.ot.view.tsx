@@ -1,15 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Link, useSearchParams } from "react-router";
 import type { Route } from "./+types/slip.ot.view";
+import { SalaryAccessPrompt } from "~/components/salary-access-prompt";
 import { useI18n } from "~/lib/i18n";
 import { requireSession } from "~/lib/require-session.server";
+import { type SalaryAccessMessages, useSalaryProtectedSlip } from "~/lib/use-salary-protected-slip";
 
 type LangCode = "th" | "en" | "lo";
-
-type SlipData = {
-  employee: { employee_code: string; name: string } | null;
-  slip: Record<string, number | string | null> | null;
-};
 
 const I18N: Record<LangCode, {
   title: string;
@@ -89,6 +86,55 @@ const I18N: Record<LangCode, {
   },
 };
 
+const SALARY_ACCESS_I18N: Record<
+  LangCode,
+  SalaryAccessMessages & {
+    title: string;
+    description: string;
+    passwordLabel: string;
+    passwordPlaceholder: string;
+    submitLabel: string;
+    submittingLabel: string;
+  }
+> = {
+  th: {
+    title: "ยืนยันรหัสผ่านเพื่อพิมพ์สลิป",
+    description: "กรุณายืนยันรหัสผ่านอีกครั้งก่อนเปิดสลิป OT สำหรับพิมพ์",
+    passwordLabel: "รหัสผ่าน",
+    passwordPlaceholder: "กรอกรหัสผ่าน",
+    submitLabel: "ยืนยันเพื่อเปิดสลิป",
+    submittingLabel: "กำลังยืนยัน...",
+    passwordRequired: "กรุณากรอกรหัสผ่าน",
+    locked: "ยืนยันรหัสผ่านไม่สำเร็จหลายครั้ง โปรดลองใหม่อีกครั้งในภายหลัง",
+    invalid: "รหัสผ่านไม่ถูกต้องหรือสิทธิ์ดูสลิปหมดอายุ กรุณาลองใหม่",
+    verifyFailed: "ไม่สามารถยืนยันสิทธิ์ดูสลิปได้ กรุณาลองใหม่",
+  },
+  en: {
+    title: "Confirm password to print the slip",
+    description: "Please confirm your password again before opening the printable OT slip.",
+    passwordLabel: "Password",
+    passwordPlaceholder: "Enter your password",
+    submitLabel: "Confirm to open slip",
+    submittingLabel: "Confirming...",
+    passwordRequired: "Password is required.",
+    locked: "Too many failed confirmations. Please try again later.",
+    invalid: "Password is incorrect or salary access has expired. Please try again.",
+    verifyFailed: "Unable to verify salary access. Please try again.",
+  },
+  lo: {
+    title: "ຢືນຢັນລະຫັດຜ່ານເພື່ອພິມສະລິບ",
+    description: "ກະລຸນາຢືນຢັນລະຫັດຜ່ານອີກຄັ້ງກ່ອນເປີດສະລິບ OT ສໍາລັບພິມ",
+    passwordLabel: "ລະຫັດຜ່ານ",
+    passwordPlaceholder: "ໃສ່ລະຫັດຜ່ານ",
+    submitLabel: "ຢືນຢັນເພື່ອເປີດສະລິບ",
+    submittingLabel: "ກຳລັງຢືນຢັນ...",
+    passwordRequired: "ກະລຸນາໃສ່ລະຫັດຜ່ານ",
+    locked: "ຢືນຢັນລະຫັດຜ່ານຜິດຫຼາຍເກີນໄປ ກະລຸນາລອງໃໝ່ພາຍຫຼັງ",
+    invalid: "ລະຫັດຜ່ານບໍ່ຖືກຕ້ອງ ຫຼື ສິດເບິ່ງສະລິບໝົດອາຍຸແລ້ວ",
+    verifyFailed: "ບໍ່ສາມາດຢືນຢັນສິດເບິ່ງສະລິບໄດ້ ກະລຸນາລອງໃໝ່",
+  },
+};
+
 export async function loader({ request, context }: Route.LoaderArgs) {
   await requireSession(request, context);
   return null;
@@ -97,50 +143,22 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 export default function OtSlipViewPage() {
   const [searchParams] = useSearchParams();
   const { lang } = useI18n();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [data, setData] = useState<SlipData | null>(null);
-
+  const salaryAccessCopy = SALARY_ACCESS_I18N[lang];
   const year = Number(searchParams.get("year") || new Date().getFullYear());
   const month = Number(searchParams.get("month") || new Date().getMonth() + 1);
   const day = Number(searchParams.get("day") || 1);
   const shouldPrint = searchParams.get("print") === "1";
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      setLoading(true);
-      setError("");
-      setData(null);
-      try {
-        const res = await fetch(`/api/ot-slip?year=${year}&month=${month}`);
-        const json = (await res.json()) as {
-          error?: string;
-          employee?: SlipData["employee"];
-          slip?: SlipData["slip"];
-        };
-
-        if (!res.ok) {
-          if (!cancelled) setError(json.error || "LOAD_FAILED");
-          return;
-        }
-
-        if (!cancelled) {
-          setData({ employee: json.employee || null, slip: json.slip || null });
-        }
-      } catch {
-        if (!cancelled) setError("LOAD_FAILED");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [year, month]);
+  const {
+    data,
+    error,
+    loading,
+    salaryAccessError,
+    salaryAccessRequired,
+    salaryPassword,
+    salaryVerifying,
+    setSalaryPassword,
+    submitSalaryPassword,
+  } = useSalaryProtectedSlip("/api/ot-slip", year, month, salaryAccessCopy);
 
   useEffect(() => {
     if (!shouldPrint || loading) return;
@@ -171,6 +189,22 @@ export default function OtSlipViewPage() {
 
         {loading ? <p className="text-sm text-[#555555]">{T.loading}</p> : null}
         {error ? <p className="text-sm text-[#B91C1C]">{error}</p> : null}
+        {salaryAccessRequired ? (
+          <SalaryAccessPrompt
+            title={salaryAccessCopy.title}
+            description={salaryAccessCopy.description}
+            password={salaryPassword}
+            onPasswordChange={setSalaryPassword}
+            onSubmit={() => { void submitSalaryPassword(); }}
+            error={salaryAccessError}
+            passwordLabel={salaryAccessCopy.passwordLabel}
+            passwordPlaceholder={salaryAccessCopy.passwordPlaceholder}
+            submitLabel={salaryAccessCopy.submitLabel}
+            submittingLabel={salaryAccessCopy.submittingLabel}
+            submitting={salaryVerifying}
+            className="print:hidden"
+          />
+        ) : null}
 
         {!loading && !error && data?.employee ? (
           <div className="space-y-1 rounded-xl border border-[#FECACA] bg-white p-3 text-sm text-[#555555]">

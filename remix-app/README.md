@@ -58,6 +58,11 @@ wrangler secret put CLOUDINARY_API_KEY
 wrangler secret put CLOUDINARY_API_SECRET
 wrangler secret put LINE_CHANNEL_ACCESS_TOKEN
 wrangler secret put LINE_ADMIN_API_KEY
+wrangler secret put GOOGLE_SERVICE_ACCOUNT_EMAIL
+wrangler secret put GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
+wrangler secret put GOOGLE_SHEETS_LEAVE_SPREADSHEET_ID
+wrangler secret put GOOGLE_SHEETS_LEAVE_SHEET_NAME
+wrangler secret put GOOGLE_APPS_SCRIPT_SYNC_URL
 ```
 
 ### One-shot setup (ค่าเริ่มต้น: Linux/macOS)

@@ -1,6 +1,7 @@
 import type { Route } from "./+types/admin.payroll.ot";
 import { requireAdminSession } from "~/lib/require-admin-session.server";
 import AdminShell from "~/components/admin-shell";
+import { formatBangkokDate } from "~/lib/date-time";
 import { useState } from "react";
 
 type PayrollRun = {
@@ -83,7 +84,7 @@ export default function AdminPayrollOtPage({ loaderData }: Route.ComponentProps)
                       {row.status || "-"}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-[#8a97ac]">{row.created_at ? new Date(row.created_at).toLocaleDateString("th-TH") : "-"}</td>
+                  <td className="px-4 py-3 text-[#8a97ac]">{formatBangkokDate(row.created_at)}</td>
                 </tr>
               ))}
               {rows.length === 0 && (

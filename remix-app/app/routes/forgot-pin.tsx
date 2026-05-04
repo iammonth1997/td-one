@@ -22,7 +22,9 @@ export default function ForgotPasswordPage() {
   const [empId, setEmpId] = useState("");
   const [startMonth, setStartMonth] = useState("");
   const [startYear, setStartYear] = useState("");
-  const [dob, setDob] = useState("");
+  const [dobDay, setDobDay] = useState("");
+  const [dobMonth, setDobMonth] = useState("");
+  const [dobYear, setDobYear] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -31,6 +33,18 @@ export default function ForgotPasswordPage() {
   for (let year = currentYear; year >= currentYear - 30; year -= 1) {
     years.push(year);
   }
+  const birthYears = [] as number[];
+  for (let year = currentYear - 14; year >= currentYear - 90; year -= 1) {
+    birthYears.push(year);
+  }
+  const daysInBirthMonth = dobMonth && dobYear ? new Date(Number(dobYear), Number(dobMonth), 0).getDate() : 31;
+  const birthDays = [] as number[];
+  for (let day = 1; day <= daysInBirthMonth; day += 1) {
+    birthDays.push(day);
+  }
+  const dob = dobDay && dobMonth && dobYear
+    ? `${dobYear}-${dobMonth.padStart(2, "0")}-${dobDay.padStart(2, "0")}`
+    : "";
 
   async function handleVerify() {
     if (loading) return;
@@ -62,6 +76,7 @@ export default function ForgotPasswordPage() {
         else if (data.error === "ACCOUNT_BLOCKED") setError("Employee account is blocked.");
         else if (data.error === "USER_NOT_REGISTERED") setError("Employee has not registered password yet.");
         else if (data.error === "FORBIDDEN") setError("You don't have permission to reset password.");
+        else if (data.error === "SERVER_CONFIG_MISSING") setError("Reset password service is not configured.");
         else setError("Unable to verify information. Please try again.");
         return;
       }
@@ -133,13 +148,57 @@ export default function ForgotPasswordPage() {
         </select>
 
         <label className="text-sm font-medium text-[#555555]">Date of Birth</label>
-        <input
-          type="date"
-          value={dob}
-          onChange={(event) => setDob(event.target.value)}
-          className="mb-4 mt-1 w-full rounded-xl border border-[#FECACA] bg-white p-2.5 text-[#111111] focus:border-[#DC2626] focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
-          disabled={loading}
-        />
+        <div className="mb-4 mt-1 grid grid-cols-[0.8fr_1fr_1fr] gap-2">
+          <select
+            aria-label="Birth day"
+            value={dobDay}
+            onChange={(event) => setDobDay(event.target.value)}
+            className="w-full rounded-lg border border-gray-300 px-3 py-3 text-base focus:outline-none focus:ring-2 focus:ring-red-400"
+            disabled={loading}
+          >
+            <option value="">Day</option>
+            {birthDays.map((day) => (
+              <option key={day} value={day}>
+                {day}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="Birth month"
+            value={dobMonth}
+            onChange={(event) => setDobMonth(event.target.value)}
+            className="w-full rounded-lg border border-gray-300 px-3 py-3 text-base focus:outline-none focus:ring-2 focus:ring-red-400"
+            disabled={loading}
+          >
+            <option value="">Month</option>
+            <option value="1">Jan</option>
+            <option value="2">Feb</option>
+            <option value="3">Mar</option>
+            <option value="4">Apr</option>
+            <option value="5">May</option>
+            <option value="6">Jun</option>
+            <option value="7">Jul</option>
+            <option value="8">Aug</option>
+            <option value="9">Sep</option>
+            <option value="10">Oct</option>
+            <option value="11">Nov</option>
+            <option value="12">Dec</option>
+          </select>
+          <select
+            aria-label="Birth year"
+            value={dobYear}
+            onChange={(event) => setDobYear(event.target.value)}
+            className="w-full rounded-lg border border-gray-300 px-3 py-3 text-base focus:outline-none focus:ring-2 focus:ring-red-400"
+            disabled={loading}
+          >
+            <option value="">Year</option>
+            {birthYears.map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
+          </select>
+        </div>
 
         {error && <p className="mb-3 text-center text-sm text-red-600">{error}</p>}
 

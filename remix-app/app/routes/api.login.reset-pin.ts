@@ -4,6 +4,7 @@ import { canManagePinReset } from "~/lib/role-access.server";
 import { validateSession } from "~/lib/session-validation.server";
 import prisma from "~/lib/prisma.server";
 import { validatePasswordPolicy, hashPassword } from "~/lib/password.server";
+import { isEmployeeAccountActive } from "~/lib/employee-auth.server";
 
 function json(data: unknown, init?: ResponseInit) {
   return new Response(JSON.stringify(data), {
@@ -72,7 +73,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
     select: { status: true },
   });
 
-  if (!emp || emp.status !== "active") {
+  if (!emp || !isEmployeeAccountActive(emp.status)) {
     return json({ error: "ACCOUNT_BLOCKED" }, { status: 403 });
   }
 

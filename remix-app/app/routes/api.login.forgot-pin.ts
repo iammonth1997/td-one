@@ -4,6 +4,7 @@ import { generateResetToken } from "~/lib/reset-token.server";
 import { canManagePinReset } from "~/lib/role-access.server";
 import { validateSession } from "~/lib/session-validation.server";
 import prisma from "~/lib/prisma.server";
+import { isEmployeeAccountActive } from "~/lib/employee-auth.server";
 
 function json(data: unknown, init?: ResponseInit) {
   return new Response(JSON.stringify(data), {
@@ -73,7 +74,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
     return json({ error: "EMPLOYEE_NOT_FOUND" }, { status: 400 });
   }
 
-  if (emp.status !== "active") {
+  if (!isEmployeeAccountActive(emp.status)) {
     return json({ error: "ACCOUNT_BLOCKED", reason: emp.status }, { status: 403 });
   }
 

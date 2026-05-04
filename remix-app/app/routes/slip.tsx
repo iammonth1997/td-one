@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link, redirect, useSearchParams } from "react-router";
 import type { Route } from "./+types/slip";
+import { SalaryAccessPrompt } from "~/components/salary-access-prompt";
 import { useI18n } from "~/lib/i18n";
 import { getMonthNames } from "~/lib/i18n.shared";
 import { validateSession } from "~/lib/session-validation.server";
+import { type SalaryAccessMessages, useSalaryProtectedSlip } from "~/lib/use-salary-protected-slip";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const { session, error } = await validateSession(request, context);
@@ -143,9 +145,53 @@ const SLIP_I18N: Record<LangCode, {
   },
 };
 
-type SlipData = {
-  employee: { employee_code: string; name: string } | null;
-  slip: Record<string, number | string | null> | null;
+const SALARY_ACCESS_I18N: Record<
+  LangCode,
+  SalaryAccessMessages & {
+    title: string;
+    description: string;
+    passwordLabel: string;
+    passwordPlaceholder: string;
+    submitLabel: string;
+    submittingLabel: string;
+  }
+> = {
+  th: {
+    title: "ยืนยันรหัสผ่านเพื่อดูสลิป",
+    description: "เพื่อความปลอดภัย กรุณายืนยันรหัสผ่านอีกครั้งก่อนดูข้อมูลสลิปเงินเดือนหรือ OT",
+    passwordLabel: "รหัสผ่าน",
+    passwordPlaceholder: "กรอกรหัสผ่าน",
+    submitLabel: "ยืนยันเพื่อดูสลิป",
+    submittingLabel: "กำลังยืนยัน...",
+    passwordRequired: "กรุณากรอกรหัสผ่าน",
+    locked: "ยืนยันรหัสผ่านไม่สำเร็จหลายครั้ง โปรดลองใหม่อีกครั้งในภายหลัง",
+    invalid: "รหัสผ่านไม่ถูกต้องหรือสิทธิ์ดูสลิปหมดอายุ กรุณาลองใหม่",
+    verifyFailed: "ไม่สามารถยืนยันสิทธิ์ดูสลิปได้ กรุณาลองใหม่",
+  },
+  en: {
+    title: "Confirm password to view slips",
+    description: "For security, please confirm your password again before viewing salary or OT slip data.",
+    passwordLabel: "Password",
+    passwordPlaceholder: "Enter your password",
+    submitLabel: "Confirm to view slips",
+    submittingLabel: "Confirming...",
+    passwordRequired: "Password is required.",
+    locked: "Too many failed confirmations. Please try again later.",
+    invalid: "Password is incorrect or salary access has expired. Please try again.",
+    verifyFailed: "Unable to verify salary access. Please try again.",
+  },
+  lo: {
+    title: "ຢືນຢັນລະຫັດຜ່ານເພື່ອເບິ່ງສະລິບ",
+    description: "ເພື່ອຄວາມປອດໄພ ກະລຸນາຢືນຢັນລະຫັດຜ່ານອີກຄັ້ງກ່ອນເບິ່ງສະລິບເງິນເດືອນຫຼື OT",
+    passwordLabel: "ລະຫັດຜ່ານ",
+    passwordPlaceholder: "ໃສ່ລະຫັດຜ່ານ",
+    submitLabel: "ຢືນຢັນເພື່ອເບິ່ງສະລິບ",
+    submittingLabel: "ກຳລັງຢືນຢັນ...",
+    passwordRequired: "ກະລຸນາໃສ່ລະຫັດຜ່ານ",
+    locked: "ຢືນຢັນລະຫັດຜ່ານຜິດຫຼາຍເກີນໄປ ກະລຸນາລອງໃໝ່ພາຍຫຼັງ",
+    invalid: "ລະຫັດຜ່ານບໍ່ຖືກຕ້ອງ ຫຼື ສິດເບິ່ງສະລິບໝົດອາຍຸແລ້ວ",
+    verifyFailed: "ບໍ່ສາມາດຢືນຢັນສິດເບິ່ງສະລິບໄດ້ ກະລຸນາລອງໃໝ່",
+  },
 };
 
 export default function SlipPage(_props: Route.ComponentProps) {
@@ -155,9 +201,23 @@ export default function SlipPage(_props: Route.ComponentProps) {
   const [tab, setTab] = useState<"salary" | "ot">("salary");
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
-  const [slipData, setSlipData] = useState<SlipData | null>(null);
-  const [slipLoading, setSlipLoading] = useState(false);
-  const [slipError, setSlipError] = useState("");
+  const salaryAccessCopy = SALARY_ACCESS_I18N[lang];
+  const {
+    data: slipData,
+    error: slipError,
+    loading: slipLoading,
+    salaryAccessError,
+    salaryAccessRequired,
+    salaryPassword,
+    salaryVerifying,
+    setSalaryPassword,
+    submitSalaryPassword,
+  } = useSalaryProtectedSlip(
+    tab === "salary" ? "/api/salary-slip" : "/api/ot-slip",
+    year,
+    month,
+    salaryAccessCopy,
+  );
 
   const years = useMemo(() => {
     const y = now.getFullYear();
@@ -181,24 +241,6 @@ export default function SlipPage(_props: Route.ComponentProps) {
       setMonth(monthQuery);
     }
   }, [searchParams]);
-
-  async function loadSlip() {
-    setSlipLoading(true);
-    setSlipError("");
-    setSlipData(null);
-    try {
-      const endpoint = tab === "salary" ? "/api/salary-slip" : "/api/ot-slip";
-      const res = await fetch(`${endpoint}?year=${year}&month=${month}`);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const data: any = await res.json();
-      if (!res.ok) { setSlipError(data.error || "LOAD_FAILED"); return; }
-      setSlipData(data);
-    } finally {
-      setSlipLoading(false);
-    }
-  }
-
-  useEffect(() => { loadSlip(); }, [tab, year, month]);
 
   const fmt = (v: number | string | null | undefined) => {
     if (v === null || v === undefined) return "-";
@@ -267,6 +309,21 @@ export default function SlipPage(_props: Route.ComponentProps) {
 
           {slipLoading && <p className="text-sm text-[#555555]">{T.loading}</p>}
           {slipError && <div className="rounded-xl border border-[#FECACA] bg-[#FEF2F2] p-3 text-sm text-[#B91C1C]">{slipError}</div>}
+          {salaryAccessRequired ? (
+            <SalaryAccessPrompt
+              title={salaryAccessCopy.title}
+              description={salaryAccessCopy.description}
+              password={salaryPassword}
+              onPasswordChange={setSalaryPassword}
+              onSubmit={() => { void submitSalaryPassword(); }}
+              error={salaryAccessError}
+              passwordLabel={salaryAccessCopy.passwordLabel}
+              passwordPlaceholder={salaryAccessCopy.passwordPlaceholder}
+              submitLabel={salaryAccessCopy.submitLabel}
+              submittingLabel={salaryAccessCopy.submittingLabel}
+              submitting={salaryVerifying}
+            />
+          ) : null}
 
           {slipData && (
             <div className="space-y-4">

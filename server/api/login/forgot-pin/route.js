@@ -8,6 +8,16 @@ import { hasAnyPermission } from "@/lib/rbac/access";
 const SECRET = process.env.RESET_PIN_SECRET || "td-one-reset-pin-secret-2026";
 const TOKEN_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
 
+const ACTIVE_EMPLOYEE_STATUSES = new Set([
+  "active",
+  "employee",
+  "\u0e1e\u0e19\u0e31\u0e01\u0e07\u0e32\u0e19",
+]);
+
+function isEmployeeAccountActive(status) {
+  return ACTIVE_EMPLOYEE_STATUSES.has(String(status || "").trim().toLowerCase());
+}
+
 function generateResetToken(empId, issuedByEmpId) {
   const payload = {
     emp_id: empId,
@@ -77,7 +87,7 @@ export async function POST(req) {
     return Response.json({ error: "EMPLOYEE_NOT_FOUND" }, { status: 400 });
   }
 
-  if (emp.status !== "active") {
+  if (!isEmployeeAccountActive(emp.status)) {
     return Response.json({ error: "ACCOUNT_BLOCKED", reason: emp.status }, { status: 403 });
   }
 

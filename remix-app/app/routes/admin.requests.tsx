@@ -3,6 +3,7 @@ import { useMemo } from "react";
 
 import type { Route } from "./+types/admin.requests";
 import AdminShell from "~/components/admin-shell";
+import { formatBangkokDateTime } from "~/lib/date-time";
 import {
   deleteUploadedRequestAttachments,
   type UploadedRequestAttachment,
@@ -89,6 +90,18 @@ function requestStatusFilterForView(view: RequestListView) {
   }
 
   return "PENDING";
+}
+
+function serializeDatabaseUtcTimestamp(value: string | Date) {
+  if (value instanceof Date) {
+    const pad = (part: number, size = 2) => String(part).padStart(size, "0");
+    return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}T${pad(value.getHours())}:${pad(value.getMinutes())}:${pad(value.getSeconds())}.${pad(value.getMilliseconds(), 3)}Z`;
+  }
+
+  const text = String(value).trim();
+  if (!text) return "";
+  if (/[zZ]$|[+-]\d{2}:?\d{2}$/.test(text)) return text;
+  return `${text.replace(" ", "T")}Z`;
 }
 
 function getStatusCounts(rows: RequestStatusCountRow[]) {
@@ -198,8 +211,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
           id: requestRow.id,
           requestType: requestRow.request_type,
           status: requestStatus,
-          createdAt:
-            requestRow.created_at instanceof Date ? requestRow.created_at.toISOString() : new Date(requestRow.created_at).toISOString(),
+          createdAt: serializeDatabaseUtcTimestamp(requestRow.created_at),
           createdBy: requestRow.created_by_name,
           employeeCount: requestRow.employee_count,
           employeePreview: requestRow.employee_preview,
@@ -447,7 +459,7 @@ export default function AdminRequestsPage({ loaderData }: Route.ComponentProps) 
                   </td>
                   <td className="px-4 py-3 text-[#475569]">{row.createdBy}</td>
                   <td className="px-4 py-3 text-[#475569]">{row.totalDays ?? "-"}</td>
-                  <td className="px-4 py-3 text-[#7c8ba1]">{new Date(row.createdAt).toLocaleString()}</td>
+                  <td className="px-4 py-3 text-[#7c8ba1]">{formatBangkokDateTime(row.createdAt)}</td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-2">
                       <span

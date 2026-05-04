@@ -1,5 +1,6 @@
 import { useState } from "react";
 import AdminShell from "~/components/admin-shell";
+import { formatBangkokDate, formatBangkokDateTime } from "~/lib/date-time";
 import { requireAdminSession } from "~/lib/require-admin-session.server";
 
 const CASE_TYPES = ["disciplinary", "grievance", "safety", "welfare", "investigation", "other"];
@@ -435,7 +436,7 @@ export default function AdminHrErPage({ loaderData }: { loaderData: LoaderData }
                   <td className="px-4 py-3"><span className={`rounded-full px-2 py-1 text-xs font-semibold ${severityTone(row.severity)}`}>{row.severity || "-"}</span></td>
                   <td className="px-4 py-3"><span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusTone(row.status)}`}>{row.status || "-"}</span></td>
                   <td className="px-4 py-3">{row.assigned_to || "-"}</td>
-                  <td className="px-4 py-3">{row.created_at ? new Date(row.created_at).toLocaleDateString("th-TH") : "-"}</td>
+                  <td className="px-4 py-3">{formatBangkokDate(row.created_at)}</td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-2">
                       <button onClick={() => void openDetail(row)} className="text-xs font-medium text-[#2563eb] hover:underline">Detail</button>
@@ -667,7 +668,7 @@ export default function AdminHrErPage({ loaderData }: { loaderData: LoaderData }
                       <div key={note.id} className="border-b border-[#edf1f7] px-4 py-3 last:border-b-0">
                         <div className="flex items-center justify-between gap-3">
                           <span className="rounded-full bg-[#eef4ff] px-2 py-1 text-[11px] font-semibold text-[#2563eb]">{note.visibility || "internal"}</span>
-                          <span className="text-xs text-[#7c8ba1]">{note.created_at ? new Date(note.created_at).toLocaleString("th-TH") : "-"}</span>
+                          <span className="text-xs text-[#7c8ba1]">{formatBangkokDateTime(note.created_at)}</span>
                         </div>
                         <p className="mt-2 whitespace-pre-wrap text-sm text-[#1b2738]">{note.note || "-"}</p>
                         <p className="mt-1 text-xs text-[#7c8ba1]">By {note.created_by || "-"}</p>

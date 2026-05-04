@@ -44,17 +44,22 @@ function normalizeConnectionString(connectionString: string) {
   try {
     const url = new URL(connectionString);
 
-    if (!url.searchParams.has('connection_limit')) {
-      url.searchParams.set('connection_limit', String(readPositiveInt('PRISMA_CONNECTION_LIMIT', 3)));
-    }
-
-    if (!url.searchParams.has('pool_timeout')) {
-      url.searchParams.set('pool_timeout', String(readPositiveInt('PRISMA_POOL_TIMEOUT', 10)));
-    }
+    url.searchParams.delete('sslmode');
+    url.searchParams.delete('uselibpqcompat');
+    url.searchParams.set('connection_limit', String(readPositiveInt('PRISMA_CONNECTION_LIMIT', 3)));
+    url.searchParams.set('pool_timeout', String(readPositiveInt('PRISMA_POOL_TIMEOUT', 10)));
 
     return url.toString();
   } catch {
     return connectionString;
+  }
+}
+
+function isSslDisabled(connectionString: string) {
+  try {
+    return new URL(connectionString).searchParams.get('sslmode') === 'disable';
+  } catch {
+    return /(?:^|[?&])sslmode=disable(?:&|$)/.test(connectionString);
   }
 }
 
@@ -86,9 +91,8 @@ function createPrismaClient(options: CreatePrismaClientOptions = {}) {
     return new PrismaClient();
   }
 
-  const normalizedUrl = normalizeConnectionString(connectionString);
-  const sslDisabled = /[?&]sslmode=disable/.test(normalizedUrl);
-  const cleanUrl = normalizedUrl.replace(/[?&](sslmode|uselibpqcompat)=[^&]*/g, '').replace(/\?$/, '').replace(/&$/, '');
+  const sslDisabled = isSslDisabled(connectionString);
+  const cleanUrl = normalizeConnectionString(connectionString);
   const pool =
     (useGlobalPoolCache ? prismaGlobal.prismaPool : undefined) ||
     new Pool({

@@ -1,6 +1,7 @@
 import type { Route } from "./+types/admin.payroll.slips";
 import { requireAdminSession } from "~/lib/require-admin-session.server";
 import AdminShell from "~/components/admin-shell";
+import { formatBangkokDateTime } from "~/lib/date-time";
 
 type SlipRow = {
   id: string;
@@ -74,7 +75,7 @@ export default function AdminPayrollSlipsPage({ loaderData }: Route.ComponentPro
                   <td className="px-4 py-3">{row.slip_type === "salary" ? "Salary" : "OT"}</td>
                   <td className="px-4 py-3">{row.emp_id || "-"}</td>
                   <td className="px-4 py-3">{Number(row.amount ?? 0).toLocaleString("th-TH")} ₭</td>
-                  <td className="px-4 py-3">{row.created_at ? new Date(row.created_at).toLocaleString("th-TH") : "-"}</td>
+                  <td className="px-4 py-3">{formatBangkokDateTime(row.created_at)}</td>
                 </tr>
               ))}
               {rows.length === 0 && (

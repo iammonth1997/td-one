@@ -3,6 +3,7 @@ import { getPrisma } from "@/lib/prisma";
 import { getEmployeeByEmpCode } from "@/lib/otRequestUtils";
 import { buildSessionAccessProfile } from "@/lib/rbac/sessionAccess";
 import { hasAnyPermission } from "@/lib/rbac/access";
+import { appendLeaveToSheet } from "@/remix-app/app/lib/google-sheets.server";
 
 function calcLeaveDays(startDate, endDate) {
   const start = new Date(`${startDate}T00:00:00+07:00`);
@@ -11,7 +12,7 @@ function calcLeaveDays(startDate, endDate) {
   return Number((diff + 1).toFixed(1));
 }
 
-export async function POST(req) {
+export async function POST(req, context) {
   const prisma = getPrisma({ DATABASE_URL: process.env.DATABASE_URL });
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) return Response.json({ error: authError }, { status: authStatus });
@@ -83,6 +84,9 @@ export async function POST(req) {
         status: "pending",
       },
     });
+
+    const sheetsSync = appendLeaveToSheet(inserted, context).catch((err) => console.error("Sheets sync failed:", err));
+    context?.cloudflare?.ctx?.waitUntil?.(sheetsSync);
 
     return Response.json({ success: true, row: inserted }, { status: 201 });
   } catch (err) {

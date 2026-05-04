@@ -1,5 +1,6 @@
 import { useState } from "react";
 import AdminShell from "~/components/admin-shell";
+import { formatBangkokDate } from "~/lib/date-time";
 import { requireAdminSession } from "~/lib/require-admin-session.server";
 
 const REQUISITION_STATUSES = ["draft", "open", "on_hold", "closed", "cancelled"];
@@ -493,7 +494,7 @@ export default function AdminRecruitmentPage({ loaderData }: { loaderData: Loade
                   <td className="px-4 py-3 text-xs text-[#5b6d85]">{requisitions.find((req) => req.id === row.requisition_id)?.job_code || row.requisition_id || "-"}</td>
                   <td className="px-4 py-3">{row.source || "-"}</td>
                   <td className="px-4 py-3"><span className={`rounded-full px-2 py-1 text-xs font-semibold ${stageTone(row.current_stage)}`}>{row.current_stage || "-"}</span></td>
-                  <td className="px-4 py-3">{row.created_at ? new Date(row.created_at).toLocaleDateString("th-TH") : "-"}</td>
+                  <td className="px-4 py-3">{formatBangkokDate(row.created_at)}</td>
                   <td className="px-4 py-3"><button onClick={() => openAdvanceCandidate(row)} className="text-xs font-medium text-[#2563eb] hover:underline">Advance Stage</button></td>
                 </tr>
               ))}

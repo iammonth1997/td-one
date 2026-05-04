@@ -26,7 +26,10 @@ function addDays(date: Date, days: number) {
 }
 
 function toIsoDate(date: Date) {
-  return date.toISOString().slice(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function formatDateForDisplay(value: string) {
@@ -46,6 +49,37 @@ function parseDateInput(value: string) {
   const isoDate = `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
   return isValidIsoDate(isoDate) ? isoDate : null;
 }
+
+function getCalendarMonth(value: string) {
+  if (isValidIsoDate(value)) {
+    const [year, month] = value.split("-").map(Number);
+    return new Date(year, month - 1, 1, 12);
+  }
+
+  const today = new Date();
+  return new Date(today.getFullYear(), today.getMonth(), 1, 12);
+}
+
+function addMonths(date: Date, months: number) {
+  return new Date(date.getFullYear(), date.getMonth() + months, 1, 12);
+}
+
+function getCalendarCells(monthDate: Date) {
+  const firstOfMonth = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1, 12);
+  const startDate = addDays(firstOfMonth, -firstOfMonth.getDay());
+
+  return Array.from({ length: 42 }, (_value, index) => {
+    const date = addDays(startDate, index);
+    return {
+      isoDate: toIsoDate(date),
+      day: date.getDate(),
+      inMonth: date.getMonth() === monthDate.getMonth() && date.getFullYear() === monthDate.getFullYear(),
+    };
+  });
+}
+
+const MONTH_FORMATTER = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric" });
+const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
 function isEarlyResignation(lastWorkingDay: string) {
   if (!lastWorkingDay) return false;
@@ -72,33 +106,34 @@ type RequestDateInputProps = {
 
 function RequestDateInput({ label, value, onChange, error, name }: RequestDateInputProps) {
   const [inputValue, setInputValue] = useState(() => formatDateForDisplay(value));
-  const nativePickerRef = useRef<HTMLInputElement>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [visibleMonth, setVisibleMonth] = useState(() => getCalendarMonth(value));
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setInputValue(formatDateForDisplay(value));
+    if (isValidIsoDate(value)) {
+      setVisibleMonth(getCalendarMonth(value));
+    }
   }, [value]);
 
-  const openNativePicker = () => {
-    const input = nativePickerRef.current;
-    if (!input) return;
+  useEffect(() => {
+    if (!pickerOpen) return;
 
-    const pickerInput = input as HTMLInputElement & { showPicker?: () => void };
-
-    try {
-      if (typeof pickerInput.showPicker === "function") {
-        pickerInput.showPicker();
-        return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!wrapperRef.current?.contains(event.target as Node)) {
+        setPickerOpen(false);
       }
-    } catch {
-      // Fall back to focus/click for browsers that gate showPicker.
-    }
+    };
 
-    input.focus();
-    input.click();
-  };
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [pickerOpen]);
+
+  const calendarCells = getCalendarCells(visibleMonth);
 
   return (
-    <div>
+    <div ref={wrapperRef}>
       <label className="block text-sm font-semibold text-[#334155]">{label}</label>
       <div className="relative mt-1">
         <input
@@ -131,29 +166,70 @@ function RequestDateInput({ label, value, onChange, error, name }: RequestDateIn
           inputMode="numeric"
           className="w-full rounded-xl border border-[#d8dee8] px-3 py-2 pr-12 text-sm text-[#1b2738] placeholder:text-[#98a4b7]"
         />
-        <input
-          ref={nativePickerRef}
-          type="date"
-          value={value}
-          onChange={(event) => {
-            const nextValue = event.currentTarget.value;
-            onChange(nextValue);
-            setInputValue(formatDateForDisplay(nextValue));
-          }}
-          tabIndex={-1}
-          aria-hidden="true"
-          className="pointer-events-none absolute right-3 top-1/2 h-10 w-10 -translate-y-1/2 opacity-0"
-        />
         <button
           type="button"
-          onClick={openNativePicker}
+          onClick={() => setPickerOpen((current) => !current)}
           className="absolute right-3 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-[#64748b] transition hover:bg-[#f1f5f9] hover:text-[#1f2937]"
           aria-label={`Open calendar for ${label}`}
+          title={`Open calendar for ${label}`}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M8 3v3M16 3v3M4 9h16M5 6h14a1 1 0 0 1 1 1v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a1 1 0 0 1 1-1Zm2 7h3v3H7v-3Zm5 0h3v3h-3v-3Z" />
           </svg>
         </button>
+        {pickerOpen ? (
+          <div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[18rem] rounded-xl border border-[#d8dee8] bg-white p-3 shadow-xl">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setVisibleMonth((current) => addMonths(current, -1))}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#d8dee8] text-[#64748b] hover:bg-[#f8fafc]"
+                aria-label="Previous month"
+              >
+                ‹
+              </button>
+              <p className="text-sm font-semibold text-[#1b2738]">{MONTH_FORMATTER.format(visibleMonth)}</p>
+              <button
+                type="button"
+                onClick={() => setVisibleMonth((current) => addMonths(current, 1))}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#d8dee8] text-[#64748b] hover:bg-[#f8fafc]"
+                aria-label="Next month"
+              >
+                ›
+              </button>
+            </div>
+            <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold text-[#7c8ba1]">
+              {WEEKDAY_LABELS.map((weekday) => (
+                <span key={weekday}>{weekday}</span>
+              ))}
+            </div>
+            <div className="mt-1 grid grid-cols-7 gap-1">
+              {calendarCells.map((cell) => {
+                const selected = cell.isoDate === value;
+                return (
+                  <button
+                    key={cell.isoDate}
+                    type="button"
+                    onClick={() => {
+                      onChange(cell.isoDate);
+                      setInputValue(formatDateForDisplay(cell.isoDate));
+                      setPickerOpen(false);
+                    }}
+                    className={`h-8 rounded-lg text-xs font-semibold transition ${
+                      selected
+                        ? "bg-[#1d4ed8] text-white"
+                        : cell.inMonth
+                          ? "text-[#1b2738] hover:bg-[#eef4ff]"
+                          : "text-[#b4bfce] hover:bg-[#f8fafc]"
+                    }`}
+                  >
+                    {cell.day}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
       </div>
       {name ? <input type="hidden" name={name} value={value} /> : null}
       <p className="mt-1 text-xs text-[#7c8ba1]">DD/MM/YYYY</p>

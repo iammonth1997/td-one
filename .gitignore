@@ -46,6 +46,8 @@ dev.log
 nul
 .claude/
 docs/live-database-schema.md
+thaidrilllao-sync-dbed3b06ce6d.json
+*-sync-*.json
 
 # typescript
 *.tsbuildinfo

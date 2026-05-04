@@ -3,8 +3,9 @@ import { getPrisma } from "@/lib/prisma";
 import { getEmployeeByEmpCode } from "@/lib/otRequestUtils";
 import { buildSessionAccessProfile, canManageAdminActions } from "@/lib/rbac/sessionAccess";
 import { hasAnyPermission } from "@/lib/rbac/access";
+import { appendLeaveToSheet } from "@/remix-app/app/lib/google-sheets.server";
 
-export async function PUT(req) {
+export async function PUT(req, context) {
   const prisma = getPrisma({ DATABASE_URL: process.env.DATABASE_URL });
   const { session, error: authError, status: authStatus } = await validateSession(req);
   if (authError) {
@@ -63,6 +64,11 @@ export async function PUT(req) {
 
     try {
       const row = await prisma.leaveRequest.update({ where: { id }, data: patch });
+      const updatedRow = await prisma.leaveRequest.findUnique({ where: { id } });
+      if (updatedRow) {
+        const sheetsSync = appendLeaveToSheet(updatedRow, context).catch((err) => console.error("Sheets sync failed:", err));
+        context?.cloudflare?.ctx?.waitUntil?.(sheetsSync);
+      }
       return Response.json({ success: true, row });
     } catch (err) {
       return Response.json({ error: "LEAVE_REQUEST_UPDATE_FAILED", detail: err.message }, { status: 500 });

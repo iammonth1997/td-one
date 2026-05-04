@@ -1,6 +1,7 @@
 import type { Route } from "./+types/admin.payroll.history";
 import { requireAdminSession } from "~/lib/require-admin-session.server";
 import AdminShell from "~/components/admin-shell";
+import { formatBangkokDateTime } from "~/lib/date-time";
 
 type PayrollRun = {
   id: string;
@@ -76,7 +77,7 @@ export default function AdminPayrollHistoryPage({ loaderData }: Route.ComponentP
                   <td className="px-4 py-3">{row.period_label || "-"}</td>
                   <td className="px-4 py-3">{Number(row.total_amount ?? 0).toLocaleString("th-TH")} ₭</td>
                   <td className="px-4 py-3">{row.status || "-"}</td>
-                  <td className="px-4 py-3">{row.created_at ? new Date(row.created_at).toLocaleString("th-TH") : "-"}</td>
+                  <td className="px-4 py-3">{formatBangkokDateTime(row.created_at)}</td>
                 </tr>
               ))}
               {rows.length === 0 && (

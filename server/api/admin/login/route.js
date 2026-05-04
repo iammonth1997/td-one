@@ -65,7 +65,9 @@ function isRetryableDbError(error) {
 
 function getConnectionString(context) {
   const hyperdriveConnectionString = context?.cloudflare?.env?.HYPERDRIVE?.connectionString || null;
-  return hyperdriveConnectionString || context?.cloudflare?.env?.DATABASE_URL || null;
+  const directDatabaseUrl = context?.cloudflare?.env?.DATABASE_URL || null;
+  const processDatabaseUrl = typeof process !== "undefined" ? process.env?.DATABASE_URL : null;
+  return hyperdriveConnectionString || directDatabaseUrl || processDatabaseUrl || null;
 }
 
 function getCookieValue(cookieHeader, name) {
@@ -83,22 +85,39 @@ function normalizeConnectionString(connectionString) {
 
   try {
     const url = new URL(connectionString);
+    url.searchParams.delete("sslmode");
     url.searchParams.delete("uselibpqcompat");
     return url.toString();
   } catch {
-    return connectionString.replace(/[?&]uselibpqcompat=[^&]*/g, "").replace(/\?$/, "").replace(/&$/, "");
+    return connectionString
+      .replace(/[?&]sslmode=[^&]*/g, "")
+      .replace(/[?&]uselibpqcompat=[^&]*/g, "")
+      .replace(/\?$/, "")
+      .replace(/&$/, "");
+  }
+}
+
+function isSslDisabled(connectionString) {
+  try {
+    return new URL(connectionString).searchParams.get("sslmode") === "disable";
+  } catch {
+    return /(?:^|[?&])sslmode=disable(?:&|$)/.test(connectionString);
   }
 }
 
 async function withPgClient(connectionString, fn, retries = 1) {
   let lastError = null;
   const normalizedConnectionString = normalizeConnectionString(connectionString);
+  const sslDisabled = isSslDisabled(connectionString);
 
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     console.log("[login] PG-A: before client.connect()", {
       attempt,
     });
-    const client = new Client({ connectionString: normalizedConnectionString });
+    const client = new Client({
+      connectionString: normalizedConnectionString,
+      ssl: sslDisabled ? false : { rejectUnauthorized: false },
+    });
 
     try {
       await client.connect();

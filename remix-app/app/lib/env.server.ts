@@ -12,8 +12,13 @@ function fromContext(context: unknown, key: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+function fromProcess(key: string): string | undefined {
+  const value = typeof process !== "undefined" ? process.env?.[key] : undefined;
+  return typeof value === "string" ? value : undefined;
+}
+
 export function getEnvValue(context: unknown, key: string): string | undefined {
-  return fromContext(context, key);
+  return fromContext(context, key) || fromProcess(key);
 }
 
 export function getServerEnv(context: unknown): EnvMap {
